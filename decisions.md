@@ -184,3 +184,44 @@
 - **Impact**: `rules.md`'s Git Workflow section and `deployment.md`'s CI
   section describe `pyrcwa`'s own repo as the unit of versioning/CI, not
   `Solver_own` as a whole.
+
+## ADR-009: Replace `examples/` with `structures/` + `postprocessing/`
+
+- **Decision**: The generic `examples/` directory (with numeric-prefixed
+  filenames like `01_fresnel_multilayer.py`) was removed entirely and
+  replaced with two purpose-named directories: `structures/` (build a
+  lattice/layer stack/materials and run the solver) and `postprocessing/`
+  (derive Jones/Mueller matrices, ellipsometric angles, and — planned —
+  RI/thickness extraction, from a `structures/` script's already-computed
+  raw output). Files were renamed descriptively (e.g.
+  `sio2_on_si_thin_film.py`, `custom_multistack.py`) instead of numbered.
+- **Reason**: Explicit user request — `examples/` read as throwaway sample
+  code rather than the actual day-to-day entry point of the project, and
+  numeric filenames (`01_`, `02_`...) didn't communicate purpose. The
+  deeper issue was conflating two genuinely different responsibilities in
+  one file: `04_jones_mueller.py` built a stack, ran the solver, *and*
+  computed a Jones/Mueller matrix all in one script, with no boundary
+  between "run the physics" and "derive a quantity from the result."
+- **Alternatives considered**: Keep `examples/` as one folder with
+  better-named files only (no `postprocessing/` split) — rejected because
+  it wouldn't address the user's specific ask that Jones/Mueller
+  computation (and future RI/thickness extraction) live separately from
+  structure-building/running code, and would leave `04_jones_mueller.py`'s
+  build+run+analyze conflation in place.
+- **Trade-offs**: Splitting the Jones/Mueller example required introducing
+  a small raw-data interchange format (a CSV of per-polarization reflected
+  `Ex, Ey` written by `structures/sio2_on_si_ellipsometry_run.py` and read
+  by `postprocessing/jones_mueller_ellipsometry.py`) that didn't exist
+  before — more moving parts than one self-contained script, but it means
+  `postprocessing/` scripts never need to call `Simulation.solve` at all,
+  which is the actual property the user asked for. `polarimetry.py`'s
+  internal `_decompose_sp` helper was made public (`decompose_sp`) so the
+  postprocessing script reuses the solver's exact convention instead of
+  duplicating that physics.
+- **Impact**: Every doc that referenced `examples/NN_*.py` (`README.md`,
+  `architecture.md`, `design.md`, `testing.md`, `phases.md`, `tasks.md`,
+  `PRD.md`, `deployment.md`, `references.md`) was updated in the same pass
+  — future phases' planned example scripts (Phase 3's `trench_grating.py`,
+  Phase 4's `pillar_array.py`/`via_array.py`) now default into `structures/`
+  by this same convention, and any future post-processing capability
+  (RI/thickness extraction) defaults into `postprocessing/`.

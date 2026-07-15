@@ -77,7 +77,7 @@ target (no server, no package registry) at current scope.
 ## Production Deployment
 
 **Not applicable.** There is no "production" for this project today — it
-is invoked directly via `python examples/NN_*.py` or imported into ad hoc
+is invoked directly via `python structures/*.py` / `python postprocessing/*.py` or imported into ad hoc
 scripts. If/when public PyPI distribution is ever desired, that would be a
 new, explicitly-scoped decision (see `decisions.md` ADR-007) requiring:
 version pinning strategy, a `CHANGELOG.md`, and a release-tagging

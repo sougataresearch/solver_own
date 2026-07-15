@@ -18,7 +18,7 @@ summary instead of deleting history here.
 ☑ Implement `Simulation.solve` (uniform path) and `SimulationResult`
 ☑ Implement Jones/Mueller polarimetry
 ☑ Validate against analytic Fresnel/TMM (`tests/test_analytic_fresnel.py`, `tests/oracles/fresnel.py`)
-☑ Ship examples `01_fresnel_multilayer.py`–`04_jones_mueller.py`
+☑ Ship the initial `structures/` scripts (anti-reflection coating, SiO2-on-Si, custom multistack, custom-material-from-nk-data) and the `postprocessing/` Jones/Mueller ellipsometry split
 
 ## Phase 2 — Fourier-Factorization Core
 
@@ -45,7 +45,7 @@ summary instead of deleting history here.
 □ Test: TE diffraction efficiencies match benchmark
 □ Test: TM diffraction efficiencies match benchmark
 □ Test: normal-incidence limit recovers Phase 1's uniform-layer Fresnel result when line/space contrast is set to zero (continuity sanity check)
-□ Write `examples/05_trench_grating.py`
+□ Write `structures/trench_grating.py`
 □ Update `memory.md` / `decisions.md` on completion
 
 ## Phase 4 — 2D-Periodic Patterned Layers (Via, Pillar)
@@ -58,8 +58,8 @@ summary instead of deleting history here.
 □ If S4 is not usable: source a published 2D benchmark instead, and explicitly document why S4 wasn't used (per `rules.md` AI rule 5 — never fabricate a match)
 □ Test: 2D patterned-layer R/T matches the chosen oracle
 □ Test: patterned-layer solve reduces to the uniform-layer result when the pattern's shape material equals the background (degenerate-pattern sanity check)
-□ Write `examples/06_pillar_array.py`
-□ Write `examples/07_via_array.py`
+□ Write `structures/pillar_array.py`
+□ Write `structures/via_array.py`
 □ Update `memory.md` / `decisions.md` on completion
 
 ## Phase 5 — Tapered / Sloped Sidewalls (Via, Trench)

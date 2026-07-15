@@ -12,8 +12,10 @@ plan-mode scratch file) as phases complete.
   angle/polarization; report Jones/Mueller polarimetry.
 - **Deliverables**: `materials.py`, `layer.py`, `eigenmodes.py` (uniform
   case), `smatrix.py`, `excitation.py`, `fields.py` (R/T), `polarimetry.py`,
-  `simulation.py` (uniform path); Fresnel-oracle test suite; examples
-  `01`-`04`.
+  `simulation.py` (uniform path); Fresnel-oracle test suite; the
+  `structures/` scripts covering the anti-reflection coating, SiO2-on-Si,
+  custom-multistack, and custom-material-from-nk-data cases, plus the
+  `postprocessing/` Jones/Mueller ellipsometry split.
 - **Estimated complexity**: (retrospective) Medium — closed-form eigenmodes
   avoided the hardest numerical risk (general eigendecomposition), but the
   S-matrix sign/normalization conventions required careful,
@@ -54,7 +56,7 @@ plan-mode scratch file) as phases complete.
   `solve_layer_eigenmodes_1d(...)` in `eigenmodes.py`; a `Lattice1D`
   dispatch branch in `simulation.py`; a validation test against a published
   1D binary-grating benchmark (Moharam & Gaylord 1995 or equivalent);
-  `examples/05_trench_grating.py`.
+  `structures/trench_grating.py`.
 - **Estimated complexity**: Medium-High. The physics (decoupled scalar
   TE/TM eigenproblems) is simpler than Phase 4's general case, but this
   phase is also where the *first* non-uniform eigensolver gets built and
@@ -75,8 +77,8 @@ plan-mode scratch file) as phases complete.
   wiring for the 2D patterned path; an S4-cross-check validation test (or,
   if S4 isn't buildable/runnable in this environment, an explicitly-flagged
   literature benchmark instead — never a fabricated "it matches" claim per
-  `rules.md`'s AI coding rules); `examples/06_pillar_array.py`,
-  `examples/07_via_array.py`.
+  `rules.md`'s AI coding rules); `structures/pillar_array.py`,
+  `structures/via_array.py`.
 - **Estimated complexity**: High — this is the highest-risk phase in the
   whole roadmap (general complex eigendecomposition, possible
   near-degenerate eigenvalues, the trickiest part of `rcwa.cpp` to
@@ -144,7 +146,7 @@ plan-mode scratch file) as phases complete.
   `EMTutorial` reference cases (thin film, multistack/DBR, trench, via,
   pillar, tapered via).
 - **Deliverables**: `slow`-marked convergence tests per geometry type;
-  `examples/` entries for each structure type in `PRD.md`'s Success
+  `structures/` entries for each structure type in `PRD.md`'s Success
   Criteria.
 - **Estimated complexity**: Low-Medium — mostly systematic application of
   patterns already established in Phases 3-7, not new algorithmic risk.

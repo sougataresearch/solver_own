@@ -10,8 +10,8 @@ validates against. Update when a new phase cites a new source.
 | [`S4`](../S4) | C++ / Lua | **Primary oracle.** Every non-trivial formula in `eigenmodes.py`, `smatrix.py`, `fields.py` is checked against a specific, cited line range in `S4/S4/rcwa.cpp` or `S4/S4r/StarProduct.hpp`. Also the source of the `geometry.py` Fourier-transform/subtraction-rule convention (`S4/S4/pattern/pattern.c`). Planned as a subprocess cross-check oracle for Phase 4 (2D patterned layers) if buildable in this environment (unverified — see `memory.md` Known Issues). |
 | [`EMpy`](../EMpy) | Python | Secondary reference for API/structure ideas (mode solvers, transfer-matrix method, general RCWA) — not used as a numerical oracle so far; not a runtime dependency. |
 | [`RigorousCoupledWaveAnalysis.jl`](../RigorousCoupledWaveAnalysis.jl) | Julia | Secondary reference implementation (ETM/SRCWA submodules); available as a possible independent cross-check if S4 isn't usable for a given Phase 4/6 validation case. |
-| [`EMTutorial`](../EMTutorial) | JCMsuite project files | Not code — FEM tutorial *geometries and setups* (thin-film DBR, through-silicon-via scatterometry, gratings, metasurfaces) used as realistic target structures for `pyrcwa`'s own examples (see `phases.md` Phase 8). Specifically referenced: `EMTutorial/ThinFilmsAndMultilayers/DistributedBraggReflector`, `EMTutorial/Scatterometry/ThroughSiliconVia`. |
-| [`NK_FILE`](../NK_FILE) | CSV data | Si/SiO2 refractive-index data consumed by `examples/03_sio2_on_si.py::material_from_csv`. |
+| [`EMTutorial`](../EMTutorial) | JCMsuite project files | Not code — FEM tutorial *geometries and setups* (thin-film DBR, through-silicon-via scatterometry, gratings, metasurfaces) used as realistic target structures for `pyrcwa`'s own `structures/` scripts (see `phases.md` Phase 8). Specifically referenced: `EMTutorial/ThinFilmsAndMultilayers/DistributedBraggReflector`, `EMTutorial/Scatterometry/ThroughSiliconVia`. |
+| [`NK_FILE`](../NK_FILE) | CSV data | Si/SiO2 refractive-index data consumed by `structures/sio2_on_si_thin_film.py::material_from_csv`. |
 
 ## External Tools Referenced (not vendored, not dependencies)
 

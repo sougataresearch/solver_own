@@ -4,7 +4,7 @@ dataset instead of a constant refractive index.
 Edit the three places marked EDIT below: (1) how you load your data,
 (2) the substrate/incidence materials, (3) the layer stack and thicknesses.
 
-Run with:  python examples/02_custom_nk_dataset.py
+Run with:  python structures/custom_material_from_nk_data.py
 """
 
 import math

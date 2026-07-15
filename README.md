@@ -86,7 +86,9 @@ users — see [`PRD.md`](PRD.md) for scope.
 - `pytest` for the test suite
 - `setuptools` (src-layout package, see `pyproject.toml`)
 - No web framework, no database, no UI — this is a library driven by
-  Python scripts (see `examples/`)
+  Python scripts, split into `structures/` (build a geometry + run the
+  solver) and `postprocessing/` (derive Jones/Mueller matrices, and,
+  eventually, RI/thickness extraction, from already-computed raw results)
 
 ## Folder Structure
 
@@ -115,10 +117,15 @@ pyrcwa/
 │   ├── smatrix.py               interface + propagation S-matrices, star product
 │   ├── excitation.py            plane-wave decomposition, incident amplitude
 │   ├── fields.py                  Poynting flux, tangential field reconstruction
-│   ├── polarimetry.py             Jones/Mueller
+│   ├── polarimetry.py             Jones/Mueller (reused by postprocessing/)
 │   └── simulation.py               top-level orchestration
 ├── tests/                    pytest suite + `tests/oracles/` (analytic references)
-├── examples/                 runnable end-to-end scripts (numbered)
+├── structures/                YOU RUN THESE: define a lattice/layer stack/materials
+│                                and run the solver -- e.g. sio2_on_si_thin_film.py,
+│                                custom_multistack.py (copy this one for a new stack)
+├── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
+│                                 output and derive Jones/Mueller matrices, ellipsometric
+│                                 angles, and (planned) RI/thickness extraction
 └── scripts/                   (currently empty; ad hoc utility scripts)
 ```
 
@@ -133,10 +140,25 @@ pip install -e ".[dev]"
 
 ## Usage
 
-Run an example end to end:
+Run a structure end to end (builds the geometry, runs the solver, prints
+R/T):
 
 ```bash
-python examples/03_sio2_on_si.py
+python structures/sio2_on_si_thin_film.py
+```
+
+For a multi-layer stack of your own materials, copy
+`structures/custom_multistack.py` and edit its numbered `EDIT` blocks.
+
+For Jones/Mueller/ellipsometric-angle analysis, run the matching
+`structures/*_ellipsometry_run.py` script first (it saves raw field data to
+a CSV), then the corresponding script in `postprocessing/` (it loads that
+CSV and derives the Jones matrix, Mueller matrix, and Psi/Delta — no
+re-solving):
+
+```bash
+python structures/sio2_on_si_ellipsometry_run.py
+python postprocessing/jones_mueller_ellipsometry.py
 ```
 
 Or use the library directly:

@@ -1,7 +1,7 @@
 """Minimal usage example: reflectance/transmittance of a uniform multilayer
 stack (an anti-reflection coating), the Phase 1 capability of pyrcwa.
 
-Run with:  python examples/01_fresnel_multilayer.py
+Run with:  python structures/anti_reflection_coating.py
 """
 
 import math

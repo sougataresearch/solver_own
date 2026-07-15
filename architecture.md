@@ -90,7 +90,7 @@ Layer(s)     ─┘            │                              │
 
 None. `pyrcwa` has no network calls, no database, no external API
 dependency at runtime. The only "external" inputs are local files: material
-`n,k` CSV data (`examples/03_sio2_on_si.py::material_from_csv`) and the
+`n,k` CSV data (`structures/sio2_on_si_thin_film.py::material_from_csv`) and the
 vendored reference repositories (`S4`, `EMpy`, `RigorousCoupledWaveAnalysis.jl`)
 used **only** as offline validation oracles during development/testing, never
 imported by `pyrcwa` itself.
@@ -147,7 +147,7 @@ service — "scalability" here means:
   `num_orders` that achieves acceptable accuracy per structure type, since
   that is the real lever available today.
 - **Wavelength/angle sweeps**: currently a Python `for` loop calling
-  `Simulation.solve` once per point (see `examples/03_sio2_on_si.py`).
+  `Simulation.solve` once per point (see `structures/sio2_on_si_thin_film.py`).
   Phase 9 explicitly proposes vectorizing this in NumPy (batched matrix
   ops) before considering any GPU/autodiff backend — see `phases.md` Phase
   9 and `decisions.md`.
@@ -163,7 +163,7 @@ authentication, no user-supplied code execution. The two considerations
 that do apply:
 
 - **File parsing (material CSV ingestion)**: `material_from_csv` in
-  `examples/03_sio2_on_si.py` reads user-controlled file paths — acceptable
+  `structures/sio2_on_si_thin_film.py` reads user-controlled file paths — acceptable
   for a local research tool run by its own author; if this ever becomes a
   shared/public tool, add path validation and handle malformed CSVs with a
   clear error rather than a raw `ValueError`/parse exception (currently

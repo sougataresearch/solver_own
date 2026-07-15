@@ -7,7 +7,7 @@ Stack (top to bottom):
            fringes in R/T vs wavelength, not treated as infinite)
     air   (exit, semi-infinite)
 
-Run with:  python examples/03_sio2_on_si.py
+Run with:  python structures/sio2_on_si_thin_film.py
 """
 
 import math

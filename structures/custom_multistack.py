@@ -1,15 +1,15 @@
 """Template: an arbitrary-length multilayer thin-film stack, any materials.
 
 Copy this file for any new multistack (thin film / DBR / anti-reflection
-coating / etc.) instead of editing 03_sio2_on_si.py in place. Everything
-you're likely to change is in the numbered EDIT blocks below.
+coating / etc.) instead of editing sio2_on_si_thin_film.py in place.
+Everything you're likely to change is in the numbered EDIT blocks below.
 
 LIMITATION (see phases.md / troubleshooting.md): only *uniform* (unpatterned)
 layers work today -- each layer has a thickness (z-direction) only, and is
 treated as extending infinitely in x/y. Trench/via/pillar patterning (real
 x/y dimensions: line width, radius, pitch) is not implemented yet.
 
-Run with:  python examples/05_custom_multistack.py
+Run with:  python structures/custom_multistack.py
 """
 
 import math

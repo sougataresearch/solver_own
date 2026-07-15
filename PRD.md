@@ -71,7 +71,7 @@ depending on them at runtime.
 | FR-7 | Represent a feature (via/trench) with linearly tapered sidewalls via staircase layer discretization, and demonstrate R/T convergence with slice count. *(planned — Phase 5)* |
 | FR-8 | Support anisotropic (full 3×3 tensor) materials in both uniform and patterned layers. *(planned — Phase 6)* |
 | FR-9 | Reconstruct real-space E/H field maps at an arbitrary depth in the stack (for cross-section visualization of trench/via structures). *(planned — Phase 7)* |
-| FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports. *(done — `examples/03_sio2_on_si.py::material_from_csv`)* |
+| FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports. *(done — `structures/sio2_on_si_thin_film.py::material_from_csv`)* |
 
 ## Non-Functional Requirements
 

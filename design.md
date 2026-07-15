@@ -104,22 +104,41 @@ grid," using `SMatrixStack.partial_smatrix_up_to` to get the local mode
 amplitudes at an arbitrary depth, then inverse-Fourier-summing over the
 retained G-vectors.
 
-## "UI/UX" — Example-Script and Plotting Surface
+## "UI/UX" — Script Surface (structures/ and postprocessing/)
 
-There is no GUI. The user-facing surface is:
+There is no GUI. The user-facing surface is split into two directories by
+responsibility (see `README.md`'s Folder Structure and `decisions.md`
+ADR-009):
 
-1. **Library API**, imported into small, single-purpose scripts (see
-   `examples/`, numbered `01_...` through `04_...` today).
-2. **Console output**: examples print a table of wavelength/R/T/A to
-   stdout during the sweep (see `examples/03_sio2_on_si.py::main`).
-3. **CSV output**: examples optionally save results
-   (`OUTPUT_CSV_PATH` pattern in `examples/03_sio2_on_si.py`).
+- **`structures/`** — build a lattice/layer stack/materials and run the
+  solver; produces raw results (printed R/T, or a raw-field CSV for
+  ellipsometry-style scripts). This is what you run first, and what you
+  edit to change geometry, dimensions, or materials.
+- **`postprocessing/`** — takes a `structures/` script's raw output and
+  derives something further from it: Jones/Mueller matrices and
+  ellipsometric angles today (`postprocessing/jones_mueller_ellipsometry.py`,
+  reading the CSV written by `structures/sio2_on_si_ellipsometry_run.py`),
+  and — planned, not yet built — RI/thickness extraction (inverse fitting
+  against measured data). This directory never calls `Simulation.solve`
+  itself; it only reads already-computed data.
+
+Concretely:
+
+1. **Library API**, imported into small, single-purpose scripts in
+   `structures/` (e.g. `sio2_on_si_thin_film.py`, `custom_multistack.py` —
+   copy the latter for a new stack) and `postprocessing/`.
+2. **Console output**: scripts print a table of wavelength/R/T/A to stdout
+   during a sweep (see `structures/sio2_on_si_thin_film.py::main`).
+3. **CSV output**: `structures/` scripts optionally save results
+   (`OUTPUT_CSV_PATH` pattern in `structures/sio2_on_si_thin_film.py`) or,
+   for ellipsometry-style scripts, save raw field data specifically so a
+   `postprocessing/` script can consume it
+   (`structures/sio2_on_si_ellipsometry_run.py`'s CSV output).
 4. **(Phase 7, planned)**: `matplotlib`-based cross-section field-intensity
-   plots for trench/via structures — the first genuinely visual output
-   this project will produce. When implemented, follow the pattern already
-   established: a `examples/NN_*.py` script that both computes and plots,
-   not a separate plotting framework/module, since there's no repeated
-   plotting logic yet to justify one.
+   plots for trench/via structures — the first genuinely visual output this
+   project will produce, living in `structures/` (computing + plotting
+   together, not a separate plotting framework/module, since there's no
+   repeated plotting logic yet to justify one).
 
 ## "API Design" — Public Python API
 
@@ -139,7 +158,7 @@ from pyrcwa.excitation import PlaneWaveExcitation
 from pyrcwa.simulation import Simulation, SimulationResult
 ```
 
-**Typical call sequence** (already the pattern in every `examples/*.py`):
+**Typical call sequence** (already the pattern in every `structures/*.py` script):
 
 ```python
 material = Material(...)                       # or Material.from_nk(...)
@@ -252,7 +271,7 @@ Current, deliberate conventions (keep consistent in new code):
 ## Logging Strategy
 
 There is currently **no logging module usage anywhere in `src/pyrcwa/`** —
-only `print()` in example scripts (`examples/03_sio2_on_si.py`). This is
+only `print()` in `structures/`/`postprocessing/` scripts (`structures/sio2_on_si_thin_film.py`). This is
 appropriate for the library core (a numerical function should not have
 side-effecting log output — it should raise or return, full stop) but
 should be formalized as follows going forward:
@@ -267,5 +286,6 @@ should be formalized as follows going forward:
   conditions (e.g. near-degenerate eigenvalues, ill-conditioned Toeplitz
   matrix at high truncation order) — never at `INFO`/`DEBUG` for routine
   solves, to avoid noise in sweep loops that call `solve()` hundreds of times.
-- **`examples/*.py` scripts may use `print`** freely — they are scripts, not
-  library code, and this matches the existing convention.
+- **`structures/*.py`/`postprocessing/*.py` scripts may use `print`** freely
+  — they are scripts, not library code, and this matches the existing
+  convention.

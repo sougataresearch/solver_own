@@ -44,10 +44,12 @@ comparison, not just "doesn't crash."
 
 Scope: a full `Simulation.solve()` call exercising multiple modules
 together (eigenmode solve → S-matrix cascade → field extraction). Every
-example script under `examples/` is implicitly an integration test (it
-must run end to end and produce a sane number); formalize the most
-important ones as actual pytest tests too (not just runnable scripts) —
-e.g. `examples/03_sio2_on_si.py`'s SiO2-on-Si case should have a
+script under `structures/` is implicitly an integration test (it must run
+end to end and produce a sane number), and every `postprocessing/` script
+is implicitly an integration test of the derived-quantity math against
+already-computed raw data; formalize the most important ones as actual
+pytest tests too (not just runnable scripts) — e.g.
+`structures/sio2_on_si_thin_film.py`'s SiO2-on-Si case should have a
 corresponding assertion-based test, not rely on eyeballing printed output.
 
 ### System Testing
@@ -84,7 +86,7 @@ speed" non-functional requirement), but two things belong here earlier:
 
 Minimal surface (see `architecture.md`'s Security Considerations) — the
 only concrete item today is malformed-CSV handling in
-`material_from_csv` (`examples/03_sio2_on_si.py`). No dedicated security
+`material_from_csv` (`structures/sio2_on_si_thin_film.py`). No dedicated security
 test suite is warranted at current scope; revisit if a structure-definition
 file format or any network/multi-user surface is ever added.
 

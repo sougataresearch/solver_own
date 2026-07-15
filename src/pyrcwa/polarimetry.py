@@ -26,7 +26,7 @@ def _p_dir(phi: float) -> np.ndarray:
     return np.array([math.cos(phi), math.sin(phi)])
 
 
-def _decompose_sp(ex: complex, ey: complex, phi: float, cos_theta_signed: float) -> tuple[complex, complex]:
+def decompose_sp(ex: complex, ey: complex, phi: float, cos_theta_signed: float) -> tuple[complex, complex]:
     """Decompose transverse `(Ex, Ey)` into `(E_s, E_p)`.
 
     `cos_theta_signed` is the same signed transverse scale factor used to
@@ -36,6 +36,11 @@ def _decompose_sp(ex: complex, ey: complex, phi: float, cos_theta_signed: float)
     orthogonal unit vectors, but the actual p-direction vector used to
     build/read the transverse field has magnitude `|cos(theta)|`, so `E_p`
     must be recovered by dividing out that scale factor.
+
+    Public (not `_`-prefixed) so a raw-field-saving "structures" script and
+    a separate "postprocessing" script (which builds the Jones/Mueller
+    matrix from that saved raw field) can both reuse this exact convention
+    instead of re-deriving/duplicating it -- see `postprocessing/jones_mueller_ellipsometry.py`.
     """
     s_hat = _s_hat(phi)
     p_dir = _p_dir(phi)
@@ -69,7 +74,7 @@ def jones_reflection_matrix(sim, wavelength: float, theta: float, phi: float) ->
         zeros = np.zeros_like(result.a0)
         ex, ey = tangential_e_field(omega, modes_inc.q, modes_inc.kp, modes_inc.phi, zeros, result.b_reflected)
         i = result.zeroth_order_index
-        e_s, e_p = _decompose_sp(ex[i], ey[i], phi, cos_theta)  # reflected: +cos(theta)
+        e_s, e_p = decompose_sp(ex[i], ey[i], phi, cos_theta)  # reflected: +cos(theta)
         jones[0, column] = e_s
         jones[1, column] = e_p
     return jones

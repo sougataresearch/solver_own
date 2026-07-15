@@ -15,7 +15,14 @@ As of 2026-07-15:
   patterned layer — this is the immediate next blocker for trench/via/pillar.
 - `pyrcwa` was just initialized as its own git repository (previously
   un-versioned) with a `.gitignore` covering `__pycache__/`,
-  `.pytest_cache/`, `*.egg-info/`, `output_RT.csv`, `*.png`.
+  `.pytest_cache/`, `*.egg-info/`, `*.csv`, `*.png`.
+- `examples/` was removed and replaced with `structures/` (build a
+  lattice/layer stack/materials, run the solver) and `postprocessing/`
+  (derive Jones/Mueller matrices, ellipsometric angles, and — planned —
+  RI/thickness extraction, from a `structures/` script's raw output). See
+  `decisions.md` ADR-009. `polarimetry.py`'s `_decompose_sp` was made
+  public (`decompose_sp`) so `postprocessing/jones_mueller_ellipsometry.py`
+  can reuse the solver's exact s/p convention.
 - The full documentation set (this file, `README.md`, `PRD.md`,
   `architecture.md`, `design.md`, `rules.md`, `phases.md`, `tasks.md`,
   `decisions.md`, `testing.md`, `deployment.md`, `references.md`,
