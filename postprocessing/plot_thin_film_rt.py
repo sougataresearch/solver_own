@@ -14,22 +14,13 @@ from pathlib import Path
 
 import numpy as np
 
-from sougata_solver.output_paths import find_latest_output
-
 # ============================================================================
-# EDIT (1): which run to plot.
-#
-# By default this looks up the most recent CSV with this filename across
-# every outputs/YYYY-MM-DD/HH-MM-SS_<run_name>/ folder (see
-# find_latest_output) -- so if you just ran sio2_on_si_thin_film.py, this
-# plots that run with no editing needed.
-#
-# To plot a SPECIFIC earlier run instead of "whatever's latest", set
-# EXPLICIT_INPUT_CSV_PATH to that run's exact CSV path (check its
-# run_metadata.txt, written alongside it, to confirm it's the one you want).
+# EDIT (1): which run to plot -- the exact CSV path a structures/ script
+# printed after it finished (also written into that same folder's
+# run_metadata.txt, if you need to find it again later). Copy the whole
+# path, including the .csv extension.
 # ============================================================================
-INPUT_CSV_FILENAME = "output_RT.csv"  # matches sio2_on_si_thin_film.py / custom_multistack.py
-EXPLICIT_INPUT_CSV_PATH = None  # e.g. r"...\outputs\2026-07-16\10-06-07_sio2_on_si_thin_film\output_RT.csv"
+INPUT_CSV_PATH = r"...\outputs\2026-07-16\10-37-12_sio2_on_si_thin_film\output_RT.csv"
 
 # ============================================================================
 # EDIT (2): optional reference data overlay (e.g. exported from a Lumerical
@@ -47,7 +38,12 @@ PLOT_FILENAME = "output_RT.png"
 
 
 def main():
-    input_path = Path(EXPLICIT_INPUT_CSV_PATH) if EXPLICIT_INPUT_CSV_PATH else find_latest_output(INPUT_CSV_FILENAME)
+    input_path = Path(INPUT_CSV_PATH)
+    if not input_path.exists():
+        raise FileNotFoundError(
+            f"{input_path} does not exist -- set INPUT_CSV_PATH at the top of this "
+            "script to the exact CSV path a structures/ script printed after it ran."
+        )
     print(f"Reading {input_path}")
     metadata_path = input_path.parent / "run_metadata.txt"
     if metadata_path.exists():
