@@ -129,16 +129,23 @@ Concretely:
    copy the latter for a new stack) and `postprocessing/`.
 2. **Console output**: scripts print a table of wavelength/R/T/A to stdout
    during a sweep (see `structures/thin_film/sio2_on_si_thin_film.py::main`).
-3. **CSV output**: `structures/` scripts optionally save results
-   (`OUTPUT_CSV_PATH` pattern in `structures/thin_film/sio2_on_si_thin_film.py`) or,
-   for ellipsometry-style scripts, save raw field data specifically so a
-   `postprocessing/` script can consume it
-   (`structures/thin_film/sio2_on_si_ellipsometry_run.py`'s CSV output).
-4. **(Phase 7, planned)**: `matplotlib`-based cross-section field-intensity
-   plots for trench/via structures — the first genuinely visual output this
-   project will produce, living in `structures/` (computing + plotting
-   together, not a separate plotting framework/module, since there's no
-   repeated plotting logic yet to justify one).
+3. **CSV + metadata output**: `structures/` scripts get one output folder
+   per invocation (`output_paths.run_output_dir`, `outputs/YYYY-MM-DD/
+   HH-MM-SS_<run_name>/`) and write both their raw CSV and a
+   `run_metadata.txt` (`output_paths.write_run_metadata`) into it — the
+   metadata file records which script produced the run and its key
+   parameters (materials, thicknesses, angle, wavelength range, ...) so a
+   run folder is identifiable without re-reading code or guessing from the
+   timestamp alone. See ADR-010 in `decisions.md`.
+4. **Plotting is always `postprocessing/`, never `structures/`.**
+   `postprocessing/plot_thin_film_rt.py` reads a `structures/` script's CSV
+   (via `output_paths.find_latest_output` by default, or an explicit path),
+   plots it, and saves the PNG back into that *same* run folder — a plot is
+   a derived view of already-computed data, not a new run. This also
+   applies to Phase 7's planned cross-section field-intensity plots for
+   trench/via structures: the `structures/` side of that phase saves raw
+   field data, and a `postprocessing/` script reads and plots it, following
+   this same split.
 
 ## "API Design" — Public Python API
 

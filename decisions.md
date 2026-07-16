@@ -225,3 +225,52 @@
   Phase 4's `pillar_array.py`/`via_array.py`) now default into `structures/`
   by this same convention, and any future post-processing capability
   (RI/thickness extraction) defaults into `postprocessing/`.
+
+## ADR-010: Plotting always lives in `postprocessing/`, never `structures/`; every run gets a `run_metadata.txt`
+
+- **Decision**: Plotting code (matplotlib, R/T-vs-wavelength or any other
+  derived view) is never added directly to a `structures/` script — it was
+  briefly added to `structures/thin_film/sio2_on_si_thin_film.py` and the
+  user correctly caught this as a violation of ADR-009's own boundary
+  ("`structures/` never derives anything, only produces raw output").
+  Plotting was moved to a new `postprocessing/plot_thin_film_rt.py`, which
+  locates a `structures/` script's CSV via
+  `output_paths.find_latest_output` (or an explicit path for a specific
+  historical run), plots it, and saves the PNG back into that *same*
+  `outputs/YYYY-MM-DD/HH-MM-SS_<run_name>/` folder — never a new one.
+  Separately, every `structures/` script that saves output now also calls
+  a new `output_paths.write_run_metadata(output_dir, __file__, **params)`,
+  writing a `run_metadata.txt` into that run's folder recording which
+  script produced it and its key parameters (materials, thicknesses,
+  angle, wavelength range, ...).
+- **Reason**: Two related problems the user identified directly. First,
+  plotting is a derived view of already-computed data, exactly like Jones/
+  Mueller matrix construction (ADR-009) — it belongs in `postprocessing/`
+  by the same logic, not bundled into the script that runs the physics.
+  Second, once a `structures/` script is re-run repeatedly with different
+  parameters (sweeping a thickness, trying a different material, etc.),
+  its timestamped output folders become indistinguishable from each other
+  by name alone — `run_metadata.txt` is the fix, making every run
+  self-describing without needing to cross-reference back to whatever the
+  script's `EDIT` blocks contained *at the time it was run* (which may have
+  since been edited again).
+- **Alternatives considered**: Logging run parameters into the CSV's
+  header/filename instead of a separate metadata file — rejected as either
+  cluttering the CSV (a filename encoding every parameter gets unwieldy
+  past 2-3 knobs) or requiring the CSV format itself to change per script.
+  A separate `run_metadata.txt` is uniform across every `structures/`
+  script regardless of what it varies.
+- **Trade-offs**: `output_paths.run_output_path` (single-call convenience:
+  get a fresh run folder and one file path in it) is no longer sufficient
+  for scripts that write both a CSV and a metadata file — those scripts
+  now call `output_paths.run_output_dir` once and build both paths under
+  it manually. `run_output_path` itself is kept (docstring updated to warn
+  against calling it more than once per run) for any future script that
+  only ever writes a single file.
+- **Impact**: `structures/thin_film/sio2_on_si_thin_film.py`,
+  `custom_multistack.py`, and `sio2_on_si_ellipsometry_run.py` all call
+  `write_run_metadata`; `postprocessing/plot_thin_film_rt.py` is the first
+  postprocessing script whose whole job is visualization rather than a new
+  derived physical quantity. Any future field-visualization work (Phase 7)
+  follows this same split: raw field data saved by `structures/`, plotted
+  by a `postprocessing/` script into the same run folder.

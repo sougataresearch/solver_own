@@ -25,7 +25,7 @@ from sougata_solver.excitation import PlaneWaveExcitation
 from sougata_solver.geometry import Lattice
 from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
-from sougata_solver.output_paths import run_output_path
+from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
 
 NK_DIR = Path(__file__).resolve().parents[3] / "NK_FILE"
@@ -147,9 +147,22 @@ def main():
         print(f"{wavelength * 1e9:16.1f}  {reflectance[i]:8.4f}  {transmittance[i]:8.4f}  {absorptance:8.4f}")
 
     if OUTPUT_CSV_PATH:
-        output_path = run_output_path(RUN_NAME, OUTPUT_CSV_PATH)
+        output_dir = run_output_dir(RUN_NAME)
+        write_run_metadata(
+            output_dir,
+            __file__,
+            layers=[(layer.name, layer.thickness) for layer in layers],
+            incidence_material=INCIDENCE_MATERIAL.name,
+            transmission_material=TRANSMISSION_MATERIAL.name,
+            incident_angle_deg=INCIDENT_ANGLE_DEG,
+            azimuthal_angle_deg=AZIMUTHAL_ANGLE_DEG,
+            s_amplitude=S_AMPLITUDE,
+            p_amplitude=P_AMPLITUDE,
+            wavelength_range_m=(WAVELENGTHS[0], WAVELENGTHS[-1], len(WAVELENGTHS)),
+        )
         absorptance = 1.0 - reflectance - transmittance
         table = np.column_stack([WAVELENGTHS * 1e9, reflectance, transmittance, absorptance])
+        output_path = output_dir / OUTPUT_CSV_PATH
         np.savetxt(output_path, table, delimiter=",", header="wavelength_nm,R,T,A", comments="")
         print(f"\nSaved {len(WAVELENGTHS)} rows to {output_path}")
 

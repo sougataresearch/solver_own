@@ -20,7 +20,7 @@ from sougata_solver.fields import tangential_e_field
 from sougata_solver.geometry import Lattice
 from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
-from sougata_solver.output_paths import run_output_path
+from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
 
 # ============================================================================
@@ -80,7 +80,16 @@ def main():
                     f"pol={polarization}  Ex={ex[i]:.6f}  Ey={ey[i]:.6f}"
                 )
 
-    output_path = run_output_path("sio2_on_si_ellipsometry_run", OUTPUT_CSV_PATH)
+    output_dir = run_output_dir("sio2_on_si_ellipsometry_run")
+    write_run_metadata(
+        output_dir,
+        __file__,
+        wavelengths_m=WAVELENGTHS,
+        incident_angles_deg=INCIDENT_ANGLES_DEG,
+        azimuthal_angle_deg=AZIMUTHAL_ANGLE_DEG,
+        layers=[(layer.name, layer.thickness) for layer in layers],
+    )
+    output_path = output_dir / OUTPUT_CSV_PATH
     with open(output_path, "w") as f:
         f.write("wavelength_m,theta_deg,phi_deg,polarization,Ex_re,Ex_im,Ey_re,Ey_im\n")
         for row in rows:

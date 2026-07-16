@@ -5,24 +5,43 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-07-15:
+As of 2026-07-16:
 - **Phase 1 (uniform multilayer core) is complete and validated.**
   Reflectance/transmittance for arbitrary uniform-layer stacks, arbitrary
   incidence angle/polarization, dispersive materials, and Jones/Mueller
-  polarimetry all work and are tested against analytic Fresnel/TMM.
+  polarimetry all work. Validated by **two independent oracles**:
+  `tests/oracles/fresnel.py` (from-scratch analytic Fresnel/TMM) and
+  `tests/oracles/empy_tmm.py` (transcribed from the vendored EMpy
+  reference library), cross-checked against the actual SiO2-on-Si
+  structure in `tests/test_thin_film_empy_cross_check.py` across
+  wavelength/angle/polarization, agreeing to `1e-8`. 68 tests pass.
 - **Phases 2-9 are planned but not started** (see `phases.md`, `tasks.md`).
   `simulation.py:98` explicitly raises `NotImplementedError` for any
   patterned layer — this is the immediate next blocker for trench/via/pillar.
-- `sougata_solver` was just initialized as its own git repository (previously
-  un-versioned) with a `.gitignore` covering `__pycache__/`,
-  `.pytest_cache/`, `*.egg-info/`, `*.csv`, `*.png`.
+- The package was renamed `pyrcwa` → `sougata_solver` (all imports/docs
+  updated) and is its own git repository, with a `.gitignore` covering
+  `__pycache__/`, `.pytest_cache/`, `*.egg-info/`, `*.csv`, `*.png`,
+  `outputs/`.
 - `examples/` was removed and replaced with `structures/` (build a
   lattice/layer stack/materials, run the solver) and `postprocessing/`
-  (derive Jones/Mueller matrices, ellipsometric angles, and — planned —
-  RI/thickness extraction, from a `structures/` script's raw output). See
-  `decisions.md` ADR-009. `polarimetry.py`'s `_decompose_sp` was made
-  public (`decompose_sp`) so `postprocessing/jones_mueller_ellipsometry.py`
-  can reuse the solver's exact s/p convention.
+  (derive Jones/Mueller matrices, ellipsometric angles, plots, and —
+  planned — RI/thickness extraction, from a `structures/` script's raw
+  output; never calls `Simulation.solve`). See `decisions.md` ADR-009.
+  `structures/` is further grouped by category (`structures/thin_film/`
+  today; `structures/trench/`, `structures/via/` etc. once those phases
+  land). `polarimetry.py`'s `_decompose_sp` was made public (`decompose_sp`)
+  so `postprocessing/jones_mueller_ellipsometry.py` can reuse the solver's
+  exact s/p convention.
+- **Every run gets its own timestamped output folder** (`output_paths.py`:
+  `outputs/YYYY-MM-DD/HH-MM-SS_<run_name>/`) containing its raw CSV/data
+  *and* a `run_metadata.txt` (`write_run_metadata`) recording which script
+  produced it and its key parameters — so re-running the same script with
+  different settings never collides or gets mixed up (ADR-010). Plotting
+  is a `postprocessing/` script (`plot_thin_film_rt.py`) that finds the
+  relevant run's CSV (`find_latest_output`, or an explicit path) and saves
+  its PNG back into that same run folder — plotting was briefly added
+  directly to a `structures/` script and the user correctly caught that as
+  a boundary violation; see ADR-010 for the fix and the reasoning.
 - The full documentation set (this file, `README.md`, `PRD.md`,
   `architecture.md`, `design.md`, `rules.md`, `phases.md`, `tasks.md`,
   `decisions.md`, `testing.md`, `deployment.md`, `references.md`,

@@ -20,7 +20,7 @@ from sougata_solver.excitation import PlaneWaveExcitation
 from sougata_solver.geometry import Lattice
 from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
-from sougata_solver.output_paths import run_output_path
+from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
 
 
@@ -116,24 +116,13 @@ WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 41)  # 400-800 nm, 41 points
 
 # ============================================================================
 # EDIT (5): where to save results (set to None to skip saving)
+#
+# Plotting is NOT done here -- this script only builds the structure, runs
+# the solver, and saves raw R/T data. Run postprocessing/plot_thin_film_rt.py
+# afterward to plot it (it finds this run's CSV automatically and saves the
+# plot into this same output folder).
 # ============================================================================
 OUTPUT_CSV_PATH = "output_RT.csv"  # filename only; saved under outputs/YYYY-MM-DD/
-
-# ============================================================================
-# EDIT (6): plot R/T vs wavelength, optionally overlaid with reference data
-# (e.g. exported from a Lumerical FDTD or stackrt/TMM run) for cross-check.
-# ============================================================================
-SHOW_PLOT = True       # pop up an interactive plot window
-SAVE_PLOT = True       # save a PNG alongside the CSV, under outputs/YYYY-MM-DD/
-PLOT_FILENAME = "output_RT.png"
-
-# To overlay commercial-tool data for a direct visual + numeric cross-check,
-# point this at a CSV with the SAME three columns as our own OUTPUT_CSV_PATH:
-# header "wavelength_nm,R,T" (wavelength in nanometers). Export this shape
-# from Lumerical (e.g. via a script that writes your R/T monitor results, or
-# the built-in `stackrt` TMM command for a quick non-FDTD comparison) --set
-# to None to skip overlay.
-REFERENCE_CSV_PATH = None  # e.g. r"C:\path\to\lumerical_export.csv"
 
 
 def main():
@@ -175,9 +164,23 @@ def main():
         print(f"{wavelength * 1e9:16.1f}  {reflectance[i]:8.4f}  {transmittance[i]:8.4f}  {1 - reflectance[i] - transmittance[i]:8.4f}")
 
     if OUTPUT_CSV_PATH:
-        output_path = run_output_path("sio2_on_si_thin_film", OUTPUT_CSV_PATH)
+        output_dir = run_output_dir("sio2_on_si_thin_film")
+        write_run_metadata(
+            output_dir,
+            __file__,
+            si_csv_path=SI_CSV_PATH,
+            sio2_csv_path=SIO2_CSV_PATH,
+            sio2_thickness_m=SIO2_THICKNESS,
+            si_thickness_m=SI_THICKNESS,
+            incident_angle_deg=INCIDENT_ANGLE_DEG,
+            azimuthal_angle_deg=AZIMUTHAL_ANGLE_DEG,
+            s_amplitude=S_AMPLITUDE,
+            p_amplitude=P_AMPLITUDE,
+            wavelength_range_m=(WAVELENGTHS[0], WAVELENGTHS[-1], len(WAVELENGTHS)),
+        )
         absorptance = 1.0 - reflectance - transmittance
         table = np.column_stack([WAVELENGTHS * 1e9, reflectance, transmittance, absorptance])
+        output_path = output_dir / OUTPUT_CSV_PATH
         np.savetxt(
             output_path,
             table,
@@ -186,58 +189,10 @@ def main():
             comments="",
         )
         print(f"\nSaved {len(WAVELENGTHS)} rows to {output_path}")
-
-    if SHOW_PLOT or SAVE_PLOT:
-        plot_reflectance_transmittance(
-            WAVELENGTHS, reflectance, transmittance,
-            reference_csv_path=REFERENCE_CSV_PATH,
-            show=SHOW_PLOT, save=SAVE_PLOT, plot_filename=PLOT_FILENAME,
-        )
+        print(f"Run metadata: {output_dir / 'run_metadata.txt'}")
+        print("To plot this run: python postprocessing/plot_thin_film_rt.py")
 
     return reflectance, transmittance
-
-
-def plot_reflectance_transmittance(
-    wavelengths, reflectance, transmittance, reference_csv_path=None,
-    show=True, save=True, plot_filename="output_RT.png",
-):
-    """Plot R and T vs wavelength; optionally overlay a reference CSV (same
-    "wavelength_nm,R,T" column layout as our own OUTPUT_CSV_PATH) as dashed
-    lines, for a direct visual cross-check against e.g. a Lumerical export.
-    """
-    import matplotlib.pyplot as plt
-
-    wavelengths_nm = np.asarray(wavelengths) * 1e9
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.plot(wavelengths_nm, reflectance, color="tab:blue", label="R (this solver)")
-    ax.plot(wavelengths_nm, transmittance, color="tab:orange", label="T (this solver)")
-
-    if reference_csv_path:
-        ref = np.genfromtxt(reference_csv_path, delimiter=",", names=True)
-        ax.plot(ref["wavelength_nm"], ref["R"], "--", color="tab:blue", label="R (reference)")
-        ax.plot(ref["wavelength_nm"], ref["T"], "--", color="tab:orange", label="T (reference)")
-        # Only meaningful if the reference uses the same wavelength grid;
-        # otherwise this is a rough guide, not a rigorous per-point check.
-        if len(ref["wavelength_nm"]) == len(wavelengths_nm) and np.allclose(ref["wavelength_nm"], wavelengths_nm, atol=1.0):
-            r_diff = np.max(np.abs(reflectance - ref["R"]))
-            t_diff = np.max(np.abs(transmittance - ref["T"]))
-            print(f"\nMax |R - R_reference| = {r_diff:.4e}, max |T - T_reference| = {t_diff:.4e}")
-
-    ax.set_xlabel("Wavelength (nm)")
-    ax.set_ylabel("Reflectance / Transmittance")
-    ax.set_ylim(0, 1)
-    ax.set_title("SiO2 on Si: R, T vs wavelength")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-
-    if save:
-        plot_path = run_output_path("sio2_on_si_thin_film", plot_filename)
-        fig.savefig(plot_path, dpi=150)
-        print(f"Saved plot to {plot_path}")
-    if show:
-        plt.show()
-    plt.close(fig)
 
 
 if __name__ == "__main__":
