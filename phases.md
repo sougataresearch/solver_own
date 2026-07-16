@@ -1,4 +1,4 @@
-# Roadmap — pyrcwa
+# Roadmap — sougata_solver
 
 This supersedes/formalizes the plan already approved and saved at
 `C:\Users\d14k4\.claude\plans\vivid-swimming-moler.md`. Phase numbering
@@ -29,7 +29,7 @@ plan-mode scratch file) as phases complete.
 - **Objectives**: build the dimension-agnostic infrastructure that turns a
   `Pattern` (shapes + background) into the Toeplitz permittivity matrices
   every patterned-layer eigensolver (Phase 3, 4) needs.
-- **Deliverables**: new `src/pyrcwa/fourier_factorization.py` with
+- **Deliverables**: new `src/sougata_solver/fourier_factorization.py` with
   `pattern_epsilon_hat(...)` and `toeplitz_matrix(...)`, producing both
   `epsilon_hat` (direct) and `epsilon_inv_hat` (inverse-rule) Toeplitz
   matrices; unit tests comparing analytic Toeplitz entries against a
@@ -56,7 +56,7 @@ plan-mode scratch file) as phases complete.
   `solve_layer_eigenmodes_1d(...)` in `eigenmodes.py`; a `Lattice1D`
   dispatch branch in `simulation.py`; a validation test against a published
   1D binary-grating benchmark (Moharam & Gaylord 1995 or equivalent);
-  `structures/trench_grating.py`.
+  `structures/trench/trench_grating.py`.
 - **Estimated complexity**: Medium-High. The physics (decoupled scalar
   TE/TM eigenproblems) is simpler than Phase 4's general case, but this
   phase is also where the *first* non-uniform eigensolver gets built and
@@ -77,8 +77,8 @@ plan-mode scratch file) as phases complete.
   wiring for the 2D patterned path; an S4-cross-check validation test (or,
   if S4 isn't buildable/runnable in this environment, an explicitly-flagged
   literature benchmark instead — never a fabricated "it matches" claim per
-  `rules.md`'s AI coding rules); `structures/pillar_array.py`,
-  `structures/via_array.py`.
+  `rules.md`'s AI coding rules); `structures/via/pillar_array.py`,
+  `structures/via/via_array.py`.
 - **Estimated complexity**: High — this is the highest-risk phase in the
   whole roadmap (general complex eigendecomposition, possible
   near-degenerate eigenvalues, the trickiest part of `rcwa.cpp` to

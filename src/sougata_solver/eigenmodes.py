@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from pyrcwa.layer import LayerEigenmodes
+from sougata_solver.layer import LayerEigenmodes
 
 
 def build_kp_matrix(omega: complex, kx: np.ndarray, ky: np.ndarray, epsilon_inv) -> np.ndarray:

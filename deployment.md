@@ -1,4 +1,4 @@
-# Deployment — pyrcwa
+# Deployment — sougata_solver
 
 Scope note (see `decisions.md` ADR-007): this is a **solo research tool
 today**, run locally on Windows. This document is deliberately light —
@@ -9,7 +9,7 @@ becomes a shared/public project.
 ## Environment Setup
 
 ```powershell
-cd c:\Users\d14k4\Desktop\Solver_own\pyrcwa
+cd c:\Users\d14k4\Desktop\Solver_own\sougata_solver
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
@@ -22,7 +22,7 @@ added as a dev/example dependency once Phase 7 (field visualization) lands
 
 ## Build Steps
 
-`pyrcwa` builds as a standard `setuptools` src-layout package
+`sougata_solver` builds as a standard `setuptools` src-layout package
 (`[tool.setuptools.packages.find] where = ["src"]`). To build a wheel
 locally (not currently published anywhere):
 
@@ -45,7 +45,7 @@ speculative multi-stage build built ahead of actual need.
 
 ## CI/CD
 
-**Not yet set up** — `pyrcwa` was just initialized as its own git
+**Not yet set up** — `sougata_solver` was just initialized as its own git
 repository in this session (see `decisions.md` ADR-008) and has no remote
 yet. Once a remote (e.g. GitHub) exists, the minimum useful CI is a single
 GitHub Actions workflow:

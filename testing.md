@@ -1,4 +1,4 @@
-# Testing Strategy — pyrcwa
+# Testing Strategy — sougata_solver
 
 Physics-software testing differs from typical application testing: the
 dominant risk is not a crash but a **plausible-looking wrong number**
@@ -49,7 +49,7 @@ end to end and produce a sane number), and every `postprocessing/` script
 is implicitly an integration test of the derived-quantity math against
 already-computed raw data; formalize the most important ones as actual
 pytest tests too (not just runnable scripts) — e.g.
-`structures/sio2_on_si_thin_film.py`'s SiO2-on-Si case should have a
+`structures/thin_film/sio2_on_si_thin_film.py`'s SiO2-on-Si case should have a
 corresponding assertion-based test, not rely on eyeballing printed output.
 
 ### System Testing
@@ -86,7 +86,7 @@ speed" non-functional requirement), but two things belong here earlier:
 
 Minimal surface (see `architecture.md`'s Security Considerations) — the
 only concrete item today is malformed-CSV handling in
-`material_from_csv` (`structures/sio2_on_si_thin_film.py`). No dedicated security
+`material_from_csv` (`structures/thin_film/sio2_on_si_thin_film.py`). No dedicated security
 test suite is warranted at current scope; revisit if a structure-definition
 file format or any network/multi-user surface is ever added.
 
@@ -102,7 +102,7 @@ file format or any network/multi-user surface is ever added.
   task in `tasks.md`); keep that test in the suite permanently, it will
   catch future refactoring bugs too.
 - Run the full (non-`slow`) suite before every commit that touches
-  `src/pyrcwa/` — see `rules.md`'s Code Review Checklist.
+  `src/sougata_solver/` — see `rules.md`'s Code Review Checklist.
 
 ### Acceptance Testing
 

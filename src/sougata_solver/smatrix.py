@@ -24,7 +24,7 @@ from __future__ import annotations
 import numpy as np
 import scipy.linalg as sla
 
-from pyrcwa.layer import LayerEigenmodes
+from sougata_solver.layer import LayerEigenmodes
 
 
 def _solve(a: np.ndarray, b: np.ndarray) -> np.ndarray:

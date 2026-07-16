@@ -14,8 +14,8 @@ import math
 
 import numpy as np
 
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.fields import tangential_e_field
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.fields import tangential_e_field
 
 
 def _s_hat(phi: float) -> np.ndarray:

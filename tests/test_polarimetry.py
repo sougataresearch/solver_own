@@ -12,12 +12,12 @@ import math
 import numpy as np
 import pytest
 
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.geometry import Lattice
-from pyrcwa.layer import Layer
-from pyrcwa.materials import Material
-from pyrcwa.polarimetry import jones_reflection_matrix, jones_to_mueller
-from pyrcwa.simulation import Simulation
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.geometry import Lattice
+from sougata_solver.layer import Layer
+from sougata_solver.materials import Material
+from sougata_solver.polarimetry import jones_reflection_matrix, jones_to_mueller
+from sougata_solver.simulation import Simulation
 
 WAVELENGTH = 0.55e-6
 

@@ -1,4 +1,4 @@
-# Development Rules — pyrcwa
+# Development Rules — sougata_solver
 
 These rules formalize conventions the codebase *already follows* (verified
 against the actual source, not invented) plus a few forward-looking ones
@@ -8,10 +8,10 @@ in the codebase, it's cited — these are not aspirational.
 ## Coding Standards
 
 - **Python ≥ 3.10**, `from __future__ import annotations` at the top of
-  every module (already universal in `src/pyrcwa/`) so modern union-type
+  every module (already universal in `src/sougata_solver/`) so modern union-type
   hints (`X | None`) work regardless of runtime version quirks.
 - **Type hints on every function signature.** Already the case throughout
-  `src/pyrcwa/`; keep it that way, including for new Phase 2-9 code.
+  `src/sougata_solver/`; keep it that way, including for new Phase 2-9 code.
 - **`dataclasses` for data containers** (`Layer`, `LayerEigenmodes`,
   `SimulationResult`, `Circle`, `Rectangle`, `Pattern`,
   `PlaneWaveExcitation`) — do not introduce a class hierarchy or
@@ -19,10 +19,10 @@ in the codebase, it's cited — these are not aspirational.
 - **No broad `except`.** Let exceptions propagate; see `design.md`'s Error
   Handling section.
 - **No hidden global state, no singletons, no module-level mutable state.**
-  Every module in `src/pyrcwa/` today is pure functions + dataclasses; keep
+  Every module in `src/sougata_solver/` today is pure functions + dataclasses; keep
   it that way.
 - **Formatting/linting**: `.flake8` and `mypy.ini` exist in the parent
-  `EMpy` reference project but **not yet in `pyrcwa`** — add both before
+  `EMpy` reference project but **not yet in `sougata_solver`** — add both before
   Phase 2 lands (a `pyproject.toml` `[tool.ruff]` section, or a standalone
   `.flake8`, plus a `mypy.ini`), so new patterned-layer code is type-checked
   from day one rather than retrofitted later.
@@ -89,14 +89,14 @@ See `testing.md` for the full strategy. Minimum bar, restated here as a
 hard rule: **no new physics capability merges without an oracle-comparison
 test** (analytic formula, published benchmark, or S4/EMpy/RCWA.jl
 cross-check) — a test that only checks "it runs without crashing" is not
-sufficient for anything under `src/pyrcwa/`.
+sufficient for anything under `src/sougata_solver/`.
 
 ## Git Workflow
 
-- `pyrcwa` is now its own git repository (root at
-  `Solver_own/pyrcwa/.git`), separate from the vendored reference repos
+- `sougata_solver` is now its own git repository (root at
+  `Solver_own/sougata_solver/.git`), separate from the vendored reference repos
   (`S4`, `EMpy`, `RigorousCoupledWaveAnalysis.jl` each keep their own
-  `.git` and are not submodules of `pyrcwa`).
+  `.git` and are not submodules of `sougata_solver`).
 - **Trunk-based, single branch (`main`) is fine** at solo-research-project
   scale — no mandatory feature-branch-per-task process. Use a short-lived
   branch only for a change you want to validate/convergence-test before
@@ -211,6 +211,6 @@ code (e.g. `simulation.py`'s explicit "Phase 1 scope only" docstring,
    a non-obvious architectural choice is made, so a future session (AI or
    human) doesn't have to re-derive context that's already been settled.
 7. **Never touch the vendored reference repos (`S4`, `EMpy`,
-   `RigorousCoupledWaveAnalysis.jl`, `EMTutorial`) as part of `pyrcwa`
+   `RigorousCoupledWaveAnalysis.jl`, `EMTutorial`) as part of `sougata_solver`
    development** — they are read-only oracles, not code to merge from or
    modify.

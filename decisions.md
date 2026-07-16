@@ -1,4 +1,4 @@
-# Architecture Decision Record — pyrcwa
+# Architecture Decision Record — sougata_solver
 
 ## ADR-001: S-matrix (Redheffer star product) over transfer-matrix cascading
 
@@ -165,24 +165,24 @@
   Out-of-Scope section records this explicitly so it isn't silently
   reintroduced as scope creep in a later phase.
 
-## ADR-008: `pyrcwa` is its own git repository, separate from vendored reference repos
+## ADR-008: `sougata_solver` is its own git repository, separate from vendored reference repos
 
-- **Decision**: `git init` was run inside `pyrcwa/` specifically (not at
-  the `Solver_own/` parent level), giving `pyrcwa` its own history,
+- **Decision**: `git init` was run inside `sougata_solver/` specifically (not at
+  the `Solver_own/` parent level), giving `sougata_solver` its own history,
   independent of the already-git-versioned `S4`, `EMpy`, and
   `RigorousCoupledWaveAnalysis.jl` reference repos.
-- **Reason**: `pyrcwa` is the user's own project; the reference repos are
+- **Reason**: `sougata_solver` is the user's own project; the reference repos are
   vendored, read-only oracles with their own independent upstream history
-  that shouldn't be conflated with `pyrcwa`'s own commit history.
+  that shouldn't be conflated with `sougata_solver`'s own commit history.
 - **Alternatives considered**: A single `Solver_own`-level repo with
   everything inside — rejected because it would either require the
   reference repos to be submodules (added process overhead not currently
   justified) or would flatten their independent git history into one
   undifferentiated tree.
-- **Trade-offs**: None significant at this scale — `pyrcwa/.gitignore`
+- **Trade-offs**: None significant at this scale — `sougata_solver/.gitignore`
   already excludes generated artifacts.
 - **Impact**: `rules.md`'s Git Workflow section and `deployment.md`'s CI
-  section describe `pyrcwa`'s own repo as the unit of versioning/CI, not
+  section describe `sougata_solver`'s own repo as the unit of versioning/CI, not
   `Solver_own` as a whole.
 
 ## ADR-009: Replace `examples/` with `structures/` + `postprocessing/`
@@ -210,7 +210,7 @@
   build+run+analyze conflation in place.
 - **Trade-offs**: Splitting the Jones/Mueller example required introducing
   a small raw-data interchange format (a CSV of per-polarization reflected
-  `Ex, Ey` written by `structures/sio2_on_si_ellipsometry_run.py` and read
+  `Ex, Ey` written by `structures/thin_film/sio2_on_si_ellipsometry_run.py` and read
   by `postprocessing/jones_mueller_ellipsometry.py`) that didn't exist
   before — more moving parts than one self-contained script, but it means
   `postprocessing/` scripts never need to call `Simulation.solve` at all,

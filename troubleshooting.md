@@ -1,4 +1,4 @@
-# Troubleshooting — pyrcwa
+# Troubleshooting — sougata_solver
 
 Known numerical gotchas, organized by where they'll bite. This file exists
 because in RCWA, the failure mode is almost never a crash — it's a

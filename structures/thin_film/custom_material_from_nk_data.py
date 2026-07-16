@@ -4,7 +4,7 @@ dataset instead of a constant refractive index.
 Edit the three places marked EDIT below: (1) how you load your data,
 (2) the substrate/incidence materials, (3) the layer stack and thicknesses.
 
-Run with:  python structures/custom_material_from_nk_data.py
+Run with:  python structures/thin_film/custom_material_from_nk_data.py
 """
 
 import math
@@ -12,11 +12,11 @@ import math
 import numpy as np
 from scipy.interpolate import interp1d
 
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.geometry import Lattice
-from pyrcwa.layer import Layer
-from pyrcwa.materials import Material
-from pyrcwa.simulation import Simulation
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.geometry import Lattice
+from sougata_solver.layer import Layer
+from sougata_solver.materials import Material
+from sougata_solver.simulation import Simulation
 
 
 def _parse_refractiveindex_csv(csv_path: str):
@@ -62,7 +62,7 @@ def material_from_csv(name: str, csv_path: str, wavelength_unit: str = "um") -> 
     (an 'n' block and an optional 'k' block).
 
     `wavelength_unit` is the unit used in the CSV's first column ("um" or
-    "nm"); pyrcwa itself always works in meters internally.
+    "nm"); sougata_solver itself always works in meters internally.
     """
     wl_n, n_vals, wl_k, k_vals = _parse_refractiveindex_csv(csv_path)
     scale = {"um": 1e-6, "nm": 1e-9, "m": 1.0}[wavelength_unit]

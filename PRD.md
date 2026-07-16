@@ -1,4 +1,4 @@
-# Product Requirements Document — pyrcwa
+# Product Requirements Document — sougata_solver
 
 ## Problem Statement
 
@@ -19,7 +19,7 @@ vendored under `Solver_own/` as reference material) solve this, but:
   can be trusted for via/trench/pillar problems with tapered sidewalls
   while being auditable line-by-line against a known-correct reference.
 
-`pyrcwa` exists to close this gap: an owned, from-scratch, fully-understood
+`sougata_solver` exists to close this gap: an owned, from-scratch, fully-understood
 RCWA implementation, validated against the vendored references rather than
 depending on them at runtime.
 
@@ -71,7 +71,7 @@ depending on them at runtime.
 | FR-7 | Represent a feature (via/trench) with linearly tapered sidewalls via staircase layer discretization, and demonstrate R/T convergence with slice count. *(planned — Phase 5)* |
 | FR-8 | Support anisotropic (full 3×3 tensor) materials in both uniform and patterned layers. *(planned — Phase 6)* |
 | FR-9 | Reconstruct real-space E/H field maps at an arbitrary depth in the stack (for cross-section visualization of trench/via structures). *(planned — Phase 7)* |
-| FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports. *(done — `structures/sio2_on_si_thin_film.py::material_from_csv`)* |
+| FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports. *(done — `structures/thin_film/sio2_on_si_thin_film.py::material_from_csv`)* |
 
 ## Non-Functional Requirements
 
@@ -124,7 +124,7 @@ published table, or S4 cross-check) + a runnable example script. A phase in
   scheduling).
 - `S4`, `EMpy`, `RigorousCoupledWaveAnalysis.jl` are reference/oracle
   material only, vendored as sibling directories under `Solver_own/` — they
-  are not runtime dependencies of `pyrcwa` and must not be imported by it.
+  are not runtime dependencies of `sougata_solver` and must not be imported by it.
 - Windows development environment (PowerShell primary shell) — anything
   written into deployment/CI docs must work there, not assume a Unix-only
   toolchain.

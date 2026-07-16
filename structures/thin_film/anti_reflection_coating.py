@@ -1,16 +1,16 @@
 """Minimal usage example: reflectance/transmittance of a uniform multilayer
-stack (an anti-reflection coating), the Phase 1 capability of pyrcwa.
+stack (an anti-reflection coating), the Phase 1 capability of sougata_solver.
 
-Run with:  python structures/anti_reflection_coating.py
+Run with:  python structures/thin_film/anti_reflection_coating.py
 """
 
 import math
 
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.geometry import Lattice
-from pyrcwa.layer import Layer
-from pyrcwa.materials import Material
-from pyrcwa.simulation import Simulation
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.geometry import Lattice
+from sougata_solver.layer import Layer
+from sougata_solver.materials import Material
+from sougata_solver.simulation import Simulation
 
 WAVELENGTH = 0.55e-6  # 550 nm, green light
 

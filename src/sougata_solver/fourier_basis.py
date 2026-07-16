@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from pyrcwa.geometry import Lattice
+from sougata_solver.geometry import Lattice
 
 
 def truncate_fourier_orders(lattice: Lattice, num_orders: int, method: str = "circular") -> np.ndarray:

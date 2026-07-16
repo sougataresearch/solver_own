@@ -11,14 +11,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from pyrcwa.eigenmodes import solve_layer_eigenmodes_uniform
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.fields import z_poynting_flux
-from pyrcwa.fourier_basis import truncate_fourier_orders
-from pyrcwa.geometry import Lattice
-from pyrcwa.layer import Layer, LayerEigenmodes, LayerStack
-from pyrcwa.materials import Material
-from pyrcwa.smatrix import SMatrixStack
+from sougata_solver.eigenmodes import solve_layer_eigenmodes_uniform
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.fields import z_poynting_flux
+from sougata_solver.fourier_basis import truncate_fourier_orders
+from sougata_solver.geometry import Lattice
+from sougata_solver.layer import Layer, LayerEigenmodes, LayerStack
+from sougata_solver.materials import Material
+from sougata_solver.smatrix import SMatrixStack
 
 
 @dataclass

@@ -1,4 +1,4 @@
-# pyrcwa
+# sougata_solver
 
 A pure-Python **Rigorous Coupled-Wave Analysis (RCWA)** solver for periodic
 electromagnetic structures — thin films, multilayer stacks, 1D-periodic
@@ -18,7 +18,7 @@ dominant failure mode in this domain, not crashes.
 
 ## Project Overview
 
-`pyrcwa` solves Maxwell's equations for plane-wave illumination of a stack
+`sougata_solver` solves Maxwell's equations for plane-wave illumination of a stack
 of periodic (or uniform) layers, returning reflected/transmitted diffraction
 efficiencies, polarimetric response (Jones/Mueller), and — in a later phase
 — reconstructed real-space field maps. It targets the same class of problems
@@ -43,22 +43,22 @@ reflectors, 1D gratings/trenches, and 2D via/pillar arrays.
 
 Current (Phase 1, shipped):
 - Arbitrary-thickness multilayer stacks with semi-infinite incidence/exit
-  half-spaces (`Layer`, `LayerStack` — [`src/pyrcwa/layer.py`](src/pyrcwa/layer.py))
+  half-spaces (`Layer`, `LayerStack` — [`src/sougata_solver/layer.py`](src/sougata_solver/layer.py))
 - Dispersive materials from constant, callable, or refractiveindex.info-style
-  CSV `n,k` data (`Material` — [`src/pyrcwa/materials.py`](src/pyrcwa/materials.py))
+  CSV `n,k` data (`Material` — [`src/sougata_solver/materials.py`](src/sougata_solver/materials.py))
 - Arbitrary incidence angle/azimuth and elliptical polarization
-  (`PlaneWaveExcitation` — [`src/pyrcwa/excitation.py`](src/pyrcwa/excitation.py))
+  (`PlaneWaveExcitation` — [`src/sougata_solver/excitation.py`](src/sougata_solver/excitation.py))
 - Numerically stable Redheffer star-product S-matrix cascading
-  ([`src/pyrcwa/smatrix.py`](src/pyrcwa/smatrix.py))
+  ([`src/sougata_solver/smatrix.py`](src/sougata_solver/smatrix.py))
 - Reflectance/transmittance via Poynting flux
-  ([`src/pyrcwa/fields.py`](src/pyrcwa/fields.py))
+  ([`src/sougata_solver/fields.py`](src/sougata_solver/fields.py))
 - Jones/Mueller polarimetry
-  ([`src/pyrcwa/polarimetry.py`](src/pyrcwa/polarimetry.py))
+  ([`src/sougata_solver/polarimetry.py`](src/sougata_solver/polarimetry.py))
 - Analytic in-plane Fourier transforms for `Circle` and `Rectangle` shapes
   with nested-shape subtraction, ready to be consumed by the patterned-layer
-  solver ([`src/pyrcwa/geometry.py`](src/pyrcwa/geometry.py))
+  solver ([`src/sougata_solver/geometry.py`](src/sougata_solver/geometry.py))
 - Circular G-vector truncation for Fourier-order selection
-  ([`src/pyrcwa/fourier_basis.py`](src/pyrcwa/fourier_basis.py))
+  ([`src/sougata_solver/fourier_basis.py`](src/sougata_solver/fourier_basis.py))
 
 Planned (see [`phases.md`](phases.md) for the full roadmap):
 - Fourier-factorization core + general (non-uniform) eigenmode solver so
@@ -93,7 +93,7 @@ users — see [`PRD.md`](PRD.md) for scope.
 ## Folder Structure
 
 ```
-pyrcwa/
+sougata_solver/
 ├── README.md            this file
 ├── PRD.md                product requirements
 ├── architecture.md       system architecture
@@ -108,7 +108,7 @@ pyrcwa/
 ├── references.md            literature + reference-implementation index
 ├── troubleshooting.md      known numerical gotchas
 ├── pyproject.toml
-├── src/pyrcwa/
+├── src/sougata_solver/
 │   ├── materials.py         permittivity models (isotropic + tensor)
 │   ├── geometry.py           Lattice, Shape (Circle/Rectangle), Pattern
 │   ├── fourier_basis.py       G-vector truncation
@@ -118,21 +118,24 @@ pyrcwa/
 │   ├── excitation.py            plane-wave decomposition, incident amplitude
 │   ├── fields.py                  Poynting flux, tangential field reconstruction
 │   ├── polarimetry.py             Jones/Mueller (reused by postprocessing/)
-│   └── simulation.py               top-level orchestration
+│   ├── simulation.py               top-level orchestration
+│   └── output_paths.py             outputs/YYYY-MM-DD/HH-MM-SS_<run>/ helper
 ├── tests/                    pytest suite + `tests/oracles/` (analytic references)
 ├── structures/                YOU RUN THESE: define a lattice/layer stack/materials
-│                                and run the solver -- e.g. sio2_on_si_thin_film.py,
-│                                custom_multistack.py (copy this one for a new stack)
-├── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
-│                                 output and derive Jones/Mueller matrices, ellipsometric
-│                                 angles, and (planned) RI/thickness extraction
-└── scripts/                   (currently empty; ad hoc utility scripts)
+│                                and run the solver -- one subfolder per geometry type
+│   └── thin_film/                uniform multilayer stacks (Phase 1, done) -- e.g.
+│                                  sio2_on_si_thin_film.py, custom_multistack.py
+│                                  (copy this one for a new stack)
+│                                (trench/ and via/ subfolders land with Phase 3/4)
+└── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
+                                  output and derive Jones/Mueller matrices, ellipsometric
+                                  angles, and (planned) RI/thickness extraction
 ```
 
 ## Installation
 
 ```bash
-cd pyrcwa
+cd sougata_solver
 python -m venv .venv
 .venv\Scripts\activate        # Windows; use `source .venv/bin/activate` on macOS/Linux
 pip install -e ".[dev]"
@@ -144,31 +147,45 @@ Run a structure end to end (builds the geometry, runs the solver, prints
 R/T):
 
 ```bash
-python structures/sio2_on_si_thin_film.py
+python structures/thin_film/sio2_on_si_thin_film.py
 ```
 
 For a multi-layer stack of your own materials, copy
-`structures/custom_multistack.py` and edit its numbered `EDIT` blocks.
+`structures/thin_film/custom_multistack.py` and edit its numbered `EDIT`
+blocks. (Trench and via/pillar structures get their own `structures/trench/`
+and `structures/via/` folders once Phase 3/4 land — see `phases.md`.)
 
 For Jones/Mueller/ellipsometric-angle analysis, run the matching
-`structures/*_ellipsometry_run.py` script first (it saves raw field data to
-a CSV), then the corresponding script in `postprocessing/` (it loads that
-CSV and derives the Jones matrix, Mueller matrix, and Psi/Delta — no
+`structures/thin_film/*_ellipsometry_run.py` script first (it saves raw field
+data to a CSV), then the corresponding script in `postprocessing/` (it loads
+that CSV and derives the Jones matrix, Mueller matrix, and Psi/Delta — no
 re-solving):
 
 ```bash
-python structures/sio2_on_si_ellipsometry_run.py
+python structures/thin_film/sio2_on_si_ellipsometry_run.py
 python postprocessing/jones_mueller_ellipsometry.py
 ```
+
+### Output files
+
+Every script that saves a result (CSV today; plots later) writes into
+`outputs/YYYY-MM-DD/HH-MM-SS_<script-name>/`, via
+`src/sougata_solver/output_paths.py`: one date folder per day, and inside it
+one timestamped subfolder per run, so a day's runs stay together but two
+different scripts — or two runs of the same script — never overwrite each
+other. `postprocessing/` scripts read the most recent matching file across
+all run subfolders, so a same-day run-then-postprocess workflow needs no path
+editing, and postprocessing still finds the input if run on a later day.
+`outputs/` is gitignored.
 
 Or use the library directly:
 
 ```python
-from pyrcwa.materials import Material
-from pyrcwa.layer import Layer
-from pyrcwa.geometry import Lattice
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.simulation import Simulation
+from sougata_solver.materials import Material
+from sougata_solver.layer import Layer
+from sougata_solver.geometry import Lattice
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.simulation import Simulation
 import math
 
 air = Material("air", 1.0)

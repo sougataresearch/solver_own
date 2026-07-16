@@ -1,4 +1,4 @@
-# Task Checklist — pyrcwa
+# Task Checklist — sougata_solver
 
 Atomic, trackable tasks per phase (see `phases.md` for objectives/context).
 Check items off as completed; do not remove completed items — move
@@ -22,8 +22,8 @@ summary instead of deleting history here.
 
 ## Phase 2 — Fourier-Factorization Core
 
-□ Add `.flake8`/`ruff` config and `mypy.ini` to `pyrcwa/` (rules.md gap, do before new modules land)
-□ Create `src/pyrcwa/fourier_factorization.py`
+□ Add `.flake8`/`ruff` config and `mypy.ini` to `sougata_solver/` (rules.md gap, do before new modules land)
+□ Create `src/sougata_solver/fourier_factorization.py`
 □ Implement `pattern_epsilon_hat(pattern, g_vectors, lattice)` (direct, sums shape contributions with containment-tree subtraction)
 □ Implement the inverse-rule variant (`1/eps` per shape, same summation) for `epsilon_inv_hat`
 □ Implement `toeplitz_matrix(eps_hat_lookup, g_indices)`
@@ -45,7 +45,7 @@ summary instead of deleting history here.
 □ Test: TE diffraction efficiencies match benchmark
 □ Test: TM diffraction efficiencies match benchmark
 □ Test: normal-incidence limit recovers Phase 1's uniform-layer Fresnel result when line/space contrast is set to zero (continuity sanity check)
-□ Write `structures/trench_grating.py`
+□ Write `structures/trench/trench_grating.py`
 □ Update `memory.md` / `decisions.md` on completion
 
 ## Phase 4 — 2D-Periodic Patterned Layers (Via, Pillar)
@@ -58,8 +58,8 @@ summary instead of deleting history here.
 □ If S4 is not usable: source a published 2D benchmark instead, and explicitly document why S4 wasn't used (per `rules.md` AI rule 5 — never fabricate a match)
 □ Test: 2D patterned-layer R/T matches the chosen oracle
 □ Test: patterned-layer solve reduces to the uniform-layer result when the pattern's shape material equals the background (degenerate-pattern sanity check)
-□ Write `structures/pillar_array.py`
-□ Write `structures/via_array.py`
+□ Write `structures/via/pillar_array.py`
+□ Write `structures/via/via_array.py`
 □ Update `memory.md` / `decisions.md` on completion
 
 ## Phase 5 — Tapered / Sloped Sidewalls (Via, Trench)
@@ -86,7 +86,7 @@ summary instead of deleting history here.
 □ Extend `fields.py` with a real-space grid reconstruction function using `SMatrixStack.partial_smatrix_up_to`
 □ Test: field continuity across a layer interface (no discontinuity where physically none should exist)
 □ Test: reconstructed field-derived R/T matches the already-validated `SimulationResult.reflectance()`/`transmittance()` (cross-check, not a new independent oracle)
-□ Add `matplotlib` as a dev/example dependency (not a core `pyrcwa` dependency — confirm this placement in `pyproject.toml`)
+□ Add `matplotlib` as a dev/example dependency (not a core `sougata_solver` dependency — confirm this placement in `pyproject.toml`)
 □ Write a cross-section field-intensity plotting example for a trench
 □ Write a cross-section field-intensity plotting example for a via
 □ Update `memory.md` / `decisions.md` on completion

@@ -1,7 +1,7 @@
 import numpy as np
 
-from pyrcwa.geometry import Circle, Rectangle
-from pyrcwa.materials import Material
+from sougata_solver.geometry import Circle, Rectangle
+from sougata_solver.materials import Material
 
 
 def test_circle_dc_value_equals_area():

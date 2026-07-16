@@ -1,8 +1,8 @@
-# Architecture — pyrcwa
+# Architecture — sougata_solver
 
 ## High-Level Architecture
 
-`pyrcwa` is a **pipeline**, not a service: given a static description of a
+`sougata_solver` is a **pipeline**, not a service: given a static description of a
 lattice + layer stack + materials + one excitation, it produces mode
 amplitudes, from which R/T, polarimetry, and (later) fields are derived.
 There is no persistent state, no server, no I/O beyond optional file reads
@@ -88,12 +88,12 @@ Layer(s)     ─┘            │                              │
 
 ## External Services
 
-None. `pyrcwa` has no network calls, no database, no external API
+None. `sougata_solver` has no network calls, no database, no external API
 dependency at runtime. The only "external" inputs are local files: material
-`n,k` CSV data (`structures/sio2_on_si_thin_film.py::material_from_csv`) and the
+`n,k` CSV data (`structures/thin_film/sio2_on_si_thin_film.py::material_from_csv`) and the
 vendored reference repositories (`S4`, `EMpy`, `RigorousCoupledWaveAnalysis.jl`)
 used **only** as offline validation oracles during development/testing, never
-imported by `pyrcwa` itself.
+imported by `sougata_solver` itself.
 
 ## Technology Choices
 
@@ -112,7 +112,7 @@ completeness since architecture and layout are tightly coupled in a project
 this size:
 
 ```
-pyrcwa/src/pyrcwa/
+sougata_solver/src/sougata_solver/
 ├── materials.py
 ├── geometry.py
 ├── fourier_basis.py
@@ -127,11 +127,11 @@ pyrcwa/src/pyrcwa/
 
 No sub-packages yet. A `fourier_factorization.py` module is planned for
 Phase 2 (see `phases.md`), and a `staircase.py` helper for Phase 5 — both
-new top-level modules in `src/pyrcwa/`, not new sub-packages, to keep the
+new top-level modules in `src/sougata_solver/`, not new sub-packages, to keep the
 import graph flat as long as the module count stays in the low teens.
 **Revisit this if the module count exceeds ~15-18** — at that point, group
-into sub-packages (e.g. `pyrcwa/geometry/`, `pyrcwa/solve/`) rather than
-letting `src/pyrcwa/` become an unstructured flat pile.
+into sub-packages (e.g. `sougata_solver/geometry/`, `sougata_solver/solve/`) rather than
+letting `src/sougata_solver/` become an unstructured flat pile.
 
 ## Scalability Considerations
 
@@ -147,7 +147,7 @@ service — "scalability" here means:
   `num_orders` that achieves acceptable accuracy per structure type, since
   that is the real lever available today.
 - **Wavelength/angle sweeps**: currently a Python `for` loop calling
-  `Simulation.solve` once per point (see `structures/sio2_on_si_thin_film.py`).
+  `Simulation.solve` once per point (see `structures/thin_film/sio2_on_si_thin_film.py`).
   Phase 9 explicitly proposes vectorizing this in NumPy (batched matrix
   ops) before considering any GPU/autodiff backend — see `phases.md` Phase
   9 and `decisions.md`.
@@ -158,12 +158,12 @@ service — "scalability" here means:
 
 ## Security Considerations
 
-`pyrcwa` has a minimal attack surface: no network, no database, no
+`sougata_solver` has a minimal attack surface: no network, no database, no
 authentication, no user-supplied code execution. The two considerations
 that do apply:
 
 - **File parsing (material CSV ingestion)**: `material_from_csv` in
-  `structures/sio2_on_si_thin_film.py` reads user-controlled file paths — acceptable
+  `structures/thin_film/sio2_on_si_thin_film.py` reads user-controlled file paths — acceptable
   for a local research tool run by its own author; if this ever becomes a
   shared/public tool, add path validation and handle malformed CSVs with a
   clear error rather than a raw `ValueError`/parse exception (currently

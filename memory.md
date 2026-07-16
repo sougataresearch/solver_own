@@ -1,4 +1,4 @@
-# Project Memory — pyrcwa
+# Project Memory — sougata_solver
 
 Living document for future sessions (AI or human). Update this at the end
 of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
@@ -13,7 +13,7 @@ As of 2026-07-15:
 - **Phases 2-9 are planned but not started** (see `phases.md`, `tasks.md`).
   `simulation.py:98` explicitly raises `NotImplementedError` for any
   patterned layer — this is the immediate next blocker for trench/via/pillar.
-- `pyrcwa` was just initialized as its own git repository (previously
+- `sougata_solver` was just initialized as its own git repository (previously
   un-versioned) with a `.gitignore` covering `__pycache__/`,
   `.pytest_cache/`, `*.egg-info/`, `*.csv`, `*.png`.
 - `examples/` was removed and replaced with `structures/` (build a
@@ -65,7 +65,7 @@ Full rationale lives in `decisions.md` (ADR format). Summary:
 
 ## Known Issues
 
-- No `.flake8`/`ruff` or `mypy.ini` config exists yet in `pyrcwa/` (unlike
+- No `.flake8`/`ruff` or `mypy.ini` config exists yet in `sougata_solver/` (unlike
   the sibling `EMpy` reference project, which has both) — flagged as a
   Phase 2 prerequisite task in `tasks.md`.
 - `excitation.py`'s s/p polarization sign convention is explicitly
@@ -84,8 +84,8 @@ Full rationale lives in `decisions.md` (ADR format). Summary:
 
 See `tasks.md` for the full atomic checklist. Immediate next actions
 (Phase 2 start):
-1. Add lint/type-check config to `pyrcwa/`.
-2. Create `src/pyrcwa/fourier_factorization.py` with
+1. Add lint/type-check config to `sougata_solver/`.
+2. Create `src/sougata_solver/fourier_factorization.py` with
    `pattern_epsilon_hat`/`toeplitz_matrix`.
 3. Validate against FFT-of-rasterized-mask numerically.
 
@@ -133,5 +133,5 @@ See `tasks.md` for the full atomic checklist. Immediate next actions
   (`C:\Users\d14k4\.claude\projects\...\memory\`) is a different mechanism
   from this file — that one is cross-project and cross-session for the AI
   assistant's own use; this `memory.md` is project-scoped documentation
-  living inside the `pyrcwa` repo itself, readable by any collaborator or
+  living inside the `sougata_solver` repo itself, readable by any collaborator or
   future session regardless of which AI tool is used.

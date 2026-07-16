@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.special import j1
 
-from pyrcwa.materials import Material
+from sougata_solver.materials import Material
 
 
 def jinc(x: np.ndarray) -> np.ndarray:

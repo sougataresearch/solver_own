@@ -1,7 +1,7 @@
 """Independent N-layer Fresnel/TMM reference (characteristic-matrix method).
 
 Written from scratch from the standard Born & Wolf / Macleod thin-film
-formulation, not derived from EMpy or pyrcwa, so it serves as an
+formulation, not derived from EMpy or sougata_solver, so it serves as an
 independent oracle for `test_analytic_fresnel.py`.
 """
 
@@ -62,7 +62,7 @@ def multilayer_rt(
         cos_d = cmath.cos(delta)
         sin_d = cmath.sin(delta)
         # Sign verified by direct derivation from E(z)=E+*exp(i*kz*z)+E-*exp(-i*kz*z)
-        # (matching pyrcwa's forward-wave convention): solving for the front-face
+        # (matching sougata_solver's forward-wave convention): solving for the front-face
         # (E1,H1) in terms of the back-face (E2,H2) gives -i*sin(delta), not +i.
         # This only matters when delta is complex (absorbing layers) -- with the
         # wrong sign, lossless cases still pass (real delta hides the error) while

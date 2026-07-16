@@ -1,11 +1,11 @@
 """Post-processing: load the raw reflected-field data written by
-structures/sio2_on_si_ellipsometry_run.py, assemble the Jones reflection
-matrix, the Mueller matrix, and the standard ellipsometric angles
+structures/thin_film/sio2_on_si_ellipsometry_run.py, assemble the Jones
+reflection matrix, the Mueller matrix, and the standard ellipsometric angles
 (Psi, Delta) -- no re-solving of the physics, just extracting these
 derived quantities from already-computed raw field data.
 
-Run structures/sio2_on_si_ellipsometry_run.py first to produce the input
-CSV, then:
+Run structures/thin_film/sio2_on_si_ellipsometry_run.py first to produce the
+input CSV, then:
 
 Run with:  python postprocessing/jones_mueller_ellipsometry.py
 """
@@ -14,12 +14,15 @@ import csv
 import math
 from collections import defaultdict
 
-from pyrcwa.polarimetry import decompose_sp, jones_to_mueller
+from sougata_solver.output_paths import find_latest_output
+from sougata_solver.polarimetry import decompose_sp, jones_to_mueller
 
 # ============================================================================
-# EDIT (1): path to the raw CSV produced by the matching "structures" script
+# EDIT (1): filename of the raw CSV produced by the matching "structures"
+# script -- looked up automatically under outputs/YYYY-MM-DD/, most recent
+# date first, so this doesn't need editing if you ran that script today.
 # ============================================================================
-INPUT_CSV_PATH = "sio2_on_si_ellipsometry_raw.csv"
+INPUT_CSV_FILENAME = "sio2_on_si_ellipsometry_raw.csv"
 
 
 def _load_raw_fields(csv_path: str):
@@ -41,7 +44,7 @@ def jones_matrix_from_raw(ex_ey_by_pol: dict[str, tuple[complex, complex]], thet
     from the raw (Ex, Ey) reflected field of an s-incidence run and a
     p-incidence run, using the same `decompose_sp` convention the solver's
     own `polarimetry.jones_reflection_matrix` uses internally (see
-    `src/pyrcwa/polarimetry.py`) -- reused here, not re-derived, so this
+    `src/sougata_solver/polarimetry.py`) -- reused here, not re-derived, so this
     post-processing step can't silently drift from the solver's convention.
     """
     cos_theta = math.cos(theta)
@@ -55,7 +58,9 @@ def jones_matrix_from_raw(ex_ey_by_pol: dict[str, tuple[complex, complex]], thet
 
 
 def main():
-    groups = _load_raw_fields(INPUT_CSV_PATH)
+    input_path = find_latest_output(INPUT_CSV_FILENAME)
+    print(f"Reading {input_path}")
+    groups = _load_raw_fields(input_path)
 
     for (wavelength, theta_deg, phi_deg), ex_ey_by_pol in sorted(groups.items()):
         if "s" not in ex_ey_by_pol or "p" not in ex_ey_by_pol:

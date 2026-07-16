@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from pyrcwa.geometry import Pattern
-from pyrcwa.materials import Material
+from sougata_solver.geometry import Pattern
+from sougata_solver.materials import Material
 
 
 @dataclass

@@ -8,19 +8,20 @@ matrix, or ellipsometric angles (Psi, Delta) is post-processing -- see
 postprocessing/jones_mueller_ellipsometry.py, which reads the CSV this
 script writes.
 
-Run with:  python structures/sio2_on_si_ellipsometry_run.py
+Run with:  python structures/thin_film/sio2_on_si_ellipsometry_run.py
 """
 
 import math
 
 import numpy as np
 
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.fields import tangential_e_field
-from pyrcwa.geometry import Lattice
-from pyrcwa.layer import Layer
-from pyrcwa.materials import Material
-from pyrcwa.simulation import Simulation
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.fields import tangential_e_field
+from sougata_solver.geometry import Lattice
+from sougata_solver.layer import Layer
+from sougata_solver.materials import Material
+from sougata_solver.output_paths import run_output_path
+from sougata_solver.simulation import Simulation
 
 # ============================================================================
 # EDIT (1): materials -- swap in material_from_csv(...) (see
@@ -49,7 +50,7 @@ AZIMUTHAL_ANGLE_DEG = 0.0
 # ============================================================================
 # EDIT (4): where to save the raw field data
 # ============================================================================
-OUTPUT_CSV_PATH = "sio2_on_si_ellipsometry_raw.csv"
+OUTPUT_CSV_PATH = "sio2_on_si_ellipsometry_raw.csv"  # filename only; saved under outputs/YYYY-MM-DD/
 
 
 def main():
@@ -79,11 +80,12 @@ def main():
                     f"pol={polarization}  Ex={ex[i]:.6f}  Ey={ey[i]:.6f}"
                 )
 
-    with open(OUTPUT_CSV_PATH, "w") as f:
+    output_path = run_output_path("sio2_on_si_ellipsometry_run", OUTPUT_CSV_PATH)
+    with open(output_path, "w") as f:
         f.write("wavelength_m,theta_deg,phi_deg,polarization,Ex_re,Ex_im,Ey_re,Ey_im\n")
         for row in rows:
             f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]},{row[5]},{row[6]},{row[7]}\n")
-    print(f"\nSaved {len(rows)} raw field rows to {OUTPUT_CSV_PATH}")
+    print(f"\nSaved {len(rows)} raw field rows to {output_path}")
 
 
 if __name__ == "__main__":

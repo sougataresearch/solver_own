@@ -1,6 +1,6 @@
-# Detailed Design — pyrcwa
+# Detailed Design — sougata_solver
 
-`pyrcwa` has no database and no UI in the traditional sense, so those
+`sougata_solver` has no database and no UI in the traditional sense, so those
 template sections are replaced below with what actually exists: the public
 Python API (in place of "API Design") and the example-script/plotting
 surface (in place of "UI/UX Design") — see the "N/A sections" note at the
@@ -117,7 +117,7 @@ ADR-009):
 - **`postprocessing/`** — takes a `structures/` script's raw output and
   derives something further from it: Jones/Mueller matrices and
   ellipsometric angles today (`postprocessing/jones_mueller_ellipsometry.py`,
-  reading the CSV written by `structures/sio2_on_si_ellipsometry_run.py`),
+  reading the CSV written by `structures/thin_film/sio2_on_si_ellipsometry_run.py`),
   and — planned, not yet built — RI/thickness extraction (inverse fitting
   against measured data). This directory never calls `Simulation.solve`
   itself; it only reads already-computed data.
@@ -128,12 +128,12 @@ Concretely:
    `structures/` (e.g. `sio2_on_si_thin_film.py`, `custom_multistack.py` —
    copy the latter for a new stack) and `postprocessing/`.
 2. **Console output**: scripts print a table of wavelength/R/T/A to stdout
-   during a sweep (see `structures/sio2_on_si_thin_film.py::main`).
+   during a sweep (see `structures/thin_film/sio2_on_si_thin_film.py::main`).
 3. **CSV output**: `structures/` scripts optionally save results
-   (`OUTPUT_CSV_PATH` pattern in `structures/sio2_on_si_thin_film.py`) or,
+   (`OUTPUT_CSV_PATH` pattern in `structures/thin_film/sio2_on_si_thin_film.py`) or,
    for ellipsometry-style scripts, save raw field data specifically so a
    `postprocessing/` script can consume it
-   (`structures/sio2_on_si_ellipsometry_run.py`'s CSV output).
+   (`structures/thin_film/sio2_on_si_ellipsometry_run.py`'s CSV output).
 4. **(Phase 7, planned)**: `matplotlib`-based cross-section field-intensity
    plots for trench/via structures — the first genuinely visual output this
    project will produce, living in `structures/` (computing + plotting
@@ -143,10 +143,10 @@ Concretely:
 ## "API Design" — Public Python API
 
 The intended import surface (already `__all__`-exported from
-`src/pyrcwa/__init__.py`):
+`src/sougata_solver/__init__.py`):
 
 ```python
-from pyrcwa import Material, Lattice, Circle, Rectangle, Pattern, Layer, LayerStack
+from sougata_solver import Material, Lattice, Circle, Rectangle, Pattern, Layer, LayerStack
 ```
 
 Plus, imported directly from their submodules (not yet re-exported at
@@ -154,8 +154,8 @@ top level — worth revisiting once Phase 3/4 land and usage patterns
 stabilize):
 
 ```python
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.simulation import Simulation, SimulationResult
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.simulation import Simulation, SimulationResult
 ```
 
 **Typical call sequence** (already the pattern in every `structures/*.py` script):
@@ -175,7 +175,7 @@ framework magic" non-functional requirement in `PRD.md`.
 
 ## "Database Design"
 
-Not applicable — `pyrcwa` has no database and no persistent application
+Not applicable — `sougata_solver` has no database and no persistent application
 state. The closest analogue is the optional CSV output described above,
 which is a one-shot export, not a managed data store.
 
@@ -256,7 +256,7 @@ Current, deliberate conventions (keep consistent in new code):
   (`simulation.py:98,101`) — this is intentional: an RCWA solver that
   silently returns a plausible-looking wrong answer is far worse than one
   that crashes.
-- **No broad `except` blocks anywhere in `src/pyrcwa/`.** Keep it that way —
+- **No broad `except` blocks anywhere in `src/sougata_solver/`.** Keep it that way —
   a caught-and-swallowed `LinAlgError` from a near-singular Toeplitz matrix
   (Phase 2/4 risk) must propagate, not be masked.
 - **Validate at construction, not at use.** Prefer raising in `__init__`/
@@ -270,13 +270,13 @@ Current, deliberate conventions (keep consistent in new code):
 
 ## Logging Strategy
 
-There is currently **no logging module usage anywhere in `src/pyrcwa/`** —
-only `print()` in `structures/`/`postprocessing/` scripts (`structures/sio2_on_si_thin_film.py`). This is
+There is currently **no logging module usage anywhere in `src/sougata_solver/`** —
+only `print()` in `structures/`/`postprocessing/` scripts (`structures/thin_film/sio2_on_si_thin_film.py`). This is
 appropriate for the library core (a numerical function should not have
 side-effecting log output — it should raise or return, full stop) but
 should be formalized as follows going forward:
 
-- **`src/pyrcwa/` (the library) never calls `print` or configures
+- **`src/sougata_solver/` (the library) never calls `print` or configures
   logging.** It's a library; logging configuration belongs to the caller.
 - **If/when diagnostic visibility is genuinely needed inside the library**
   (e.g. reporting Toeplitz condition number or eigenvalue-degeneracy

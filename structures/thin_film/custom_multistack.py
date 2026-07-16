@@ -1,15 +1,18 @@
 """Template: an arbitrary-length multilayer thin-film stack, any materials.
 
-Copy this file for any new multistack (thin film / DBR / anti-reflection
-coating / etc.) instead of editing sio2_on_si_thin_film.py in place.
-Everything you're likely to change is in the numbered EDIT blocks below.
+Copy this file (within structures/thin_film/) for any new multistack (thin
+film / DBR / anti-reflection coating / etc.) instead of editing
+sio2_on_si_thin_film.py in place. Everything you're likely to change is in
+the numbered EDIT blocks below.
 
 LIMITATION (see phases.md / troubleshooting.md): only *uniform* (unpatterned)
 layers work today -- each layer has a thickness (z-direction) only, and is
 treated as extending infinitely in x/y. Trench/via/pillar patterning (real
-x/y dimensions: line width, radius, pitch) is not implemented yet.
+x/y dimensions: line width, radius, pitch) is not implemented yet -- once
+Phase 3/4 land, those get their own structures/trench/ and structures/via/
+folders and templates.
 
-Run with:  python structures/custom_multistack.py
+Run with:  python structures/thin_film/custom_multistack.py
 """
 
 import math
@@ -18,13 +21,14 @@ from pathlib import Path
 import numpy as np
 from scipy.interpolate import interp1d
 
-from pyrcwa.excitation import PlaneWaveExcitation
-from pyrcwa.geometry import Lattice
-from pyrcwa.layer import Layer
-from pyrcwa.materials import Material
-from pyrcwa.simulation import Simulation
+from sougata_solver.excitation import PlaneWaveExcitation
+from sougata_solver.geometry import Lattice
+from sougata_solver.layer import Layer
+from sougata_solver.materials import Material
+from sougata_solver.output_paths import run_output_path
+from sougata_solver.simulation import Simulation
 
-NK_DIR = Path(__file__).resolve().parent.parent.parent / "NK_FILE"
+NK_DIR = Path(__file__).resolve().parents[3] / "NK_FILE"
 
 
 def _parse_refractiveindex_csv(csv_path: str):
@@ -109,8 +113,11 @@ P_AMPLITUDE = 0.0   #   (1,0)=s-pol, (0,1)=p-pol, (1,1)=45deg, (1,1j)=circular
 WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 401)
 
 # ============================================================================
-# EDIT (5): where to save results (set to None to skip saving)
+# EDIT (5): where to save results (set OUTPUT_CSV_PATH to None to skip
+# saving); RUN_NAME tags the output subfolder -- rename it if you copy this
+# file for a new stack, so its outputs don't get labeled "custom_multistack".
 # ============================================================================
+RUN_NAME = "custom_multistack"
 OUTPUT_CSV_PATH = "output_multistack_RT.csv"
 
 
@@ -140,10 +147,11 @@ def main():
         print(f"{wavelength * 1e9:16.1f}  {reflectance[i]:8.4f}  {transmittance[i]:8.4f}  {absorptance:8.4f}")
 
     if OUTPUT_CSV_PATH:
+        output_path = run_output_path(RUN_NAME, OUTPUT_CSV_PATH)
         absorptance = 1.0 - reflectance - transmittance
         table = np.column_stack([WAVELENGTHS * 1e9, reflectance, transmittance, absorptance])
-        np.savetxt(OUTPUT_CSV_PATH, table, delimiter=",", header="wavelength_nm,R,T,A", comments="")
-        print(f"\nSaved {len(WAVELENGTHS)} rows to {OUTPUT_CSV_PATH}")
+        np.savetxt(output_path, table, delimiter=",", header="wavelength_nm,R,T,A", comments="")
+        print(f"\nSaved {len(WAVELENGTHS)} rows to {output_path}")
 
     return reflectance, transmittance
 
