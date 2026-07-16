@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyrcwa"
+name = "sougata_solver"
 version = "0.1.0"
 description = "Pure-Python Rigorous Coupled-Wave Analysis (RCWA) solver for periodic layered electromagnetic structures"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "matplotlib>=3.7"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
