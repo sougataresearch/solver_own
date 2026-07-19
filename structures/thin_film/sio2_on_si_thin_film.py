@@ -91,7 +91,7 @@ CSV_WAVELENGTH_UNIT = "um"                  # "um", "nm", or "m" -- match your f
 # EDIT (2): layer thicknesses (meters)
 # ============================================================================
 SIO2_THICKNESS = 50e-9   # 50 nm
-SI_THICKNESS = 12e-6     # 12 um
+SI_THICKNESS = 2e-3     # 2 mm
 
 # ============================================================================
 # EDIT (3): incident light -- angle (degrees), polarization
@@ -112,7 +112,7 @@ P_AMPLITUDE = 0.0
 # ============================================================================
 # EDIT (4): wavelength sweep (meters)
 # ============================================================================
-WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 41)  # 400-800 nm, 41 points
+WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 401)  # 400-800 nm, 401 points
 
 # ============================================================================
 # EDIT (5): where to save results (set to None to skip saving)
@@ -122,7 +122,7 @@ WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 41)  # 400-800 nm, 41 points
 # afterward to plot it (it finds this run's CSV automatically and saves the
 # plot into this same output folder).
 # ============================================================================
-OUTPUT_CSV_PATH = "output_RT.csv"  # filename only; saved under outputs/YYYY-MM-DD/
+OUTPUT_CSV_PATH = "output_RT.csv"  # filename only; saved under outputs/YYYY_MM_DD/
 
 
 def main():

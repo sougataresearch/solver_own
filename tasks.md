@@ -20,18 +20,18 @@ summary instead of deleting history here.
 ☑ Validate against analytic Fresnel/TMM (`tests/test_analytic_fresnel.py`, `tests/oracles/fresnel.py`)
 ☑ Ship the initial `structures/` scripts (anti-reflection coating, SiO2-on-Si, custom multistack, custom-material-from-nk-data) and the `postprocessing/` Jones/Mueller ellipsometry split
 
-## Phase 2 — Fourier-Factorization Core
+## Phase 2 — Fourier-Factorization Core (DONE)
 
-□ Add `.flake8`/`ruff` config and `mypy.ini` to `sougata_solver/` (rules.md gap, do before new modules land)
-□ Create `src/sougata_solver/fourier_factorization.py`
-□ Implement `pattern_epsilon_hat(pattern, g_vectors, lattice)` (direct, sums shape contributions with containment-tree subtraction)
-□ Implement the inverse-rule variant (`1/eps` per shape, same summation) for `epsilon_inv_hat`
-□ Implement `toeplitz_matrix(eps_hat_lookup, g_indices)`
-□ Write numerical FFT-of-rasterized-mask reference for a `Circle` pattern
-□ Write numerical FFT-of-rasterized-mask reference for a `Rectangle` pattern
-□ Test: analytic Toeplitz entries match FFT reference within tolerance, for both `Circle` and `Rectangle`
-□ Test: DC term of `epsilon_hat` equals area-weighted average permittivity (closed-form sanity check)
-□ Update `memory.md` / `decisions.md` on completion
+☑ Add `.flake8`/`ruff` config and `mypy.ini` to `sougata_solver/` (rules.md gap, do before new modules land)
+☑ Create `src/sougata_solver/fourier_factorization.py`
+☑ Implement `pattern_epsilon_hat(pattern, lattice, g1, g2, wavelength)` (direct, sums shape contributions with containment-tree subtraction)
+☑ Implement the inverse-rule variant (`1/eps` per shape, same summation) for `epsilon_inv_hat`
+☑ Implement `toeplitz_matrix(pattern, lattice, g_vectors, wavelength)`
+☑ Write numerical rasterize-and-sum reference for a `Circle` pattern
+☑ Write numerical rasterize-and-sum reference for a `Rectangle` pattern
+☑ Test: analytic Toeplitz entries match the rasterized reference within tolerance, for both `Circle` and `Rectangle`
+☑ Test: DC term of `epsilon_hat` equals area-weighted average permittivity (closed-form sanity check)
+☑ Update `memory.md` / `decisions.md` on completion
 
 ## Phase 3 — 1D-Periodic Lamellar Gratings (Trench)
 

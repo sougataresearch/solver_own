@@ -237,7 +237,7 @@
   locates a `structures/` script's CSV via
   `output_paths.find_latest_output` (or an explicit path for a specific
   historical run), plots it, and saves the PNG back into that *same*
-  `outputs/YYYY-MM-DD/HH-MM-SS_<run_name>/` folder — never a new one.
+  `outputs/YYYY_MM_DD/HH_MM_SS_<run_name>/` folder — never a new one.
   Separately, every `structures/` script that saves output now also calls
   a new `output_paths.write_run_metadata(output_dir, __file__, **params)`,
   writing a `run_metadata.txt` into that run's folder recording which

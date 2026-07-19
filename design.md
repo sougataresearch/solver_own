@@ -130,8 +130,8 @@ Concretely:
 2. **Console output**: scripts print a table of wavelength/R/T/A to stdout
    during a sweep (see `structures/thin_film/sio2_on_si_thin_film.py::main`).
 3. **CSV + metadata output**: `structures/` scripts get one output folder
-   per invocation (`output_paths.run_output_dir`, `outputs/YYYY-MM-DD/
-   HH-MM-SS_<run_name>/`) and write both their raw CSV and a
+   per invocation (`output_paths.run_output_dir`, `outputs/YYYY_MM_DD/
+   HH_MM_SS_<run_name>/`) and write both their raw CSV and a
    `run_metadata.txt` (`output_paths.write_run_metadata`) into it — the
    metadata file records which script produced the run and its key
    parameters (materials, thicknesses, angle, wavelength range, ...) so a

@@ -55,15 +55,25 @@ Current (Phase 1, shipped):
 - Jones/Mueller polarimetry
   ([`src/sougata_solver/polarimetry.py`](src/sougata_solver/polarimetry.py))
 - Analytic in-plane Fourier transforms for `Circle` and `Rectangle` shapes
-  with nested-shape subtraction, ready to be consumed by the patterned-layer
-  solver ([`src/sougata_solver/geometry.py`](src/sougata_solver/geometry.py))
+  with nested-shape subtraction
+  ([`src/sougata_solver/geometry.py`](src/sougata_solver/geometry.py))
 - Circular G-vector truncation for Fourier-order selection
   ([`src/sougata_solver/fourier_basis.py`](src/sougata_solver/fourier_basis.py))
 
+Current (Phase 2, shipped):
+- Toeplitz permittivity matrix construction (direct and inverse-rule) for
+  patterned layers — `pattern_epsilon_hat`, `toeplitz_matrix`
+  ([`src/sougata_solver/fourier_factorization.py`](src/sougata_solver/fourier_factorization.py)),
+  validated against two independent numerical references (from-scratch
+  rasterize-and-sum, and an FFT-of-rasterized-mask reproduction of the
+  vendored `RigorousCoupledWaveAnalysis.jl`/`convmat2D.py` algorithm). Not
+  yet wired into `simulation.py` — the general (non-uniform) eigenmode
+  solver that consumes it is Phase 4.
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
-- Fourier-factorization core + general (non-uniform) eigenmode solver so
-  patterned layers actually work end to end (currently
-  `simulation.py` raises `NotImplementedError` for any patterned layer)
+- General (non-uniform) eigenmode solver so patterned layers actually work
+  end to end (currently `simulation.py` raises `NotImplementedError` for
+  any patterned layer)
 - 1D lamellar gratings (trench)
 - 2D patterned layers (via, pillar)
 - Tapered/sloped sidewalls via staircase layer discretization
@@ -102,16 +112,18 @@ sougata_solver/
 ├── phases.md              roadmap phases
 ├── tasks.md                atomic task checklist per phase
 ├── memory.md               live project status for future sessions
+├── progress_log.md          dated log of discussions + action items (new 2026-07-19)
 ├── decisions.md            architecture decision record (ADR)
 ├── testing.md              testing strategy
 ├── deployment.md           environment/CI/release process
 ├── references.md            literature + reference-implementation index
 ├── troubleshooting.md      known numerical gotchas
 ├── pyproject.toml
-├── src/sougata_solver/
+├── src/sougata_solver/        see src/sougata_solver/README.md for the module map
 │   ├── materials.py         permittivity models (isotropic + tensor)
 │   ├── geometry.py           Lattice, Shape (Circle/Rectangle), Pattern
 │   ├── fourier_basis.py       G-vector truncation
+│   ├── fourier_factorization.py  Toeplitz permittivity matrices (Phase 2, done)
 │   ├── layer.py                Layer, LayerStack, LayerEigenmodes
 │   ├── eigenmodes.py           per-layer eigenmode solve (uniform today)
 │   ├── smatrix.py               interface + propagation S-matrices, star product
@@ -119,18 +131,20 @@ sougata_solver/
 │   ├── fields.py                  Poynting flux, tangential field reconstruction
 │   ├── polarimetry.py             Jones/Mueller (reused by postprocessing/)
 │   ├── simulation.py               top-level orchestration
-│   └── output_paths.py             outputs/YYYY-MM-DD/HH-MM-SS_<run>/ helper
-├── tests/                    pytest suite + `tests/oracles/` (analytic references)
-├── structures/                YOU RUN THESE: define a lattice/layer stack/materials
-│                                and run the solver -- one subfolder per geometry type
-│   └── thin_film/                uniform multilayer stacks (Phase 1, done) -- e.g.
-│                                  sio2_on_si_thin_film.py, custom_multistack.py
-│                                  (copy this one for a new stack)
+│   └── output_paths.py             outputs/YYYY_MM_DD/HH_MM_SS_<run>/ helper
+├── tests/                    pytest suite + `tests/oracles/` -- see tests/README.md
+├── structures/                YOU RUN THESE -- see structures/README.md
+│   └── thin_film/                uniform multilayer stacks (Phase 1, done)
 │                                (trench/ and via/ subfolders land with Phase 3/4)
 └── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
                                   output and derive Jones/Mueller matrices, ellipsometric
                                   angles, and (planned) RI/thickness extraction
 ```
+
+Folder-level READMEs with more detail:
+[`src/sougata_solver/README.md`](src/sougata_solver/README.md) ·
+[`structures/README.md`](structures/README.md) ·
+[`tests/README.md`](tests/README.md)
 
 ## Installation
 
@@ -169,7 +183,7 @@ python postprocessing/jones_mueller_ellipsometry.py
 ### Output files
 
 Every script that saves a result (CSV today; plots later) writes into
-`outputs/YYYY-MM-DD/HH-MM-SS_<script-name>/`, via
+`outputs/YYYY_MM_DD/HH_MM_SS_<script-name>/`, via
 `src/sougata_solver/output_paths.py`: one date folder per day, and inside it
 one timestamped subfolder per run, so a day's runs stay together but two
 different scripts — or two runs of the same script — never overwrite each

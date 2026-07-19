@@ -50,7 +50,7 @@ AZIMUTHAL_ANGLE_DEG = 0.0
 # ============================================================================
 # EDIT (4): where to save the raw field data
 # ============================================================================
-OUTPUT_CSV_PATH = "sio2_on_si_ellipsometry_raw.csv"  # filename only; saved under outputs/YYYY-MM-DD/
+OUTPUT_CSV_PATH = "sio2_on_si_ellipsometry_raw.csv"  # filename only; saved under outputs/YYYY_MM_DD/
 
 
 def main():

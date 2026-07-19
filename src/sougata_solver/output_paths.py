@@ -1,10 +1,11 @@
 """Date-stamped output folder shared by structures/ and postprocessing/ scripts.
 
 Every script-generated file (CSV, PNG, ...) lands under
-`outputs/YYYY-MM-DD/HH-MM-SS_<run_name>/`, so runs from the same day stay
+`outputs/YYYY_MM_DD/HH_MM_SS_<run_name>/`, so runs from the same day stay
 grouped by date but each individual run -- whether it's a different script or
 a rerun of the same one -- gets its own subfolder and never overwrites or
-gets mixed up with another run's files.
+gets mixed up with another run's files. Underscores throughout (not hyphens)
+to keep folder names consistent with the rest of the project's naming.
 """
 
 from __future__ import annotations
@@ -16,18 +17,18 @@ OUTPUTS_ROOT = Path(__file__).resolve().parents[2] / "outputs"
 
 
 def dated_output_dir(run_date: date | None = None) -> Path:
-    """`outputs/YYYY-MM-DD/` for `run_date` (default: today), created if needed."""
-    d = OUTPUTS_ROOT / (run_date or date.today()).isoformat()
+    """`outputs/YYYY_MM_DD/` for `run_date` (default: today), created if needed."""
+    d = OUTPUTS_ROOT / (run_date or date.today()).strftime("%Y_%m_%d")
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def run_output_dir(run_name: str) -> Path:
     """A fresh subfolder for one script invocation:
-    `outputs/YYYY-MM-DD/HH-MM-SS_<run_name>/`, created if needed -- so two
+    `outputs/YYYY_MM_DD/HH_MM_SS_<run_name>/`, created if needed -- so two
     different scripts, or two runs of the same script, never collide.
     """
-    timestamp = datetime.now().strftime("%H-%M-%S")
+    timestamp = datetime.now().strftime("%H_%M_%S")
     d = dated_output_dir() / f"{timestamp}_{run_name}"
     d.mkdir(parents=True, exist_ok=True)
     return d
@@ -62,8 +63,8 @@ def write_run_metadata(output_dir: Path, script_path: str, **params: object) -> 
 
 def find_latest_output(filename: str) -> Path:
     """Most recently written `outputs/*/*/filename` (newest run subfolder
-    first -- folder names sort chronologically since they're `HH-MM-SS_...`
-    inside a `YYYY-MM-DD` date folder).
+    first -- folder names sort chronologically since they're `HH_MM_SS_...`
+    inside a `YYYY_MM_DD` date folder).
 
     For scripts (e.g. postprocessing) that read a file an earlier script
     wrote, possibly on a previous day -- so a same-day workflow still works

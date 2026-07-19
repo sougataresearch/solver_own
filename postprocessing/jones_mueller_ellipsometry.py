@@ -19,7 +19,7 @@ from sougata_solver.polarimetry import decompose_sp, jones_to_mueller
 
 # ============================================================================
 # EDIT (1): filename of the raw CSV produced by the matching "structures"
-# script -- looked up automatically under outputs/YYYY-MM-DD/, most recent
+# script -- looked up automatically under outputs/YYYY_MM_DD/, most recent
 # date first, so this doesn't need editing if you ran that script today.
 # ============================================================================
 INPUT_CSV_FILENAME = "sio2_on_si_ellipsometry_raw.csv"

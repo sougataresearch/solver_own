@@ -24,24 +24,53 @@ plan-mode scratch file) as phases complete.
 - **Status**: shipped, validated against analytic Fresnel/TMM
   (`tests/test_analytic_fresnel.py`).
 
-## Phase 2 — Fourier-Factorization Core
+## Phase 2 — Fourier-Factorization Core — **DONE**
 
 - **Objectives**: build the dimension-agnostic infrastructure that turns a
   `Pattern` (shapes + background) into the Toeplitz permittivity matrices
   every patterned-layer eigensolver (Phase 3, 4) needs.
-- **Deliverables**: new `src/sougata_solver/fourier_factorization.py` with
+- **Deliverables**: `src/sougata_solver/fourier_factorization.py` with
   `pattern_epsilon_hat(...)` and `toeplitz_matrix(...)`, producing both
   `epsilon_hat` (direct) and `epsilon_inv_hat` (inverse-rule) Toeplitz
-  matrices; unit tests comparing analytic Toeplitz entries against a
-  numerical FFT-of-rasterized-mask reference for `Circle` and `Rectangle`.
-- **Estimated complexity**: Medium. The math is well-defined (sum of
-  already-implemented shape Fourier transforms), but getting the
-  direct-vs-inverse-rule distinction right, and validating it
-  independently (not just "it compiles"), is the actual work.
+  matrices; unit tests (`tests/test_fourier_factorization.py`) comparing
+  analytic Toeplitz entries against **two independent** numerical
+  references for `Circle` and `Rectangle`: a from-scratch rasterize-and-sum
+  (direct Riemann-sum evaluation of the Fourier integral) and a literal
+  FFT-of-rasterized-mask reproducing the vendored `Rigorous-Coupled-Wave-Analysis`
+  (Python `convmat2D.py`) / `RigorousCoupledWaveAnalysis.jl`
+  (`ft2d.jl::real2recip`) algorithm; plus an anisotropic-material
+  `NotImplementedError` guard; `.flake8`/`mypy.ini` added.
+- **Estimated complexity**: (retrospective) Medium, as estimated. The
+  formula was transcribed from
+  `S4/S4/pattern/pattern.c::pattern_get_fourier_transform` (lines
+  889-1029) for the per-shape subtraction-rule accumulation, and
+  `S4/S4/fmm/fmm_closed.cpp::FMMGetEpsilon_ClosedForm` (lines 77-127) for
+  how direct vs. inverse-rule Toeplitz entries are assembled from
+  `G_i - G_j`. Two surprises worth recording: (1) a rectangle's sharp
+  edges alias more than a circle's smooth boundary at a given grid
+  resolution, so the rasterize-and-sum cross-check needed a finer grid
+  (900x900) than first tried (300x300) before agreeing to 5e-3; (2) the
+  first attempt at the FFT cross-check used an uncentered `[0, Lx)` raster
+  grid to mirror `fft2`'s domain convention directly, which silently
+  truncated any shape whose footprint crossed the domain edge (caught
+  because the resulting DC term didn't match the pattern's true
+  area-weighted-average permittivity) — fixed by rasterizing on the same
+  centered grid as the other reference and applying `numpy.fft.ifftshift`
+  before the FFT instead, verified against the DC term before trusting it
+  for the full matrix.
 - **Dependencies**: `geometry.py` (`Shape.fourier_transform`,
   `Pattern.containment_tree`) and `fourier_basis.py`
   (`truncate_fourier_orders`) — both already implemented, no changes
   needed to either.
+- **Status**: shipped, validated against two independent numerical
+  references (from-scratch rasterize-and-sum, and an FFT-of-rasterized-mask
+  reproduction of the vendored `Rigorous-Coupled-Wave-Analysis`/
+  `RigorousCoupledWaveAnalysis.jl` convolution-matrix algorithm) for both
+  `Circle` and `Rectangle` patterns, direct and inverse-rule, at several
+  nonzero G-vectors (`tests/test_fourier_factorization.py`, 12 tests).
+  Scalar isotropic materials only — anisotropic materials raise
+  `NotImplementedError` naming Phase 6, per the AI Coding Rules' scope
+  discipline.
 
 ## Phase 3 — 1D-Periodic Lamellar Gratings (Trench)
 

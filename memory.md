@@ -5,7 +5,33 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-07-16:
+As of 2026-07-18:
+- **Phase 2 (Fourier-factorization core) is complete and validated.**
+  `fourier_factorization.py`'s `pattern_epsilon_hat`/`toeplitz_matrix`
+  build the direct and inverse-rule Toeplitz permittivity matrices from a
+  `Pattern`, transcribed from `S4/S4/pattern/pattern.c::pattern_get_fourier_transform`
+  (lines 889-1029) and `S4/S4/fmm/fmm_closed.cpp::FMMGetEpsilon_ClosedForm`
+  (lines 77-127). Validated against **two independent** numerical
+  references (neither calling into the module under test): a from-scratch
+  rasterize-and-sum, and a literal FFT-of-rasterized-mask reproduction of
+  the vendored `Rigorous-Coupled-Wave-Analysis` (Python `convmat2D.py`)
+  and `RigorousCoupledWaveAnalysis.jl` (`ft2d.jl::real2recip`)
+  convolution-matrix algorithm — the user explicitly asked that S4 not be
+  the only cross-check source, and `rules.md` names RCWA.jl as a
+  sanctioned oracle. Caught one real bug during this: the first
+  FFT-reference attempt used an uncentered raster grid that silently
+  truncated a shape whose footprint crossed the domain edge; fixed via
+  `numpy.fft.ifftshift` before the FFT (see `phases.md` Phase 2 for the
+  full story). Both references agree with the analytic Toeplitz entries
+  for `Circle` and `Rectangle` patterns, direct and inverse rule, at
+  several nonzero G-vectors (`tests/test_fourier_factorization.py`, 12
+  tests, all passing; 75 tests pass project-wide). Scalar isotropic
+  materials only; anisotropic materials raise `NotImplementedError`
+  naming Phase 6.
+  `.flake8`/`mypy.ini` added (mypy/flake8 themselves are not installed in
+  this dev environment, so linting was done by manual review, not an
+  actual tool run — flag this for whoever next has the tools available).
+  **Phase 3 (1D lamellar gratings) is next.**
 - **Phase 1 (uniform multilayer core) is complete and validated.**
   Reflectance/transmittance for arbitrary uniform-layer stacks, arbitrary
   incidence angle/polarization, dispersive materials, and Jones/Mueller
@@ -33,7 +59,7 @@ As of 2026-07-16:
   so `postprocessing/jones_mueller_ellipsometry.py` can reuse the solver's
   exact s/p convention.
 - **Every run gets its own timestamped output folder** (`output_paths.py`:
-  `outputs/YYYY-MM-DD/HH-MM-SS_<run_name>/`) containing its raw CSV/data
+  `outputs/YYYY_MM_DD/HH_MM_SS_<run_name>/`) containing its raw CSV/data
   *and* a `run_metadata.txt` (`write_run_metadata`) recording which script
   produced it and its key parameters — so re-running the same script with
   different settings never collides or gets mixed up (ADR-010). Plotting
@@ -76,17 +102,20 @@ Full rationale lives in `decisions.md` (ADR format). Summary:
 - Phase 1: uniform multilayer stacks, dispersive materials, arbitrary
   polarization/angle, Jones/Mueller polarimetry — validated against
   analytic Fresnel/TMM (`tests/test_analytic_fresnel.py`).
-- Geometry primitives (`Circle`, `Rectangle`, `Pattern` with containment
-  tree) implemented and unit-tested at the shape level
-  (`tests/test_fourier_factorization.py`), but **not yet wired into the
-  solver** — this is Phase 2/4's job, not redundant with what's tested today.
-- Full project documentation suite created (this session).
+- Phase 2: `fourier_factorization.py` (`pattern_epsilon_hat`,
+  `toeplitz_matrix`) — validated against a from-scratch rasterize-and-sum
+  reference (`tests/test_fourier_factorization.py`). **Not yet wired into
+  the solver** — `simulation.py:98`'s `NotImplementedError` for patterned
+  layers still stands; that's Phase 3/4's job (they *consume*
+  `toeplitz_matrix`'s output as the `epsilon_inv` argument
+  `eigenmodes.build_kp_matrix` already accepts).
+- Full project documentation suite created (2026-07-16 session).
 
 ## Known Issues
 
-- No `.flake8`/`ruff` or `mypy.ini` config exists yet in `sougata_solver/` (unlike
-  the sibling `EMpy` reference project, which has both) — flagged as a
-  Phase 2 prerequisite task in `tasks.md`.
+- `.flake8`/`mypy.ini` now exist (added with Phase 2), but neither `flake8`
+  nor `mypy` is actually installed in this dev environment — no run has
+  verified the codebase is clean under either tool yet.
 - `excitation.py`'s s/p polarization sign convention is explicitly
   documented as "internal and self-consistent (not yet matched to
   S4/EMpy's convention)" (`excitation.py:16-19`) — fine for Phase 1 (only
@@ -102,11 +131,15 @@ Full rationale lives in `decisions.md` (ADR format). Summary:
 ## Pending Tasks
 
 See `tasks.md` for the full atomic checklist. Immediate next actions
-(Phase 2 start):
-1. Add lint/type-check config to `sougata_solver/`.
-2. Create `src/sougata_solver/fourier_factorization.py` with
-   `pattern_epsilon_hat`/`toeplitz_matrix`.
-3. Validate against FFT-of-rasterized-mask numerically.
+(Phase 3 start — 1D-periodic lamellar gratings):
+1. Add `Lattice1D` and a `Slab`/`Line` shape to `geometry.py`.
+2. Add `truncate_fourier_orders_1d` to `fourier_basis.py`.
+3. Add `solve_layer_eigenmodes_1d(...)` to `eigenmodes.py` (decoupled
+   scalar TE/TM eigenproblems), consuming Phase 2's `toeplitz_matrix`.
+4. Wire a `Lattice1D` dispatch branch into `simulation.py`.
+5. Validate against a published 1D binary-grating benchmark (Moharam &
+   Gaylord 1995 or equivalent).
+6. `structures/trench/trench_grating.py`.
 
 ## Architecture Notes
 
@@ -148,6 +181,12 @@ See `tasks.md` for the full atomic checklist. Immediate next actions
 - **Do not import from or modify the vendored reference repos**
   (`../S4`, `../EMpy`, `../RigorousCoupledWaveAnalysis.jl`, `../EMTutorial`)
   — they are read-only oracles.
+- **`progress_log.md` (new, 2026-07-19)** is a dated, append-only log of
+  discussions and their action items — check it at the start of any
+  session for open `[ ]` items, verify against the actual code whether
+  they've since been implemented, and add a new dated entry at the end of
+  any substantive session. Distinct from this file (status snapshot) and
+  `tasks.md` (phase-organized checklist).
 - **The user's separate Claude-Code memory system**
   (`C:\Users\d14k4\.claude\projects\...\memory\`) is a different mechanism
   from this file — that one is cross-project and cross-session for the AI
