@@ -30,13 +30,15 @@ reflectors, 1D gratings/trenches, and 2D via/pillar arrays.
 ## Objectives
 
 1. Correctly solve uniform multilayer stacks (thin film / DBR) — **done**.
-2. Correctly solve 1D-periodic lamellar gratings (trench, line/space) with
-   sloped sidewalls.
-3. Correctly solve 2D-periodic patterned layers (via, pillar arrays), also
-   with sloped sidewalls.
-4. Support dispersive, absorbing, and (eventually) anisotropic materials.
+2. Correctly solve 1D-periodic lamellar gratings (trench, line/space),
+   including sloped sidewalls — **done**.
+3. Correctly solve 2D-periodic patterned layers (via, pillar arrays),
+   including sloped sidewalls — **done**.
+4. Support dispersive, absorbing, and (eventually) anisotropic materials —
+   dispersive/absorbing done; anisotropic materials planned (Phase 6).
 5. Validate every new capability against an independent oracle (S4, analytic
-   Fresnel, or a published benchmark table) before trusting it.
+   Fresnel, `RigorousCoupledWaveAnalysis.jl`, or a published benchmark
+   table) before trusting it.
 6. Stay a small, readable, single-author codebase — not a framework.
 
 ## Features
@@ -66,19 +68,45 @@ Current (Phase 2, shipped):
   ([`src/sougata_solver/fourier_factorization.py`](src/sougata_solver/fourier_factorization.py)),
   validated against two independent numerical references (from-scratch
   rasterize-and-sum, and an FFT-of-rasterized-mask reproduction of the
-  vendored `RigorousCoupledWaveAnalysis.jl`/`convmat2D.py` algorithm). Not
-  yet wired into `simulation.py` — the general (non-uniform) eigenmode
-  solver that consumes it is Phase 4.
+  vendored `RigorousCoupledWaveAnalysis.jl`/`convmat2D.py` algorithm).
+
+Current (Phase 3, shipped):
+- 1D-periodic lamellar gratings (trench, line/space) — `Lattice1D`, `Slab`
+  ([`src/sougata_solver/geometry.py`](src/sougata_solver/geometry.py)),
+  `truncate_fourier_orders_1d`
+  ([`src/sougata_solver/fourier_basis.py`](src/sougata_solver/fourier_basis.py)),
+  `solve_layer_eigenmodes_1d`
+  ([`src/sougata_solver/eigenmodes.py`](src/sougata_solver/eigenmodes.py)),
+  with diffraction efficiencies via `SimulationResult.diffraction_efficiencies()`.
+  Validated against `tests/oracles/rcwa_1d_gaylord.py` (Moharam & Gaylord
+  1995) and the energy-conservation invariant.
+
+Current (Phase 4a/4b, shipped):
+- General (non-uniform) 2D-periodic patterned-layer eigenmode solver —
+  `solve_layer_eigenmodes_patterned`
+  ([`src/sougata_solver/eigenmodes.py`](src/sougata_solver/eigenmodes.py)),
+  removing `simulation.py`'s prior `NotImplementedError` for any patterned
+  layer. Validated against an independent eigenvalue oracle transcribed
+  from `RigorousCoupledWaveAnalysis.jl` (agrees to ~1e-12), energy
+  conservation, and a ky=0-reduces-to-1D cross-check.
+- Condition-number `WARNING` logging (`eigenmodes.ILL_CONDITIONED_THRESHOLD`)
+  for near-degenerate/ill-conditioned patterned-layer cases, after a
+  deliberate high-contrast/high-order stress sweep found no catastrophic
+  failure.
+
+Current (Phase 5, shipped):
+- Tapered/sloped sidewalls via staircase (z-discretized) layer
+  approximation — `staircase_circle_layers`, `staircase_rectangle_layers`,
+  `staircase_slab_layers`
+  ([`src/sougata_solver/staircase.py`](src/sougata_solver/staircase.py)).
+  Validated by a zero-taper regression to the already-oracle-validated
+  single-uniform-layer result, energy conservation, and
+  convergence-vs-`num_slices` studies.
 
 Planned (see [`phases.md`](phases.md) for the full roadmap):
-- General (non-uniform) eigenmode solver so patterned layers actually work
-  end to end (currently `simulation.py` raises `NotImplementedError` for
-  any patterned layer)
-- 1D lamellar gratings (trench)
-- 2D patterned layers (via, pillar)
-- Tapered/sloped sidewalls via staircase layer discretization
-- Anisotropic materials
-- Real-space field reconstruction and cross-section plotting
+- Anisotropic materials (full 3x3 permittivity tensor, Phase 6)
+- Real-space field reconstruction and cross-section plotting (Phase 7)
+- Expanded systematic validation sweep across all geometry types (Phase 8)
 - Optional vectorized/GPU/autodiff backend (later; see `decisions.md`)
 
 ## Target Users
@@ -121,11 +149,13 @@ sougata_solver/
 ├── pyproject.toml
 ├── src/sougata_solver/        see src/sougata_solver/README.md for the module map
 │   ├── materials.py         permittivity models (isotropic + tensor)
-│   ├── geometry.py           Lattice, Shape (Circle/Rectangle), Pattern
-│   ├── fourier_basis.py       G-vector truncation
+│   ├── geometry.py           Lattice, Lattice1D, Shape (Circle/Rectangle/Slab), Pattern
+│   ├── fourier_basis.py       G-vector truncation (2D circular + 1D)
 │   ├── fourier_factorization.py  Toeplitz permittivity matrices (Phase 2, done)
+│   ├── staircase.py             tapered-sidewall staircase layer generators (Phase 5, done)
 │   ├── layer.py                Layer, LayerStack, LayerEigenmodes
-│   ├── eigenmodes.py           per-layer eigenmode solve (uniform today)
+│   ├── eigenmodes.py           per-layer eigenmode solve: uniform, 1D-patterned
+│   │                            (Phase 3), 2D-patterned (Phase 4a/4b), all done
 │   ├── smatrix.py               interface + propagation S-matrices, star product
 │   ├── excitation.py            plane-wave decomposition, incident amplitude
 │   ├── fields.py                  Poynting flux, tangential field reconstruction
@@ -134,8 +164,9 @@ sougata_solver/
 │   └── output_paths.py             outputs/YYYY_MM_DD/HH_MM_SS_<run>/ helper
 ├── tests/                    pytest suite + `tests/oracles/` -- see tests/README.md
 ├── structures/                YOU RUN THESE -- see structures/README.md
-│   └── thin_film/                uniform multilayer stacks (Phase 1, done)
-│                                (trench/ and via/ subfolders land with Phase 3/4)
+│   ├── thin_film/                uniform multilayer stacks (Phase 1, done)
+│   ├── trench/                    1D lamellar gratings, tapered ridges (Phase 3/5, done)
+│   └── via/                        2D via/pillar arrays, tapered vias/pillars (Phase 4/5, done)
 └── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
                                   output and derive Jones/Mueller matrices, ellipsometric
                                   angles, and (planned) RI/thickness extraction
@@ -166,8 +197,10 @@ python structures/thin_film/sio2_on_si_thin_film.py
 
 For a multi-layer stack of your own materials, copy
 `structures/thin_film/custom_multistack.py` and edit its numbered `EDIT`
-blocks. (Trench and via/pillar structures get their own `structures/trench/`
-and `structures/via/` folders once Phase 3/4 land — see `phases.md`.)
+blocks. Trench (1D grating) and via/pillar (2D patterned) structures live in
+`structures/trench/` and `structures/via/`, including tapered-sidewall
+variants (`tapered_trench.py`, `tapered_via.py`, `tapered_pillar.py`) — see
+[`structures/README.md`](structures/README.md).
 
 For Jones/Mueller/ellipsometric-angle analysis, run the matching
 `structures/thin_film/*_ellipsometry_run.py` script first (it saves raw field
@@ -220,6 +253,9 @@ pytest
 
 ## Future Improvements
 
-See [`phases.md`](phases.md) for the complete, ordered roadmap (Fourier
-factorization, 1D trenches, 2D via/pillar, tapered sidewalls, anisotropy,
-field visualization, expanded validation, optional performance backend).
+Phases 1-5 (uniform stacks, Fourier factorization, 1D trenches, 2D
+via/pillar, tapered sidewalls) are done. See [`phases.md`](phases.md) for
+the complete, ordered roadmap of what remains: anisotropic materials
+(Phase 6), real-space field reconstruction/visualization (Phase 7),
+expanded systematic validation (Phase 8), and an optional
+vectorized/GPU/autodiff performance backend (Phase 9).
