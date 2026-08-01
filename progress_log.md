@@ -243,5 +243,5 @@ whether it was ever actually implemented.
   done 2026-08-01.
 - [x] Add `structures/via/tapered_pillar.py` — done 2026-08-01.
 - [x] Add `OUTPUT_RCWA/`/`demo.fsp` to `.gitignore` — done 2026-08-01.
-- [ ] Commit and push the full backlog (Phases 3-8 plus today's changes) to
-  `origin/main` — in progress this session.
+- [x] Commit and push the full backlog (Phases 3-8 plus today's changes) to
+  `origin/main` — done 2026-08-01 (`f5fd81b`).
