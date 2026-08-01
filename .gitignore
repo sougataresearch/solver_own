@@ -11,3 +11,5 @@ venv/
 .coverage
 htmlcov/
 outputs/
+OUTPUT_RCWA/
+demo.fsp

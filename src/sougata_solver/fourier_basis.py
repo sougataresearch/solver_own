@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from sougata_solver.geometry import Lattice
+from sougata_solver.geometry import Lattice, Lattice1D
 
 
 def truncate_fourier_orders(lattice: Lattice, num_orders: int, method: str = "circular") -> np.ndarray:
@@ -30,3 +30,23 @@ def truncate_fourier_orders(lattice: Lattice, num_orders: int, method: str = "ci
 
     selected = order[:num_orders]
     return np.stack([g1[selected], g2[selected]], axis=1)
+
+
+def truncate_fourier_orders_1d(lattice: Lattice1D, num_orders: int) -> np.ndarray:
+    """1D analogue of `truncate_fourier_orders`: same "sort candidate
+    G-indices by `|k|`, take the smallest `num_orders`" selection, restricted
+    to a single reciprocal direction (`g2` always `0`, matching S4's 1D
+    G-vector convention, `S4/S4/S4.cpp:236-251`/`1031-1044`). Returned shape
+    is the same `(n, 2)` int array as `truncate_fourier_orders`, so it plugs
+    into `fourier_factorization.py`'s `pattern_epsilon_hat`/`toeplitz_matrix`
+    unmodified.
+    """
+    Lk = lattice.reciprocal_vectors()
+    radius = num_orders + 2
+    g1 = np.arange(-radius, radius + 1)
+    kmag = np.abs(g1 * Lk[0, 0])
+    order = np.argsort(kmag, kind="stable")
+
+    selected = order[:num_orders]
+    g1_sel = g1[selected]
+    return np.stack([g1_sel, np.zeros_like(g1_sel)], axis=1)

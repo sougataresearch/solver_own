@@ -1,18 +1,10 @@
-"""Template: an arbitrary-length multilayer thin-film stack, any materials.
+"""TiO2/SiO2 DBR stack on a finite-thickness Si substrate (air below).
 
-Copy this file (within structures/thin_film/) for any new multistack (thin
-film / DBR / anti-reflection coating / etc.) instead of editing
-sio2_on_si_thin_film.py in place. Everything you're likely to change is in
-the numbered EDIT blocks below.
+Copied from custom_multistack.py -- see that file's docstring for the
+general template. Everything you're likely to change is in the numbered
+EDIT blocks below.
 
-LIMITATION (see phases.md / troubleshooting.md): only *uniform* (unpatterned)
-layers work today -- each layer has a thickness (z-direction) only, and is
-treated as extending infinitely in x/y. Trench/via/pillar patterning (real
-x/y dimensions: line width, radius, pitch) is not implemented yet -- once
-Phase 3/4 land, those get their own structures/trench/ and structures/via/
-folders and templates.
-
-Run with:  python structures/thin_film/custom_multistack.py
+Run with:  python structures/thin_film/tio2_sio2_dbr_on_si.py
 """
 
 import math
@@ -28,32 +20,38 @@ from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
 
 NK_DIR = Path(__file__).resolve().parents[3] / "NK_FILE"
+TIO2_DEVORE_O_YML = (
+    NK_DIR / "refractiveindex.info-database" / "database" / "data" / "main"
+    / "TiO2" / "nk" / "Devore-o.yml"
+)
 
 
 # ============================================================================
-# EDIT (1): define every material you need, one of three ways
+# EDIT (1): define every material you need -- all dispersive, from file
 # ============================================================================
-air = Material("air", 1.0)                                       # constant, lossless
-tio2 = Material("TiO2", 2.4**2)                                   # constant n, lossless (n=2.4)
-sio2 = Material.from_nk("SiO2", n=1.46, k=0.0)                    # constant n and k
-si = Material.from_nk_file("Si", str(NK_DIR / "si_nk.csv"))       # dispersive, from file
+air = Material("air", 1.0)                                                # constant, lossless
+# Devore (1951) rutile ordinary-ray Sellmeier fit, valid 0.43-1.53 um,
+# k=0 (no absorption data in this source) -- see Material.from_refractiveindex_formula_file.
+tio2 = Material.from_refractiveindex_formula_file("TiO2", str(TIO2_DEVORE_O_YML))
+sio2 = Material.from_nk_file("SiO2", str(NK_DIR / "SiO2_nk.csv"))         # dispersive, from file
+si = Material.from_nk_file("Si", str(NK_DIR / "si_nk.csv"))               # dispersive, from file
 
 # ============================================================================
 # EDIT (2): the stack itself -- as many Layer(name, thickness, material=...)
 # entries as you want, top to bottom. incidence/transmission below are the
 # semi-infinite half-spaces above/below this list (not part of it).
 # ============================================================================
-INCIDENCE_MATERIAL = air     # what light travels through before hitting the stack
-TRANSMISSION_MATERIAL = si   # semi-infinite substrate below the stack
-# ^ if you want the substrate to have a *finite* thickness instead of being
-#   semi-infinite, add it as a normal Layer(...) in the list below and set
-#   TRANSMISSION_MATERIAL back to whatever is truly underneath it (e.g. air).
+INCIDENCE_MATERIAL = air   # what light travels through before hitting the stack
+TRANSMISSION_MATERIAL = air  # semi-infinite exit medium below the finite Si substrate
+
+SI_SUBSTRATE_THICKNESS = 2e-3  # <-- EDIT: set this (meters) before running, e.g. 500e-6
 
 layers = [
-    Layer("TiO2", 60e-9, material=tio2),
-    Layer("SiO2", 90e-9, material=sio2),
-    Layer("TiO2", 60e-9, material=tio2),
-    Layer("SiO2", 90e-9, material=sio2),
+    Layer("TiO2", 50e-9, material=tio2),
+    Layer("SiO2", 50e-9, material=sio2),
+    Layer("TiO2", 50e-9, material=tio2),
+    Layer("SiO2", 50e-9, material=sio2),
+    Layer("Si", SI_SUBSTRATE_THICKNESS, material=si),  # finite substrate, not semi-infinite
 ]
 
 # ============================================================================
@@ -71,14 +69,16 @@ WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 401)
 
 # ============================================================================
 # EDIT (5): where to save results (set OUTPUT_CSV_PATH to None to skip
-# saving); RUN_NAME tags the output subfolder -- rename it if you copy this
-# file for a new stack, so its outputs don't get labeled "custom_multistack".
+# saving)
 # ============================================================================
-RUN_NAME = "custom_multistack"
-OUTPUT_CSV_PATH = "output_multistack_RT.csv"
+RUN_NAME = "tio2_sio2_dbr_on_si"
+OUTPUT_CSV_PATH = "output_dbr_RT.csv"
 
 
 def main():
+    if SI_SUBSTRATE_THICKNESS is None:
+        raise ValueError("Set SI_SUBSTRATE_THICKNESS (meters) before running -- see EDIT (2).")
+
     lattice = Lattice((1e-6, 0.0), (0.0, 1e-6))  # unused -- only matters for patterned layers
     sim = Simulation(
         lattice, layers, num_orders=1,

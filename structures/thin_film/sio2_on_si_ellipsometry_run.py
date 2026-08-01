@@ -24,8 +24,8 @@ from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
 
 # ============================================================================
-# EDIT (1): materials -- swap in material_from_csv(...) (see
-# custom_material_from_nk_data.py) for your real Si/SiO2 n,k data.
+# EDIT (1): materials -- swap in Material.from_nk_file(name, path) for your
+# real Si/SiO2 n,k data files.
 # ============================================================================
 air = Material("air", 1.0)
 si = Material("Si", (3.9 + 0.02j) ** 2)   # placeholder -- use your real Si n,k

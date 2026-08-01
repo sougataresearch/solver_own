@@ -1,11 +1,13 @@
-"""Jones and Mueller reflection matrices for a specular, non-depolarizing
-(uniform, unpatterned) multilayer stack.
+"""Jones and Mueller reflection matrices for a non-depolarizing multilayer
+stack, at the specular (zeroth) order or per diffraction order.
 
-Scope note: this is only physically meaningful for structures that don't
-scatter light into other diffraction orders (Phase 1's uniform layers).
-Once patterned/grating layers exist (Phase 2+), off-specular diffraction
-orders carry their own power and a single 2x2 Jones matrix no longer
-captures the whole reflected field.
+`jones_reflection_matrix`/`jones_to_mueller` give the specular-order Jones
+and Mueller matrices -- the whole reflected field for a uniform
+(unpatterned) stack, since it has no other orders to scatter into.
+`jones_reflection_matrix_by_order` generalizes this to patterned/grating
+layers, which scatter power into non-zero orders that each carry their own
+Jones matrix -- pass any one order's matrix through `jones_to_mueller` the
+same way.
 """
 
 from __future__ import annotations
@@ -78,6 +80,48 @@ def jones_reflection_matrix(sim, wavelength: float, theta: float, phi: float) ->
         jones[0, column] = e_s
         jones[1, column] = e_p
     return jones
+
+
+def jones_reflection_matrix_by_order(sim, wavelength: float, theta: float, phi: float) -> dict[tuple[int, int], np.ndarray]:
+    """Per-diffraction-order 2x2 complex Jones reflection matrix, keyed by
+    the same `(g1, g2)` reciprocal-lattice index as
+    `SimulationResult.diffraction_efficiencies` (`simulation.py`).
+
+    `rXY = E_X_reflected_at_this_order / E_Y_incident_at_zeroth_order` for
+    `X, Y` in `{s, p}` -- incidence is always injected at the zeroth order
+    only (`PlaneWaveExcitation.incident_mode_amplitude`), so this is the
+    natural per-order generalization of `jones_reflection_matrix`.
+
+    Isolates one order's field by zeroing every other order's mode
+    amplitude before calling `tangential_e_field`, the identical technique
+    `SimulationResult.diffraction_efficiencies` already uses (and its
+    docstring already justifies) to isolate one order's power -- reused
+    here rather than re-derived. For a uniform (unpatterned) stack,
+    `num_orders == 1` and this returns only the zeroth-order entry, equal
+    to `jones_reflection_matrix`'s result; non-zero orders only carry
+    power for patterned/grating layers (`num_orders > 1`).
+    """
+    cos_theta = math.cos(theta)
+    jones_by_order: dict[tuple[int, int], np.ndarray] = {}
+    for column, (s_amp, p_amp) in enumerate([(1.0, 0.0), (0.0, 1.0)]):
+        excitation = PlaneWaveExcitation(wavelength, theta, phi, s_amplitude=s_amp, p_amplitude=p_amp)
+        result = sim.solve(excitation)
+        modes_inc = result.all_modes[0]
+        omega = excitation.omega()
+        zeros = np.zeros_like(result.a0)
+        block = result.b_reflected.shape[0] // 2
+        for i in range(result.num_orders):
+            key = (int(result.g[i, 0]), int(result.g[i, 1]))
+            if key not in jones_by_order:
+                jones_by_order[key] = np.zeros((2, 2), dtype=complex)
+            b_masked = np.zeros_like(result.b_reflected)
+            idx = [i, i + block]
+            b_masked[idx] = result.b_reflected[idx]
+            ex, ey = tangential_e_field(omega, modes_inc.q, modes_inc.kp, modes_inc.phi, zeros, b_masked)
+            e_s, e_p = decompose_sp(ex[i], ey[i], phi, cos_theta)  # reflected: +cos(theta)
+            jones_by_order[key][0, column] = e_s
+            jones_by_order[key][1, column] = e_p
+    return jones_by_order
 
 
 _SIGMA = (

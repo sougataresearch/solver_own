@@ -14,7 +14,6 @@ import math
 from pathlib import Path
 
 import numpy as np
-from scipy.interpolate import interp1d
 
 from sougata_solver.excitation import PlaneWaveExcitation
 from sougata_solver.geometry import Lattice
@@ -22,58 +21,6 @@ from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
 from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
-
-
-def _parse_refractiveindex_csv(csv_path: str):
-    """Parse the refractiveindex.info CSV export format: an 'n' block
-    (header 'wl,n') and, optionally, a separate 'k' block (header 'wl,k')
-    after a blank line -- the two blocks can even be on different
-    wavelength grids. If there's no 'k' block, k is treated as zero
-    (lossless) at every wavelength.
-    """
-    with open(csv_path) as f:
-        lines = [line.strip() for line in f if line.strip()]
-
-    blocks: list[list[str]] = []
-    current: list[str] = []
-    for line in lines:
-        try:
-            float(line.split(",")[0])
-        except ValueError:
-            if current:
-                blocks.append(current)
-            current = []
-        else:
-            current.append(line)
-    if current:
-        blocks.append(current)
-    if not blocks:
-        raise ValueError(f"No numeric data found in {csv_path!r}")
-
-    def parse_block(block):
-        arr = np.array([[float(x) for x in line.split(",")] for line in block])
-        return arr[:, 0], arr[:, 1]
-
-    wl_n, n_vals = parse_block(blocks[0])
-    if len(blocks) > 1:
-        wl_k, k_vals = parse_block(blocks[1])
-    else:
-        wl_k, k_vals = wl_n, np.zeros_like(wl_n)
-    return wl_n, n_vals, wl_k, k_vals
-
-
-def material_from_csv(name: str, csv_path: str, wavelength_unit: str = "um") -> Material:
-    """refractiveindex.info-style CSV: an 'n' block and an optional 'k' block."""
-    wl_n, n_vals, wl_k, k_vals = _parse_refractiveindex_csv(csv_path)
-    scale = {"um": 1e-6, "nm": 1e-9, "m": 1.0}[wavelength_unit]
-
-    n_interp = interp1d(wl_n * scale, n_vals, bounds_error=False, fill_value="extrapolate")
-    k_interp = interp1d(wl_k * scale, k_vals, bounds_error=False, fill_value="extrapolate")
-    return Material.from_nk(
-        name,
-        lambda wl: float(n_interp(wl)),
-        lambda wl: float(k_interp(wl)),
-    )
 
 
 # ============================================================================
@@ -91,7 +38,7 @@ CSV_WAVELENGTH_UNIT = "um"                  # "um", "nm", or "m" -- match your f
 # EDIT (2): layer thicknesses (meters)
 # ============================================================================
 SIO2_THICKNESS = 50e-9   # 50 nm
-SI_THICKNESS = 2e-3     # 2 mm
+SI_THICKNESS = 12e-6     # 2 μm
 
 # ============================================================================
 # EDIT (3): incident light -- angle (degrees), polarization
@@ -127,8 +74,8 @@ OUTPUT_CSV_PATH = "output_RT.csv"  # filename only; saved under outputs/YYYY_MM_
 
 def main():
     try:
-        si = material_from_csv("Si", SI_CSV_PATH, CSV_WAVELENGTH_UNIT)
-        sio2 = material_from_csv("SiO2", SIO2_CSV_PATH, CSV_WAVELENGTH_UNIT)
+        si = Material.from_nk_file("Si", SI_CSV_PATH, CSV_WAVELENGTH_UNIT)
+        sio2 = Material.from_nk_file("SiO2", SIO2_CSV_PATH, CSV_WAVELENGTH_UNIT)
     except OSError:
         print(f"Could not find {SI_CSV_PATH!r} / {SIO2_CSV_PATH!r} -- using placeholder constants instead.\n")
         si = Material("Si", (3.9 + 0.02j) ** 2)      # rough placeholder, NOT real Si data

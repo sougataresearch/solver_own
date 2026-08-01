@@ -27,7 +27,6 @@ comment in each script).
 | [`sio2_on_si_thin_film.py`](thin_film/sio2_on_si_thin_film.py) | SiO2-on-Si, wavelength sweep, R/T/A to CSV — **copy this one to start a new stack** |
 | [`custom_multistack.py`](thin_film/custom_multistack.py) | Reusable N-layer stack template |
 | [`anti_reflection_coating.py`](thin_film/anti_reflection_coating.py) | Single- or multi-layer AR coating example |
-| [`custom_material_from_nk_data.py`](thin_film/custom_material_from_nk_data.py) | Building a `Material` from your own `n,k` data (not refractiveindex.info CSV format) |
 | [`sio2_on_si_ellipsometry_run.py`](thin_film/sio2_on_si_ellipsometry_run.py) | Saves raw field data (not just R/T) for `postprocessing/jones_mueller_ellipsometry.py` to consume |
 
 ### Editing a script for your own structure
@@ -38,12 +37,33 @@ incident angle/azimuth/polarization (`s_amplitude`/`p_amplitude`, complex —
 their ratio sets linear/circular/elliptical polarization), wavelength sweep,
 and output path. No other part of the script should normally need touching.
 
-### `trench/`, `via/` — not yet present
+## `trench/` (Phase 3 lamellar grating, Phase 5 tapered sidewall — done)
 
-Land with Phase 3 (1D lamellar gratings) and Phase 4 (2D via/pillar arrays)
-respectively — see [`phases.md`](../phases.md) and [`tasks.md`](../tasks.md).
-Until then, any `Layer` given a `pattern` (instead of a plain `material`)
-will raise `NotImplementedError` in `simulation.py`.
+1D-periodic patterned layers (`Lattice1D`/`Slab`).
+
+| Script | Purpose |
+|---|---|
+| [`trench_grating.py`](trench/trench_grating.py) | Uniform (untapered) lamellar grating, wavelength sweep |
+| [`trench_grating_ellipsometry_run.py`](trench/trench_grating_ellipsometry_run.py) | Saves raw field data for ellipsometry postprocessing |
+| [`tapered_trench.py`](trench/tapered_trench.py) | Linearly-tapered ridge (staircase-discretized), `num_slices` convergence sweep; FDTD-style `TCD`/`BCD`/`SPACING`/`PERIOD` naming for the ridge geometry |
+
+## `via/` (Phase 4a/4b 2D patterned layers, Phase 5 tapered sidewall — done)
+
+2D-periodic patterned layers (`Lattice`/`Circle`/`Rectangle`).
+
+| Script | Purpose |
+|---|---|
+| [`pillar_array.py`](via/pillar_array.py) | Uniform (untapered) circular Si pillar, wavelength sweep |
+| [`via_array.py`](via/via_array.py) | Uniform (untapered) circular via/hole, wavelength sweep |
+| [`tapered_via.py`](via/tapered_via.py) | Linearly-tapered circular via (staircase-discretized), `num_slices` convergence sweep; FDTD-style `TCD`/`BCD`/`SPACING`/`PERIOD` naming (via diameters) |
+| [`tapered_pillar.py`](via/tapered_pillar.py) | Linearly-tapered square pillar (staircase-discretized, `Rectangle` with equal x/y halfwidths), same FDTD-style naming (pillar side length) |
+
+All three tapered scripts (`tapered_trench.py`, `tapered_via.py`,
+`tapered_pillar.py`) build on `src/sougata_solver/staircase.py`'s
+`staircase_slab_layers`/`staircase_circle_layers`/`staircase_rectangle_layers`
+generators (Phase 5, `decisions.md` ADR-004) and use `TCD`/`BCD` (top/bottom
+critical dimension) plus `SPACING` naming to match the equivalent FDTD
+(Lumerical) grating-structure-group parametrization.
 
 ## Doubts already resolved for this folder (see `progress_log.md` 2026-07-19)
 

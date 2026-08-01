@@ -20,7 +20,7 @@ import numpy as np
 # run_metadata.txt, if you need to find it again later). Copy the whole
 # path, including the .csv extension.
 # ============================================================================
-INPUT_CSV_PATH = r"C:\Users\d14k4\Desktop\Solver_own\sougata_solver\outputs\2026_07_19\17_04_10_sio2_on_si_thin_film\output_RT.csv"
+INPUT_CSV_PATH = r"C:\Users\d14k4\Desktop\Solver_own\sougata_solver\outputs\2026_07_31\21_54_11_tio2_sio2_dbr_on_si\output_dbr_RT.csv"
 
 # ============================================================================
 # EDIT (2): optional reference data overlay (e.g. exported from a Lumerical

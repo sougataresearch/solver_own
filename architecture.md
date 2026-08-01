@@ -30,15 +30,16 @@ Layer(s)     ─┘            │                              │
 | Module | Responsibility | Status |
 |--------|-----------------|--------|
 | `materials.py` | Permittivity representation (scalar or 3×3 tensor), dispersion via callables | done |
-| `geometry.py` | `Lattice` (reciprocal-vector math), `Shape` (`Circle`, `Rectangle`) with analytic Fourier transforms, `Pattern` (ordered shapes + containment/subtraction tree) | geometry primitives done; not yet wired to the solver |
-| `fourier_basis.py` | G-vector (Fourier order) truncation, circular selection matching S4's `gsel.c` | done |
+| `geometry.py` | `Lattice`/`Lattice1D` (reciprocal-vector math), `Shape` (`Circle`, `Rectangle`, `Slab`) with analytic Fourier transforms, `Pattern` (ordered shapes + containment/subtraction tree) | done for 1D (`Lattice1D`/`Slab`, Phase 3); 2D shapes done, wired for 1D use only so far |
+| `fourier_basis.py` | G-vector (Fourier order) truncation: `truncate_fourier_orders` (2D, circular selection matching S4's `gsel.c`), `truncate_fourier_orders_1d` (Phase 3) | done |
 | `layer.py` | `Layer` (uniform or patterned), `LayerStack` (with incidence/transmission half-spaces), `LayerEigenmodes` (result container) | done |
-| `eigenmodes.py` | Per-layer eigenmode solve: closed-form for uniform isotropic layers today; general non-uniform solve is Phase 4 | uniform case done |
-| `smatrix.py` | Interface S-matrices, propagation S-matrices, Redheffer star-product cascade (`SMatrixStack`) | done, dimension-agnostic (works unchanged once Phase 3/4 land) |
+| `eigenmodes.py` | Per-layer eigenmode solve: closed-form for uniform isotropic layers; `solve_layer_eigenmodes_1d` (Phase 3, block-diagonal specialization of S4's general operator); dense general non-uniform solve (2D patterns) is Phase 4a | uniform + 1D-patterned done |
+| `smatrix.py` | Interface S-matrices, propagation S-matrices, Redheffer star-product cascade (`SMatrixStack`) | done, dimension-agnostic — confirmed unchanged through Phase 3, expected unchanged through Phase 4/6 too |
 | `excitation.py` | Plane-wave s/p decomposition, incident-mode-amplitude inversion | done |
-| `fields.py` | z-Poynting flux (R/T power), tangential E-field reconstruction at one interface | done for R/T; full real-space reconstruction is Phase 7 |
+| `fields.py` | z-Poynting flux (R/T power), tangential E-field reconstruction at one interface | done for R/T (unchanged through Phase 3); full real-space reconstruction is Phase 7 |
 | `polarimetry.py` | Jones/Mueller matrix construction from simulation results | done |
-| `simulation.py` | Orchestration: builds the Fourier-order set, solves every layer's eigenmodes, cascades the S-matrix stack, solves for transmitted/reflected amplitudes given an incident excitation | done for uniform layers; raises `NotImplementedError` for any patterned layer today (`simulation.py:98`) |
+| `simulation.py` | Orchestration: builds the Fourier-order set, solves every layer's eigenmodes, cascades the S-matrix stack, solves for transmitted/reflected amplitudes given an incident excitation; `SimulationResult.diffraction_efficiencies()` (Phase 3, per-order R/T) | done for uniform + 1D-patterned + 2D-patterned layers |
+| `staircase.py` | Phase 5: `staircase_circle_layers`/`staircase_rectangle_layers`/`staircase_slab_layers` — generate a `list[Layer]` approximating a linearly-tapered via/trench sidewall as `N` uniform-in-z slices; pure geometry/bookkeeping, no new physics formula (consumes Phase 3/4a's per-layer solvers unchanged) | done |
 
 ## Data Flow
 

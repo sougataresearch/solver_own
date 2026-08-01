@@ -40,6 +40,44 @@ covering: nominal input, a degenerate/edge case (e.g. DC term, zero-size
 shape, `N=1` staircase), and — where a closed form exists — an exact
 comparison, not just "doesn't crash."
 
+### Physical-Invariant Testing (oracle-independent)
+
+Scope: checks that follow from Maxwell's equations / Poynting's theorem
+directly, rather than from matching an external reference implementation.
+These are strictly weaker than an oracle-comparison test (they can't catch
+every wrong-but-self-consistent bug) but strictly cheaper and
+oracle-independent — they don't need S4 buildable, a paper table
+transcribed, or a second implementation trusted. Two are required starting
+Phase 3 (the first patterned-layer phase), in addition to, not instead of,
+the oracle-comparison test in System Testing below:
+
+- **Energy conservation**: for lossless materials (real, positive `n`, no
+  absorption), `R + T + sum(diffraction efficiencies) = 1` to within
+  solver-precision tolerance; for absorbing materials,
+  `R + T + sum(diffraction efficiencies) + A = 1` where `A` is computed
+  from the imaginary part of the layer permittivities (Poynting-flux
+  divergence), not fit to make the identity hold. A failure here means a
+  sign/normalization bug regardless of whether the R/T numbers happen to
+  look plausible or even happen to match a specific oracle test case by
+  coincidence.
+- **Convergence-rate-vs-theory**: not just "does R/T converge as
+  `num_orders` increases" (that's Phase 5/8's convergence-vs-`N`/
+  `num_orders` studies) but *at what rate*, compared to the rate Li (1996)
+  predicts for whichever Fourier-factorization rule (`epsilon_hat` vs.
+  `epsilon_inv_hat`) is in use at a discontinuous interface (see
+  `references.md`'s Li 1996 entry and `design.md`'s Fourier-factorization
+  section). A convergence curve that flattens at the right *value* but the
+  wrong *rate* is a real finding — the classic case is using the direct
+  rule where the inverse rule is needed at a discontinuity, which still
+  converges, just first-order instead of the improved rate the inverse
+  rule gives.
+
+Both checks are cheap to add once `SimulationResult` already has R/T/
+diffraction-order data (no new solver machinery), so add them to each new
+geometry phase's existing test file rather than deferring to Phase 8 —
+Phase 8's job is to run them systematically across every geometry type in
+one place, not to be the first place they're checked.
+
 ### Integration Testing
 
 Scope: a full `Simulation.solve()` call exercising multiple modules
@@ -60,9 +98,11 @@ consistency:
 - Phase 1: analytic Fresnel/TMM (done, `tests/oracles/fresnel.py`).
 - Phase 3: a published 1D binary-grating diffraction-efficiency benchmark
   (Moharam & Gaylord 1995 or equivalent — see `references.md`).
-- Phase 4: S4 itself, driven as a subprocess oracle if buildable in this
-  environment (check this explicitly before assuming it — see
-  `memory.md`'s Known Issues), or a published 2D benchmark otherwise.
+- Phase 4a/4b: S4 itself, driven as a subprocess oracle if buildable in
+  this environment (check this explicitly before assuming it — see
+  `memory.md`'s Known Issues), or a published 2D benchmark otherwise. 4a
+  uses a moderate-contrast case; 4b adds a deliberately near-degenerate/
+  high-contrast stress case against the same oracle.
 - Phase 6: a closed-form birefringent-material benchmark (uniaxial
   waveplate at normal incidence).
 - **Never substitute a fabricated "it matches" claim if the real oracle
@@ -96,9 +136,9 @@ file format or any network/multi-user surface is ever added.
   not yet needed since no post-release bug has occurred, but the rule
   applies from Phase 2 onward).
 - Every phase's "reduces to a simpler already-validated case" check is a
-  standing regression guard, not a one-time task — e.g. Phase 4's
+  standing regression guard, not a one-time task — e.g. Phase 4a's
   patterned-layer solver should reduce to Phase 1's uniform result when
-  the shape material equals the background (already listed as a Phase 4
+  the shape material equals the background (already listed as a Phase 4a
   task in `tasks.md`); keep that test in the suite permanently, it will
   catch future refactoring bugs too.
 - Run the full (non-`slow`) suite before every commit that touches

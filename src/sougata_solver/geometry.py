@@ -49,6 +49,29 @@ class Lattice:
         return abs(self.a[0] * self.b[1] - self.a[1] * self.b[0])
 
 
+class Lattice1D:
+    """1D periodic lattice (grating vector along `x`, invariant along `y`).
+
+    Exposes the same `reciprocal_vectors()`/`unit_cell_area()` interface as
+    `Lattice` (duck-typed) so `fourier_factorization.py`'s
+    `pattern_epsilon_hat`/`toeplitz_matrix` work unmodified. Matches S4's
+    1D-lattice convention (`S4/S4_internal.h:188-190`,
+    `S4/S4.cpp:463-481`): the second real-space lattice vector is treated
+    as zero, and so is its reciprocal counterpart, rather than computed.
+    """
+
+    def __init__(self, period: float):
+        self.period = float(period)
+        self.a = np.array([self.period, 0.0])
+        self.b = np.array([0.0, 0.0])
+
+    def reciprocal_vectors(self) -> np.ndarray:
+        return np.array([[1.0 / self.period, 0.0], [0.0, 0.0]])
+
+    def unit_cell_area(self) -> float:
+        return self.period
+
+
 def _rotate(x: float, y: float, angle: float) -> tuple[float, float]:
     c, s = np.cos(angle), np.sin(angle)
     return c * x + s * y, -s * x + c * y
@@ -144,6 +167,48 @@ class Rectangle(Shape):
         # rotate normal back to lab frame (inverse of _rotate)
         c, s = np.cos(self.angle), np.sin(self.angle)
         return np.array([c * n_local[0] - s * n_local[1], s * n_local[0] + c * n_local[1]])
+
+
+@dataclass
+class Slab(Shape):
+    """1D analogue of `Rectangle`: an interval `[center-halfwidth,
+    center+halfwidth]` along `x`, infinite along `y` (invariant in the
+    direction the `Lattice1D` grating is uniform along).
+
+    `area` is a length (`2*halfwidth`), not an area, consistent with
+    `Lattice1D.unit_cell_area()` also being a length — both feed the same
+    `pattern_epsilon_hat` normalization (`fourier_factorization.py`)
+    unmodified. `fourier_transform` ignores `ky` (always `0` for a 1D
+    lattice's G-vectors) and reduces to `Rectangle`'s `x`-only sinc factor,
+    per `S4/S4/pattern/pattern.c`'s 1D shape handling (same subtraction-rule
+    convention already used by `Rectangle`/`Circle`).
+    """
+
+    center_x: float
+    halfwidth: float
+    material: Material
+
+    @property
+    def center(self) -> tuple[float, float]:
+        """`(x, 0.0)`, matching the `Shape` ABC's tuple contract so
+        `Pattern.containment_tree`'s `cx, cy = shape.center` unpacking
+        works unmodified for a 1D shape."""
+        return (self.center_x, 0.0)
+
+    @property
+    def area(self) -> float:
+        return 2.0 * self.halfwidth
+
+    def fourier_transform(self, kx: np.ndarray, ky: np.ndarray) -> np.ndarray:
+        kx = np.asarray(kx, dtype=float)
+        phase = np.exp(-2j * np.pi * kx * self.center_x)
+        return self.area * np.sinc(2 * kx * self.halfwidth) * phase
+
+    def contains(self, x: float, y: float) -> bool:
+        return abs(x - self.center_x) <= self.halfwidth
+
+    def signed_distance_normal(self, x: float, y: float) -> np.ndarray:
+        return np.array([np.sign(x - self.center_x) or 1.0, 0.0])
 
 
 @dataclass

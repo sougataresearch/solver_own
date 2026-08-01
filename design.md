@@ -27,7 +27,7 @@ outgoing/decaying root: for real-valued `q^2`, positive values give a real
 decaying-forward) `q`; for complex `q^2` (absorbing media), the principal
 square root is flipped in sign if needed so `Im(q) >= 0`.
 
-### 2. General (non-uniform) eigenmode solve (patterned layers — Phase 4)
+### 2. General (non-uniform) eigenmode solve (patterned layers — Phase 4a/4b)
 
 Source of truth (not yet transcribed): `S4/S4/rcwa.cpp::SolveLayerEigensystem`,
 lines 794-827. This is the general eigenproblem for a layer whose in-plane
@@ -47,10 +47,13 @@ this case). The two new pieces needed (Phase 2/4) are: (a) constructing
 (b) the general complex eigendecomposition + degenerate-eigenvalue handling.
 **This is the highest-risk remaining algorithm in the project** — general
 eigendecompositions can have near-degenerate eigenvalues with
-poorly-conditioned eigenvectors; the mitigation is the Phase 4 validation
-requirement (cross-check against S4 itself, which has already solved this
-problem correctly) rather than a from-scratch re-derivation of stability
-fixes.
+poorly-conditioned eigenvectors; the mitigation is split across two phases
+(`phases.md`): Phase 4a validates the solver on moderate-contrast cases
+first (cross-check against S4 itself, which has already solved this
+problem correctly, rather than a from-scratch re-derivation of stability
+fixes), and Phase 4b is a dedicated follow-up phase that deliberately
+stress-tests near-degenerate/high-contrast cases rather than trusting
+Phase 4a's easier cases to have exercised that regime.
 
 ### 3. Fourier factorization (Toeplitz permittivity construction — Phase 2)
 
@@ -277,22 +280,26 @@ Current, deliberate conventions (keep consistent in new code):
 
 ## Logging Strategy
 
-There is currently **no logging module usage anywhere in `src/sougata_solver/`** —
-only `print()` in `structures/`/`postprocessing/` scripts (`structures/thin_film/sio2_on_si_thin_film.py`). This is
-appropriate for the library core (a numerical function should not have
-side-effecting log output — it should raise or return, full stop) but
-should be formalized as follows going forward:
+`src/sougata_solver/` uses the standard `logging` module in exactly one
+place as of Phase 4b: `eigenmodes.py`'s module-level
+`logger = logging.getLogger(__name__)`, used by
+`solve_layer_eigenmodes_patterned` to emit a `WARNING` when
+`cond(epsilon_hat)` or `cond(phi)` exceeds `ILL_CONDITIONED_THRESHOLD`
+(`1e4`, chosen from a Phase 4b stress-test sweep — see that function's
+docstring). Everywhere else, `structures/`/`postprocessing/` scripts still
+use plain `print()` (`structures/thin_film/sio2_on_si_thin_film.py`). The
+convention going forward:
 
 - **`src/sougata_solver/` (the library) never calls `print` or configures
-  logging.** It's a library; logging configuration belongs to the caller.
-- **If/when diagnostic visibility is genuinely needed inside the library**
-  (e.g. reporting Toeplitz condition number or eigenvalue-degeneracy
-  warnings once Phase 4's general eigensolver lands), use the standard
-  `logging` module with a module-level `logger = logging.getLogger(__name__)`,
-  emitted at `WARNING` level for numerically-concerning-but-not-fatal
-  conditions (e.g. near-degenerate eigenvalues, ill-conditioned Toeplitz
-  matrix at high truncation order) — never at `INFO`/`DEBUG` for routine
-  solves, to avoid noise in sweep loops that call `solve()` hundreds of times.
+  logging.** It's a library; logging configuration belongs to the caller
+  (a test uses `caplog`, e.g. `tests/test_2d_pillar_stress.py`; an
+  interactive script would call `logging.basicConfig()` itself).
+- **New diagnostic warnings follow the same pattern**: a module-level
+  `logger = logging.getLogger(__name__)`, emitted at `WARNING` level for
+  numerically-concerning-but-not-fatal conditions (near-degenerate
+  eigenvalues, ill-conditioned matrices at high truncation order) — never
+  at `INFO`/`DEBUG` for routine solves, to avoid noise in sweep loops that
+  call `solve()` hundreds of times.
 - **`structures/*.py`/`postprocessing/*.py` scripts may use `print`** freely
   — they are scripts, not library code, and this matches the existing
   convention.

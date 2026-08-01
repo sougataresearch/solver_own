@@ -102,8 +102,40 @@ whether it was ever actually implemented.
   dated, checkable discussion/action-item log distinct from the personal
   Claude-Code memory system (which is cross-project/cross-session for the
   AI assistant, not repo-local project documentation).
+- User asked for a Claude Code skill that, before coding any phase, checks
+  `REFERENCE/` and picks the best-fit vendored repo per structure type
+  (thin film, multilayer, 1D trench, via, etc.) instead of one repo being
+  reused everywhere. Added `phase-reference-picker`
+  (`.claude/skills/phase-reference-picker/` at the workspace root). First
+  draft implicitly leaned on S4 as the default answer for most phases;
+  user caught this and asked for a real per-sub-task comparison plus an
+  explicit choice between transcribing a source vs. deriving independently
+  and using it only as a cross-check — skill rewritten accordingly, and
+  `references.md`/`rules.md`/this file cross-referenced to it.
+
+- User asked how to make the roadmap more scientifically/mathematically
+  rigorous — whether to split phases further or add more complex
+  requirements. Recommended, and (on approval) implemented: (1) split
+  Phase 4 into 4a (well-conditioned via/pillar) and 4b (near-degenerate/
+  ill-conditioned stress cases), since `design.md` already called the
+  general eigendecomposition "the highest-risk remaining algorithm" but
+  the original single Phase 4 let an easy passing test case stand in for
+  that whole risk; (2) added a new oracle-independent Physical-Invariant
+  Testing tier to `testing.md` (energy conservation, convergence-rate-vs-
+  Li-1996-theory), required starting Phase 3, layered on top of (not
+  replacing) the existing oracle-comparison requirement. Deliberately did
+  *not* add new out-of-scope physics (magneto-optic, arbitrary polygons)
+  since `PRD.md` already excludes those by explicit prior decision.
+  Updated: `phases.md`, `tasks.md`, `PRD.md`, `testing.md`, `rules.md`,
+  `design.md`, `memory.md`.
 
 ### Action items
+- [x] Add `phase-reference-picker` skill and cross-reference it from
+  `references.md` ("Choosing a Reference for a New Phase"), `rules.md`
+  (AI Coding Rule 8), and `memory.md` (Things Future AI Sessions Should
+  Remember) — done 2026-07-19.
+- [x] Split Phase 4 into 4a/4b and add Physical-Invariant Testing tier —
+  done 2026-07-19, see `phases.md`/`tasks.md`/`PRD.md`/`testing.md`.
 - [x] (no action needed — see reasoning) Sign convention in code vs hand
   calculation — no mismatch to fix, just keep them separate.
 - [x] (no action needed — see reasoning) Transversality of E/H fields — 
@@ -123,3 +155,93 @@ whether it was ever actually implemented.
   Already recorded as a design decision in `decisions.md`. Revisit once
   Phase 4 (2D-periodic patterned layers) lands — check `tasks.md` Phase 4
   checklist status first.
+
+---
+
+## 2026-07-21
+
+### Discussed
+- Reviewed Phase 4a completion status from scratch: `solve_layer_eigenmodes_patterned`
+  (dense `2n x 2n`, `rcwa.cpp:794-827`), `simulation.py` 2D dispatch, and
+  `structures/via/pillar_array.py` / `via_array.py` were already implemented.
+  `tasks.md` already showed Phase 4a as ☑ complete.
+- Verified all 98 non-slow tests pass (including all 9 `test_2d_pillar.py` tests:
+  reduce-to-uniform, ky=0→1D, 6 energy-conservation parametrize cases, end-to-end).
+- Found a signature bug in both `structures/via/pillar_array.py` and
+  `via_array.py`: `write_run_metadata(out, {dict})` was passing a dict as the
+  `script_path` argument instead of `__file__` — caught because
+  `output_paths.write_run_metadata` takes `(output_dir, script_path: str, **params)`
+  not `(output_dir, dict)`. Scripts ran without raising (Python happily wrote the
+  dict's `str()` as the script path) but recorded wrong metadata.
+- Both structure scripts were also not doing a wavelength sweep (only one wavelength
+  point) and had no console R/T print table, inconsistent with `trench_grating.py`.
+- Fixed both scripts: correct `write_run_metadata` call, 21-point wavelength sweep
+  (500–1500 nm), console R/T table matching `trench_grating.py` style.
+- Ran both scripts post-fix: R+T = 1.0000 at all 21 points for both pillar and via.
+- Noted that `memory.md`/`progress_log.md` had not been updated to reflect Phase 4a
+  completion (still said "Phase 4a is next") — updated both this session.
+- The `staircase discretization for slanted/graded patterned layers` item
+  (progress_log.md 2026-07-19) was blocked on Phase 4 landing — Phase 4a is now
+  done, so this is unblocked; it belongs in Phase 5 (`tasks.md` Phase 5).
+
+### Action items
+- [x] Fix `write_run_metadata` call signature in `pillar_array.py` and
+  `via_array.py` — done 2026-07-21.
+- [x] Add wavelength sweep + console R/T table to both via structure scripts —
+  done 2026-07-21 (matches `trench_grating.py` pattern).
+- [x] Update `memory.md` to reflect Phase 4a completion — done 2026-07-21.
+- [ ] **Phase 4b** (near-degenerate/ill-conditioned stress cases) — next phase.
+  See `tasks.md` Phase 4b for the checklist. Start with: high-contrast Si pillar
+  at small radius/period ratio and high `num_orders`, add condition-number
+  `WARNING` logging to `eigenmodes.py`.
+- [ ] **Layer slicing (staircase discretization)** — unblocked by Phase 4a;
+  now trackable as Phase 5 (`tasks.md` Phase 5). Check `tasks.md` Phase 5
+  checklist before starting.
+
+## 2026-08-01
+
+### Discussed
+- User shared a Lumerical/FDTD structure-group script building a tapered
+  1D grating parametrized by `tcd`/`bcd`/`depth`/`spacing`/`zSpan`/
+  `yCompensation`/`zCompensation`/`grating_number`, and asked what each
+  parameter meant, then asked to build the equivalent trench/via/pillar
+  structures with this parameter style.
+- Mapped FDTD params to Phase 5's already-shipped `staircase.py` generators:
+  `tcd`/`bcd` -> `top_halfwidth`/`bottom_halfwidth` (trench) or
+  `top_radius`/`bottom_radius` (via) or square-pillar side length;
+  `depth` -> `thickness`; `spacing` -> derives `period = tcd + spacing`.
+  `zSpan`, `yCompensation`/`zCompensation`, and `grating_number` have no
+  sougata_solver equivalent (no finite 3D mesh/extrusion, no absolute
+  z-origin offset, and `Lattice`/`Lattice1D` are infinite-periodic so no
+  finite-array replication is needed).
+- Confirmed with the user (via question) to keep the existing per-shape
+  example-script pattern rather than add a new shared
+  tcd/bcd-to-halfwidth conversion helper module — Phase 5 didn't scope a
+  new shared module, and the existing scripts already work fine, so
+  renaming constants in place is the smaller, correctly-scoped change.
+- Renamed `structures/trench/tapered_trench.py` and
+  `structures/via/tapered_via.py`'s top/bottom-size constants to
+  `TCD`/`BCD`/`SPACING`, `PERIOD` derived. Added
+  `structures/via/tapered_pillar.py` (the `Rectangle` case of
+  `staircase_rectangle_layers`, square pillar with equal x/y halfwidths) —
+  this shape type had generator support in `staircase.py` since Phase 5 but
+  no example script yet. All three re-run end-to-end: R+T=1.0000 at every
+  `num_slices` value.
+- User then asked to commit and push to
+  `https://github.com/sougataresearch/solver_own.git`. Found the repo had
+  a large uncommitted backlog beyond today's change: `git log` showed the
+  last commit only covers through Phase 2, while `phases.md` records
+  Phases 3-8 as done — all of that source/tests/structures was sitting
+  uncommitted. Also found two untracked stray files not covered by
+  `.gitignore`: `demo.fsp` (25MB Lumerical binary) and `OUTPUT_RCWA/` (old
+  run-output artifacts, same category `outputs/` already ignores). Asked
+  the user before including either; user chose to exclude both. Added
+  `OUTPUT_RCWA/` and `demo.fsp` to `.gitignore`.
+
+### Action items
+- [x] Rename tapered trench/via constants to FDTD-style tcd/bcd/spacing —
+  done 2026-08-01.
+- [x] Add `structures/via/tapered_pillar.py` — done 2026-08-01.
+- [x] Add `OUTPUT_RCWA/`/`demo.fsp` to `.gitignore` — done 2026-08-01.
+- [ ] Commit and push the full backlog (Phases 3-8 plus today's changes) to
+  `origin/main` — in progress this session.

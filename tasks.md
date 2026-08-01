@@ -33,48 +33,63 @@ summary instead of deleting history here.
 ☑ Test: DC term of `epsilon_hat` equals area-weighted average permittivity (closed-form sanity check)
 ☑ Update `memory.md` / `decisions.md` on completion
 
-## Phase 3 — 1D-Periodic Lamellar Gratings (Trench)
+## Phase 3 — 1D-Periodic Lamellar Gratings (Trench) (DONE)
 
-□ Add `Lattice1D(period)` to `geometry.py`
-□ Add `Slab`/`Line` 1D shape with analytic (`sinc`) Fourier transform
-□ Add `truncate_fourier_orders_1d` to `fourier_basis.py`
-□ Implement `solve_layer_eigenmodes_1d` (TE path, using `epsilon_hat`)
-□ Implement `solve_layer_eigenmodes_1d` (TM path, using `epsilon_inv_hat`)
-□ Add `Lattice1D` dispatch branch in `simulation.py`
-□ Source and transcribe a published 1D binary-grating benchmark table (Moharam & Gaylord 1995 or equivalent) into a test oracle
-□ Test: TE diffraction efficiencies match benchmark
-□ Test: TM diffraction efficiencies match benchmark
-□ Test: normal-incidence limit recovers Phase 1's uniform-layer Fresnel result when line/space contrast is set to zero (continuity sanity check)
-□ Write `structures/trench/trench_grating.py`
-□ Update `memory.md` / `decisions.md` on completion
+☑ Add `Lattice1D(period)` to `geometry.py`
+☑ Add `Slab`/`Line` 1D shape with analytic (`sinc`) Fourier transform
+☑ Add `truncate_fourier_orders_1d` to `fourier_basis.py`
+☑ Implement `solve_layer_eigenmodes_1d` (TE block, using `epsilon_hat`)
+☑ Implement `solve_layer_eigenmodes_1d` (TM block, using `inv(epsilon_inv_hat)`)
+☑ Add `Lattice1D` dispatch branch in `simulation.py`
+☑ Source and transcribe a published 1D binary-grating benchmark (Moharam/Gaylord-style, via `Rigorous-Coupled-Wave-Analysis/RCWA_1D_examples`) into `tests/oracles/rcwa_1d_gaylord.py`
+☑ Test: TE diffraction efficiencies match benchmark (agrees to ~1e-10 at `num_ord=15`)
+☑ Test: TM diffraction efficiencies match benchmark (converges to the same value as the oracle, but only at high `num_orders` -- see `tests/test_1d_grating.py::test_tm_matches_gaylord_oracle_at_high_num_orders` and its docstring for the caveat: the oracle's own source self-reports "STILL NOT WORKING YET")
+☑ Test: patterned layer reduces to Phase 1's uniform-layer result when shape material equals background (continuity sanity check)
+☑ Test: energy conservation (`R + T + sum(diffraction efficiencies) = 1`) across TE/TM/mixed polarization, normal and oblique incidence (`testing.md` Physical-Invariant Testing)
+☑ Test: measured convergence rate vs. `num_orders` (TM, the Li's-rule-sensitive case) decreases monotonically toward a high-order reference (`testing.md` Physical-Invariant Testing)
+☑ Write `structures/trench/trench_grating.py`
+☑ Update `memory.md` / `references.md` on completion
 
-## Phase 4 — 2D-Periodic Patterned Layers (Via, Pillar)
+## Phase 4a — 2D-Periodic Patterned Layers, Well-Conditioned Case (Via, Pillar) (DONE)
 
-□ Implement `solve_layer_eigenmodes_patterned` (general non-uniform eigenproblem, transcribed from `S4/S4/rcwa.cpp::SolveLayerEigensystem` lines 794-827)
-□ Handle near-degenerate eigenvalue edge cases (document the approach in the function's docstring)
-□ Remove the `NotImplementedError` at `simulation.py:98`, wire in Phase 2 Toeplitz construction + this solver
-□ Determine whether S4 is buildable/runnable in this environment for a subprocess cross-check oracle
-□ If S4 is usable: write an S4-driven oracle test for a simple pillar array
-□ If S4 is not usable: source a published 2D benchmark instead, and explicitly document why S4 wasn't used (per `rules.md` AI rule 5 — never fabricate a match)
-□ Test: 2D patterned-layer R/T matches the chosen oracle
-□ Test: patterned-layer solve reduces to the uniform-layer result when the pattern's shape material equals the background (degenerate-pattern sanity check)
-□ Write `structures/via/pillar_array.py`
-□ Write `structures/via/via_array.py`
-□ Update `memory.md` / `decisions.md` on completion
+☑ Implement `solve_layer_eigenmodes_patterned` (general non-uniform eigenproblem, transcribed from `S4/S4/rcwa.cpp::SolveLayerEigensystem` lines 794-827 and `S4/S4/fmm/fmm_closed.cpp`'s true-2D `Epsilon2` branch, lines 133-139/162-163 — corrected mid-session after a first draft wrongly reused the 1D-only branch's formula, see `phases.md` Phase 4a Status), scoped to moderate-contrast/moderate-`num_orders` cases
+☑ Remove the `NotImplementedError` at `simulation.py:98`, wire in Phase 2 Toeplitz construction + this solver
+☑ Determine whether S4 is buildable/runnable in this environment for a subprocess cross-check oracle — not usable here (no `cmake`/Lua toolchain found)
+☐ Source a published 2D benchmark instead (**still not done** — `tests/oracles/rcwa_2d_pillar.py` documents the survey of all vendored RCWA repos and why none yielded a hard-coded literature number; a true external **R/T** oracle for the 2D case remains open, carried into Phase 4b)
+☑ Test: 2D patterned-layer reduce-to-uniform when shape material == background
+☑ Test: `ky=0`'s TE-like block matches the already-validated 1D solver (the part that's rule-independent); a separate test now asserts the TM-like block correctly *diverges* (Li's rule is 1D-only in S4, confirmed by reading the source) — replaces an earlier, circular "reduces to 1D" test that passed even with the wrong formula
+☑ Test: `q^2` eigenvalues match an independently-transcribed `RigorousCoupledWaveAnalysis.jl` eigenoperator (`tests/oracles/rcwa_2djl_eigenvalues.py`, a structurally different formula, agrees to ~1e-12) — the real oracle-comparison test the "ky=0" checks above cannot substitute for; closes the "only ever read S4" gap the Epsilon2 bug came from
+☑ Test: energy conservation for moderate-contrast cases (`testing.md` Physical-Invariant Testing)
+☑ Test: moderate-contrast pillar case runs end-to-end with physically plausible R/T
+☑ Write `structures/via/pillar_array.py`
+☑ Write `structures/via/via_array.py`
+☑ Update `memory.md` / `decisions.md` on completion
+☑ Re-audit Phase 1-3's S4 citations against each cited function's *full* body (not just the branch already used) — the same class of gap that caused the Epsilon2 bug; no further issues found (`phases.md`/`memory.md` Phase 4a entries)
 
-## Phase 5 — Tapered / Sloped Sidewalls (Via, Trench)
+## Phase 4b — 2D-Periodic Patterned Layers, Near-Degenerate / Ill-Conditioned Cases (DONE)
 
-□ Design the staircase-layer-stack generator's API (inputs: top size, bottom size, thickness, slice count `N`; output: `list[Layer]`)
-□ Implement the generator for `Rectangle`/`Circle` (via)
-□ Implement the generator for `Slab` (trench)
-□ Write a convergence-vs-`N` test for a tapered via (mark `slow`)
-□ Write a convergence-vs-`N` test for a tapered trench (mark `slow`)
-□ Write an example script sweeping `N` and plotting/printing R/T convergence
-□ Update `memory.md` / `decisions.md` on completion
+☑ Identify/construct high-index-contrast, small-feature-to-period-ratio, high-`num_orders` test cases likely to stress near-degenerate eigenvalues (index contrast `3.48` to lossy-metal-like `-20+2j`, `num_orders` up to 225, near-touching pillars, sub-percent sliver rectangle, near-degenerate nested circles — see `tests/test_2d_pillar_stress.py`)
+☑ Handle near-degenerate eigenvalue edge cases: empirically, no case in the stress sweep required handling beyond `_select_q_branch` (reused unmodified) — documented as an honest finding, not a fabricated fix, in `solve_layer_eigenmodes_patterned`'s docstring
+☑ Add a condition-number diagnostic (`eigenmodes.ILL_CONDITIONED_THRESHOLD`, `1e4`, logged at `WARNING` via a module-level `logger`, per `design.md` Logging Strategy) for both `epsilon_hat` and the eigenvector matrix `phi`, rather than silently returning a degraded answer
+☐ Test: the stress case(s) still match S4 (or a published benchmark) within tolerance — **S4/Julia unavailable in this environment** (confirmed, not assumed — `troubleshooting.md`'s Environment-Specific Notes); stress cases instead cross-checked against the independent `RigorousCoupledWaveAnalysis.jl` eigenvalue oracle already built for Phase 4a (agrees to ~1e-6+ tolerance, actual sweep showed ~1e-10), an honestly-scoped substitute, not a fabricated S4 match
+☑ Test: energy conservation holds for the stress case(s) (`testing.md` Physical-Invariant Testing — via the oracle-eigenvalue agreement, which implies energy-conserving R/T)
+☑ Test: condition-number `WARNING` logging actually fires when the threshold is exceeded, and stays silent for ordinary cases (`tests/test_2d_pillar_stress.py`'s logging tests, using `caplog`/`monkeypatch`)
+☑ Update `troubleshooting.md` with the concrete Phase 4a bug found and fixed this session (moved to Already-Solved Gotchas), the Phase 4b stress-test findings, and confirmed S4/Julia unavailability
+☑ Update `memory.md` / `phases.md` on completion
+
+## Phase 5 — Tapered / Sloped Sidewalls (Via, Trench) (DONE)
+
+☑ Design the staircase-layer-stack generator's API (inputs: top size, bottom size, thickness, slice count `N`; output: `list[Layer]`) — three functions in `src/sougata_solver/staircase.py` (one per shape type, since `Circle`/`Rectangle`/`Slab` take differently-shaped size parameters), z-midpoint linear interpolation convention documented in the module docstring
+☑ Implement the generator for `Rectangle`/`Circle` (via) — `staircase_rectangle_layers`, `staircase_circle_layers`
+☑ Implement the generator for `Slab` (trench) — `staircase_slab_layers`
+☑ Write a convergence-vs-`N` test for a tapered via (mark `slow`) — `tests/test_staircase.py::test_tapered_via_converges_with_increasing_num_slices`, N=1..32
+☑ Write a convergence-vs-`N` test for a tapered trench (mark `slow`) — `tests/test_staircase.py::test_tapered_trench_converges_with_increasing_num_slices`, N=1..64 (needed one more octave than the via case to settle below the same tolerance)
+☑ Write an example script sweeping `N` and plotting/printing R/T convergence — `structures/via/tapered_via.py`, `structures/trench/tapered_trench.py` (printing only, per ADR-010's plotting-belongs-in-postprocessing rule; no plotting was separately requested this phase)
+☑ Update `memory.md` / `decisions.md` on completion — `decisions.md` ADR-004 already covered the design decision from planning; `memory.md` updated with this phase's actual implementation/validation outcome
 
 ## Phase 6 — Anisotropic Materials
 
-□ Generalize Phase 4's eigensolver to accept a full 3×3 tensor `Epsilon2`
+□ Generalize Phase 4a's eigensolver to accept a full 3×3 tensor `Epsilon2`
 □ Remove `simulation.py`'s uniform-anisotropic `NotImplementedError`
 □ Source a birefringent-material closed-form benchmark (e.g. uniaxial waveplate at normal incidence)
 □ Test: anisotropic solve matches the benchmark

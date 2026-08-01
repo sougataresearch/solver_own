@@ -31,6 +31,51 @@ one; don't rely on memory across sessions.
   (e.g. "just to check something quickly"), don't — see ADR-001 in
   `decisions.md`. Even a quick diagnostic script should use the existing
   `SMatrixStack`/star-product machinery.
+- **A source-cited formula can still be wrong if only the matching branch
+  was read (Phase 4a).** `solve_layer_eigenmodes_patterned`'s `Epsilon2`
+  construction was first written by copying `solve_layer_eigenmodes_1d`'s
+  `epsilon_hat`/`inv(epsilon_inv_hat)` formula — plausible, cited the right
+  file, and passed every test, including a "ky=0 reduces to the 1D solver"
+  check that seemed like a real cross-check. It was wrong: that formula is
+  S4's **1D-only** special case (`fmm_closed.cpp:110-132`,
+  `0==Lr[2]&&Lr[3]==0`); the adjacent true-2D branch
+  (`fmm_closed.cpp:133-139`) uses plain Laurent's rule for *both* blocks
+  and was never read. The "ky=0" test couldn't catch this because both
+  solvers shared the identical wrong formula — a **circular test that
+  passes for the wrong reason looks identical to a real regression guard**
+  until you ask what would make it fail. **Symptom to watch for**: any
+  time two of this project's own functions are cross-checked against each
+  other (not an external oracle) and always agree suspiciously exactly —
+  ask whether they could share a bug, not just a correct formula. **Fixed
+  by**: actually reading the full source function (not just the branch
+  matching prior usage) whenever citing it as "the general case," and by
+  building a genuinely independent oracle
+  (`tests/oracles/rcwa_2djl_eigenvalues.py`, a structurally different
+  formula from `RigorousCoupledWaveAnalysis.jl`) instead of only
+  cross-checking this project's own code against itself. See
+  `eigenmodes.solve_layer_eigenmodes_patterned`'s docstring and `phases.md`
+  Phase 4a's Status for the full account.
+- **Degenerate/near-degenerate eigenvalues and Toeplitz ill-conditioning
+  (Phase 4b) — stress-tested, not found to be catastrophic in practice.**
+  A deliberate sweep (index contrast from `3.48` to a lossy-metal-like
+  `-20+2j`, `num_orders` up to 225, near-touching circular pillars, a
+  sub-percent-halfwidth sliver rectangle, near-degenerate nested circles
+  with a `1e-4`-scale radius difference) found `cond(epsilon_hat)` up to
+  ~900 and `cond(phi)` up to ~170 in the worst cases tried — energy
+  conservation and the independent `RigorousCoupledWaveAnalysis.jl`
+  eigenvalue oracle both held to ~1e-10 throughout, no case actually broke.
+  This is an honest empirical finding for the *closed-form isotropic
+  Circle/Rectangle* patterns tested, not a proof that no pathological case
+  exists — `numpy.linalg.eig` can still misbehave on an input this sweep
+  didn't probe (e.g. a shape with a true measure-zero degeneracy engineered
+  on purpose, or a much larger `num_orders`). **Mitigation shipped**:
+  `cond(epsilon_hat)`/`cond(phi)` logged at `WARNING`
+  (`eigenmodes.ILL_CONDITIONED_THRESHOLD`, `1e4`, ~10x headroom above the
+  worst observed case) rather than silently returning a possibly-degraded
+  result — detection, not silent correction. See
+  `solve_layer_eigenmodes_patterned`'s docstring and
+  `tests/test_2d_pillar_stress.py` for the frozen stress cases and the
+  logging tests.
 
 ## Anticipated Gotchas (not yet encountered — flagged ahead of Phase 2-6)
 
@@ -43,22 +88,6 @@ one; don't rely on memory across sessions.
   `references.md`). **Symptom to watch for**: convergence with `num_orders`
   that's suspiciously slow, or a result that doesn't match a known limit
   (e.g. the Fresnel limit as pattern contrast goes to zero).
-- **Degenerate/near-degenerate eigenvalues in the general non-uniform
-  eigensolver (Phase 4).** `scipy.linalg.eig` on a matrix with two
-  eigenvalues that are equal or very close can return a poorly-conditioned
-  eigenvector basis, which then corrupts `phi`/`kp`-based quantities
-  downstream (S-matrix, fields) even though `q` itself looks fine.
-  **Symptom to watch for**: R/T that's sensitive to tiny perturbations in
-  wavelength/angle where physically it shouldn't be, or that fails the
-  "reduces to uniform case" regression test (`tasks.md` Phase 4) at low
-  pattern contrast specifically (where near-degeneracy is most likely).
-- **Toeplitz matrix ill-conditioning at high truncation order (Phase 2/4).**
-  A very high `num_orders` with a high-index-contrast pattern can produce
-  a badly-conditioned Toeplitz matrix. **Mitigation**: this is exactly the
-  kind of thing the planned `WARNING`-level logging (see `design.md`'s
-  Logging Strategy) should surface once implemented — condition-number
-  checks are cheap (`numpy.linalg.cond`) and worth adding as a diagnostic
-  in Phase 2, not just reacted to after a bad result.
 - **1D-vs-2D lattice convention mismatch (Phase 3).** Do not implement
   `Lattice1D` by reusing 2D `Lattice` with one basis vector set to a very
   large period — this was explicitly rejected during planning (see
@@ -84,12 +113,14 @@ one; don't rely on memory across sessions.
 - Development is on **Windows with PowerShell** as the primary shell (per
   `PRD.md` Constraints) — any new tooling (linting, CI YAML, scripts) must
   be verified to work there, not assumed to work only in a Unix shell.
-- Whether **S4 is actually built/runnable** in this environment (needed
-  for a live Phase 4 cross-check) has not been verified as of this
-  writing — check this explicitly (e.g. can `S4/` be compiled, is its Lua
-  interface accessible) before Phase 4 work assumes it's available; if it
-  isn't, fall back to a literature benchmark per `rules.md`'s AI Coding
-  Rules (never fabricate a match).
+- **Neither S4 nor Julia is runnable in this environment** — confirmed
+  (not just assumed) during Phase 4a/4b: `S4` needs `cmake`+a Lua
+  toolchain, neither found; `which julia` fails (needed to run
+  `RigorousCoupledWaveAnalysis.jl` directly, e.g. to freeze a reference
+  number). This is why Phase 4a/4b's oracle strategy is hand-transcription
+  of vendored source into `tests/oracles/` rather than a live subprocess
+  cross-check — re-check this if the environment ever changes (a new
+  toolchain installed) rather than assuming it's still true.
 
 ## When You Hit Something New
 

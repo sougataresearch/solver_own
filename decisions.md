@@ -274,3 +274,48 @@
   derived physical quantity. Any future field-visualization work (Phase 7)
   follows this same split: raw field data saved by `structures/`, plotted
   by a `postprocessing/` script into the same run folder.
+
+## ADR-011: FDTD is a genuine future goal, but a separate effort from `sougata_solver`'s own phases
+
+- **Decision**: `PRD.md`'s Out-of-Scope Items previously stated flatly that
+  FDTD-style transient simulation is out of scope, reading as "this
+  capability is rejected." Corrected: `sougata_solver` itself (this RCWA
+  codebase, its module structure, its phase numbering) will not grow FDTD
+  capability — RCWA is fundamentally frequency-domain/periodic-BC, so
+  bolting time-domain simulation onto it doesn't fit the architecture. But
+  per the project owner (2026-07-21), FDTD *is* a real future goal of the
+  broader EM-wave-solver effort this project is part of; RCWA was chosen
+  first specifically for simplicity (frequency-domain, periodic structures
+  are the lower-risk starting point per this session's discussion). No
+  FDTD phase, module, timeline, or even repository structure is decided
+  yet — this ADR only records that the goal exists and clarifies
+  `sougata_solver`'s own scope boundary, it does not commit to an FDTD
+  design.
+- **Reason**: The previous "out of scope" wording was discovered this
+  session to contradict the project owner's actual intent when asked
+  directly why the vendored FDTD/FEM reference repos (`meep`, `gprMax`,
+  `fd3d`, `maxwellfdfd`, `mfem`, `OpenParEM`, the FEniCS stack) hadn't been
+  surveyed — the honest answer combined two reasons, one still valid
+  (different numerical method, not a formula source for any current RCWA
+  phase, per the `phase-reference-picker` skill's own guidance) and one
+  that was simply wrong (the docs saying FDTD is rejected outright, not
+  "later, separately"). Docs should reflect actual intent, not create a
+  false impression that a future goal was considered and declined.
+- **Alternatives considered**: Leaving `PRD.md` unchanged and treating this
+  as a verbal-only clarification — rejected because `memory.md`/`rules.md`
+  both treat the written docs as the source of truth a future session (AI
+  or human) inherits; an undocumented verbal clarification would be lost
+  the moment this conversation ends, and the next session would again see
+  "out of scope" and again not survey the FDTD/FEM repos, repeating the
+  same gap.
+- **Trade-offs**: None substantive — this is a documentation correction,
+  not a scope commitment. It does not obligate any FDTD work, add a
+  dependency, or change any current phase's deliverables.
+- **Impact**: `PRD.md`'s Out-of-Scope Items entry rewritten to state the
+  clarification and explicitly name which vendored repos are already
+  sitting there for that future effort (`meep`, `gprMax`, `fd3d`,
+  `maxwellfdfd` for FDTD/FDFD; `mfem`, `OpenParEM`, `dolfinx`/`ufl`/
+  `basix`/`ffcx`, `FreeFem-sources` for FEM, in case that route is chosen
+  instead of or alongside FDTD). No other file changed — a real FDTD
+  planning session (reference survey, architecture decision on
+  standalone-vs-shared-codebase, etc.) is future work, not done here.

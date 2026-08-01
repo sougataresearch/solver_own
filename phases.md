@@ -72,7 +72,7 @@ plan-mode scratch file) as phases complete.
   `NotImplementedError` naming Phase 6, per the AI Coding Rules' scope
   discipline.
 
-## Phase 3 — 1D-Periodic Lamellar Gratings (Trench)
+## Phase 3 — 1D-Periodic Lamellar Gratings (Trench) — **DONE**
 
 - **Objectives**: solve reflectance/transmittance/diffraction efficiencies
   for a 1D-periodic patterned layer (line/space, i.e. a trench), as the
@@ -85,7 +85,14 @@ plan-mode scratch file) as phases complete.
   `solve_layer_eigenmodes_1d(...)` in `eigenmodes.py`; a `Lattice1D`
   dispatch branch in `simulation.py`; a validation test against a published
   1D binary-grating benchmark (Moharam & Gaylord 1995 or equivalent);
-  `structures/trench/trench_grating.py`.
+  `structures/trench/trench_grating.py`; the energy-conservation invariant
+  (`R + T + sum(diffraction efficiencies) + A = 1`) and a measured
+  convergence-rate-vs-`num_orders` check compared against Li (1996)'s
+  predicted rate for the chosen Fourier-factorization rule — both defined
+  in `testing.md`'s Physical-Invariant Testing, and required here as the
+  first patterned-layer phase precisely because these checks are
+  oracle-independent and should catch a wrong-but-benchmark-coincidental
+  result before the benchmark comparison is even run.
 - **Estimated complexity**: Medium-High. The physics (decoupled scalar
   TE/TM eigenproblems) is simpler than Phase 4's general case, but this
   phase is also where the *first* non-uniform eigensolver gets built and
@@ -93,13 +100,51 @@ plan-mode scratch file) as phases complete.
   Fourier-factorization bugs from Phase 2, not 1D-specific ones — budget
   time accordingly.
 - **Dependencies**: Phase 2.
+- **Status**: shipped. Key finding during implementation: 1D gratings'
+  "decoupled scalar TE/TM eigenproblem" turned out not to be a separate
+  formula at all — reading `S4/S4/rcwa.cpp::SolveLayerEigensystem`
+  (lines 684-827) in full showed S4 has no dedicated 1D/TE/TM code path;
+  a 1D lattice is just the *general* non-uniform eigenoperator with the
+  G-vector set restricted to `ky=0`, which then reduces algebraically to
+  exactly block-diagonal (verified directly by a unit test on a random
+  Toeplitz input, not just claimed). So `solve_layer_eigenmodes_1d` is a
+  genuine specialization of Phase 4a's eventual general solver, not an
+  independently-derived scalar formula — this is the concrete form of
+  "validating the general non-uniform eigenmode-solve pattern" the
+  objectives above named. A second finding, from reading
+  `S4/S4/fmm/fmm_closed.cpp:77-127`'s "1D proper FFF rule" branch: the
+  `TM`-like block's effective permittivity is `inv(epsilon_inv_hat)` (the
+  matrix-inverse of Phase 2's *inverse-rule* Toeplitz), not the direct-rule
+  Toeplitz — Li's (1996) factorization rule, and the reason Phase 2 built
+  both `epsilon_hat` and `epsilon_inv_hat` in the first place. Validated
+  against `tests/oracles/rcwa_1d_gaylord.py` (hand-transcribed from
+  `Rigorous-Coupled-Wave-Analysis/RCWA_1D_examples/1D_Grating_Gaylord_{TE,TM}.py`,
+  which cites Moharam, Grann, Pommet & Gaylord 1995): TE agrees with the
+  oracle to ~1e-10 at modest `num_orders`; TM converges to the same limit
+  as the oracle but only at high `num_orders` (measured directly, a real
+  convergence-rate asymmetry between the direct and inverse Fourier rules,
+  consistent with Li 1996) — and the oracle's own TM source file
+  self-reports "STILL NOT WORKING YET" in its module docstring, so TM's
+  primary correctness evidence is the energy-conservation invariant (holds
+  to `1e-8`+ across TE/TM/mixed polarization, normal and oblique incidence)
+  and the reduces-to-Phase-1-uniform-result regression test, not the
+  oracle comparison alone — see `tests/test_1d_grating.py` for the full,
+  honestly-caveated account. 91 tests pass project-wide (75 pre-existing +
+  16 new).
 
-## Phase 4 — 2D-Periodic Patterned Layers (Via, Pillar)
+## Phase 4a — 2D-Periodic Patterned Layers, Well-Conditioned Case (Via, Pillar) — **DONE**
 
 - **Objectives**: solve reflectance/transmittance/diffraction efficiencies
   for a full 2D-periodic patterned layer using the existing `Circle`/
-  `Rectangle` shapes — i.e. make via and pillar arrays actually work,
-  removing the `NotImplementedError` at `simulation.py:98`.
+  `Rectangle` shapes on a *moderate*, well-conditioned case (single circular
+  via, moderate index contrast, moderate `num_orders`) — i.e. get the
+  general eigensolver and its S4/benchmark cross-check working end to end,
+  removing the `NotImplementedError` at `simulation.py:98`. Split out from
+  the original single Phase 4 specifically so the highest-risk numerical
+  work (near-degenerate eigenvalues, ill-conditioning) has its own phase
+  with its own dedicated validation, instead of being one implicit sub-task
+  inside a single large phase where a passing test on an easy case could
+  mask a fragile implementation.
 - **Deliverables**: `solve_layer_eigenmodes_patterned(...)` in
   `eigenmodes.py` (general non-uniform eigenproblem, transcribed from
   `S4/S4/rcwa.cpp::SolveLayerEigensystem`, lines 794-827); `simulation.py`
@@ -107,16 +152,132 @@ plan-mode scratch file) as phases complete.
   if S4 isn't buildable/runnable in this environment, an explicitly-flagged
   literature benchmark instead — never a fabricated "it matches" claim per
   `rules.md`'s AI coding rules); `structures/via/pillar_array.py`,
-  `structures/via/via_array.py`.
-- **Estimated complexity**: High — this is the highest-risk phase in the
-  whole roadmap (general complex eigendecomposition, possible
-  near-degenerate eigenvalues, the trickiest part of `rcwa.cpp` to
-  transcribe correctly). See `troubleshooting.md` for known failure modes
-  to watch for once this lands.
+  `structures/via/via_array.py`; the energy-conservation check
+  (`R + T + sum(diffraction efficiencies) + A = 1`, see `testing.md`'s
+  Physical-Invariant Testing) applied to this phase's cases as a first,
+  oracle-independent correctness signal, before the S4/benchmark cross-check.
+- **Estimated complexity**: High — general complex eigendecomposition is
+  still new machinery here, but the chosen test cases are deliberately
+  scoped to avoid the near-degenerate/ill-conditioned regime (deferred to
+  Phase 4b) so this phase's risk is "get the transcription right," not
+  "get the transcription right *and* numerically stable everywhere."
 - **Dependencies**: Phase 2; benefits from Phase 3 having already
   shaken out Fourier-factorization bugs on the simpler 1D case.
+- **Status**: shipped, with a correction worth recording as a cautionary
+  finding. A first implementation (by a different agent working on this
+  phase) built `Epsilon2` for the 2D case by copying
+  `solve_layer_eigenmodes_1d`'s `epsilon_hat`/`inv(epsilon_inv_hat)`
+  block construction — plausible-looking, consistent with the 1D
+  docstring's citation of `rcwa.cpp:794-827`, and it passed every test
+  including a "ky=0 reduces to the 1D solver" check. It was wrong: that
+  `Epsilon2` construction is only valid inside `fmm_closed.cpp`'s
+  `0==Lr[2]&&Lr[3]==0` branch (the 1D case) — nobody had actually read the
+  adjacent true-2D branch (`fmm_closed.cpp:133-139`) before writing or
+  reviewing this code. Reading it (this session) shows S4's actual default
+  2D closed-form behavior (no polarization basis) is plain Laurent's rule
+  throughout: `Epsilon2 = block_diag(epsilon_hat, epsilon_hat)`, and even
+  `kp` is built from `inv(epsilon_hat)` (a numerical matrix-inverse), not
+  Phase 2's separately-factorized `epsilon_inv_hat` — that quantity turns
+  out to be 1D-only in S4's own source, not general-2D infrastructure as
+  first assumed. The "ky=0 reduces to 1D" test that should have caught
+  this didn't, because it was circular: both solvers used the identical
+  (wrong) formula, so of course they agreed — a concrete instance of
+  `rules.md`'s warning that a passing test on an easy/coincidental case can
+  mask a fragile implementation. Fixed and re-validated (energy
+  conservation and both `structures/via/` scripts re-checked after the
+  fix); the "ky=0" test was replaced with two honest ones — see
+  `memory.md`'s Phase 4a entry and `eigenmodes.solve_layer_eigenmodes_patterned`'s
+  docstring for the full citation.
 
-## Phase 5 — Tapered / Sloped Sidewalls (Via, Trench)
+  **Follow-up (same day, per explicit user request to stop relying on S4
+  alone)**: surveyed all three other vendored RCWA-family repos (`EMpy`,
+  `Rigorous-Coupled-Wave-Analysis`, `RigorousCoupledWaveAnalysis.jl`) for
+  material relevant to Phase 4a. `EMpy/EMpy/RCWA.py` ruled out (1D-only, no
+  2D support, an author-acknowledged instability hack). Confirmed (a third
+  independent source, alongside S4 and this survey) that
+  `Rigorous-Coupled-Wave-Analysis`'s `run_RCWA_2D` also uses plain
+  Laurent's rule for 2D with no inverse-rule correction — reassuring that
+  the fixed formula's rule choice isn't an S4 idiosyncrasy. Built a real
+  eigenoperator oracle from `RigorousCoupledWaveAnalysis.jl/src/Common/Common.jl:57-99`
+  (`tests/oracles/rcwa_2djl_eigenvalues.py`) — a **structurally different**
+  derivation (direct Maxwell-curl elimination, not S4's `Epsilon2 @ kp`
+  route) that, after reconciling its `k0`-normalization and an overall
+  sign-convention difference (both confirmed empirically, documented in
+  the oracle's docstring), matches `solve_layer_eigenmodes_patterned`'s
+  `q^2` eigenvalues to ~1e-12 across several `num_orders`/angle/pattern
+  cases (`tests/test_2d_pillar.py::test_2d_patterned_eigenvalues_match_rcwa_jl_oracle`,
+  6 parametrized cases). This closes the eigenoperator-correctness gap with
+  a genuinely independent formula — the exact class of check that would
+  have caught the original bug (unlike the old circular "ky=0 reduces to
+  1D" test). A full external **R/T** oracle (not just eigenvalues) is still
+  an open gap — no independently-published 2D benchmark was found in any
+  vendored repo, S4 isn't buildable here (no `cmake`/Lua toolchain), and
+  Julia isn't installed either (`which julia` fails) — explicitly flagged
+  rather than faked (`tests/oracles/rcwa_2d_pillar.py`), carried forward as
+  Phase 4b work alongside that phase's originally-scoped near-degenerate
+  stress cases. 107 tests pass project-wide (101 prior + 6 new
+  parametrized eigenoperator-oracle cases).
+
+## Phase 4b — 2D-Periodic Patterned Layers, Near-Degenerate / Ill-Conditioned Cases — **DONE**
+
+- **Objectives**: stress-test Phase 4a's general eigensolver on the cases
+  that actually risk numerical instability — high index contrast, small
+  feature-to-period ratio, high `num_orders` — and add explicit handling
+  (or an explicit, tested failure boundary) for near-degenerate eigenvalues
+  with poorly-conditioned eigenvectors. This is the concrete form of the
+  risk `design.md` names as "the highest-risk remaining algorithm in the
+  project" and `PRD.md`'s Risks table lists — Phase 4a alone does not
+  retire that risk, since a single well-conditioned test case passing says
+  nothing about behavior near degeneracy.
+- **Deliverables**: a documented degenerate-eigenvalue handling strategy in
+  `solve_layer_eigenmodes_patterned`'s docstring (reusing/extending the
+  already-validated `_select_q_branch` outgoing-mode convention, per
+  `PRD.md`'s Risks mitigation); a dedicated regression test suite
+  exercising high-contrast/high-`num_orders` cases against S4 (or a
+  published benchmark) and against the energy-conservation invariant; an
+  explicit condition-number diagnostic (logged at `WARNING`, per
+  `design.md`'s Logging Strategy) when the Toeplitz or eigenvector matrix
+  is ill-conditioned, rather than silently returning a degraded answer.
+- **Estimated complexity**: High — this is where a from-scratch
+  implementation is most likely to diverge from S4's already-solved
+  stability fixes; budget real time for iterating against the S4 cross-check
+  rather than treating one pass as sufficient.
+- **Dependencies**: Phase 4a (reuses its eigensolver and wiring; this phase
+  only adds stress cases and stability handling, not new solve machinery).
+- **Status**: shipped, with an honest (not fabricated) finding: a
+  deliberate stress sweep — index contrast from `n=3.48` to a
+  lossy-metal-like `-20+2j`, `num_orders` up to 225, near-touching circular
+  pillars (`radius=0.49*period`), a sub-percent-halfwidth sliver rectangle,
+  and near-degenerate nested circles (`1e-4`-scale radius difference) —
+  did **not** find a catastrophic near-degenerate/ill-conditioned failure
+  for the closed-form isotropic `Circle`/`Rectangle` patterns tested:
+  `cond(epsilon_hat)` reached ~900 and `cond(phi)` reached ~170 in the
+  worst cases, while energy conservation and the independent
+  `RigorousCoupledWaveAnalysis.jl` eigenvalue oracle (built in Phase 4a)
+  both held to ~1e-10 throughout (`tests/test_2d_pillar_stress.py`). This
+  is reported as what was actually observed, not oversold as "no
+  pathological case can exist" — `numpy.linalg.eig` could still misbehave
+  on an input this sweep didn't probe. Given no failure to fix, the
+  "handle near-degenerate eigenvalues" deliverable became **detection**:
+  `cond(epsilon_hat)`/`cond(phi)` now logged at `WARNING`
+  (`eigenmodes.ILL_CONDITIONED_THRESHOLD = 1e4`, ~10x headroom above the
+  worst observed case, module-level `logger` per `design.md`'s Logging
+  Strategy), verified by dedicated logging tests (`caplog`/`monkeypatch`
+  to force the threshold and confirm the mechanism fires, plus a
+  no-warning-in-the-ordinary-case check). The "match S4 or a published
+  benchmark" deliverable was **not met as originally worded** — S4 needs
+  `cmake`/a Lua toolchain (neither present) and Julia isn't installed
+  either (`which julia` fails, both confirmed not assumed) — so stress
+  cases are instead cross-checked against the same independent
+  `RigorousCoupledWaveAnalysis.jl` eigenoperator oracle used for Phase 4a's
+  base validation; `tasks.md` records this substitution honestly (one
+  unchecked box, not silently marked done) rather than claiming a match
+  that didn't happen, per `rules.md` AI Coding Rule 5. 118 tests pass
+  project-wide (107 prior + 11 new: 9 stress-case oracle cross-checks + 2
+  logging tests — see `tests/test_2d_pillar_stress.py` for the exact
+  breakdown).
+
+## Phase 5 — Tapered / Sloped Sidewalls (Via, Trench) — **DONE**
 
 - **Objectives**: represent a via or trench with linearly tapered
   sidewalls via staircase (z-discretized) layer approximation, and
@@ -127,27 +288,74 @@ plan-mode scratch file) as phases complete.
   convergence-vs-`N` test/example for both a tapered via and a tapered
   trench (marked `slow` per the existing pytest marker).
 - **Estimated complexity**: Low — no new Fourier/eigenmode math, purely a
-  layer-stack generation helper consuming Phase 3/4's already-validated
+  layer-stack generation helper consuming Phase 3/4a's already-validated
   per-layer solvers.
-- **Dependencies**: Phase 3 and Phase 4 (needs at least one working
+- **Dependencies**: Phase 3 and Phase 4a (needs at least one working
   patterned-layer eigensolver to stack; ideally both, to cover tapered
-  trench and tapered via).
+  trench and tapered via). Does not require Phase 4b — staircase generation
+  doesn't push into the near-degenerate regime any more than the base
+  patterned solver already does.
+- **Status**: shipped. Per the `phase-reference-picker` skill's procedure,
+  every RCWA-family repo under `REFERENCE/` was grepped for "stair"/"taper"
+  before writing any code; none had a matching staircase-generator
+  implementation to cite (only unrelated `meep`/`gprMax` docs hits), so
+  `src/sougata_solver/staircase.py` is independently derived, per
+  `rules.md` AI Coding Rule 1 — the technique itself (staircase/multi-slice
+  approximation of a tapered sidewall) is standard/well-precedented and was
+  already decided in `decisions.md` ADR-004, this phase just implements it.
+  Three generator functions (`staircase_circle_layers`,
+  `staircase_rectangle_layers`, `staircase_slab_layers`) each produce
+  `num_slices` uniform-in-z `Layer`s of equal thickness, with the shape
+  size linearly interpolated at each slice's **z-midpoint**
+  (`frac = (i+0.5)/num_slices`) between a `top` and `bottom` value — a
+  specific, documented convention choice (module docstring), not the only
+  possible one (edge-averaging was considered and not used, no strong
+  reason to prefer it). Because this phase adds no new eigenmode/Fourier
+  formula, there is no external oracle to cross-check against (unlike every
+  prior phase) — correctness instead rests on: (a) a zero-taper
+  (`top_size == bottom_size`) regression test showing the staircase
+  reproduces Phase 3/4a's already-oracle-validated single-uniform-layer
+  result to `1e-10` regardless of `num_slices`, for all three shape types;
+  (b) energy conservation for genuinely tapered cases; (c) two
+  `slow`-marked convergence-vs-`num_slices` studies
+  (`tests/test_staircase.py`) sweeping `num_slices` from 1 up to 32 (via)
+  and 64 (trench) at a fixed wavelength/angle — both show the expected
+  monotone-shrinking successive-`ΔR` trend (via: `R` settles to ≈0.565 by
+  `N=16-32`; trench needs more slices to settle, ≈0.248 by `N=32-64`,
+  consistent with its larger top-to-bottom taper ratio). Both
+  `structures/via/tapered_via.py` and `structures/trench/tapered_trench.py`
+  print (not plot, per ADR-010) the same `num_slices` sweep and confirm
+  R+T=1.0000 at every point. 130 tests pass project-wide (118 prior + 12
+  new — 10 fast + 2 `slow` — `tests/test_staircase.py`).
+
+  **Follow-up, 2026-08-01**: renamed `tapered_trench.py`/`tapered_via.py`'s
+  top/bottom-size constants to FDTD-style `TCD`/`BCD` (top/bottom critical
+  dimension) plus `SPACING`, with `PERIOD = TCD + SPACING` derived, to match
+  the equivalent Lumerical grating-structure-group parametrization the user
+  referenced; added `structures/via/tapered_pillar.py` (the `Rectangle`
+  case of `staircase_rectangle_layers`, not previously covered by an
+  example script, with equal x/y halfwidths for a tapered square pillar).
+  No new physics — same staircase generators, only naming/coverage. All
+  three scripts re-verified end-to-end with R+T=1.0000.
 
 ## Phase 6 — Anisotropic Materials
 
 - **Objectives**: support full 3×3 permittivity tensors (already exposed by
   `Material.epsilon_tensor`) in both uniform and patterned layers, removing
   `simulation.py`'s anisotropic `NotImplementedError`.
-- **Deliverables**: generalize Phase 4's eigensolver to accept a full
+- **Deliverables**: generalize Phase 4a's eigensolver to accept a full
   tensor `Epsilon2` rather than only scalar/diagonal; validation against a
   known birefringent-material benchmark (e.g. a uniaxial waveplate at
   normal incidence, checked against closed-form ordinary/extraordinary
   index behavior).
-- **Estimated complexity**: Medium — the eigensolver machinery from Phase 4
+- **Estimated complexity**: Medium — the eigensolver machinery from Phase 4a
   already generalizes to tensors mathematically; the work is mostly
   correctly wiring `Material.epsilon_tensor`'s off-diagonal terms through
   and validating the coupling terms are handled right.
-- **Dependencies**: Phase 4 (reuses/extends its general eigensolver).
+- **Dependencies**: Phase 4a (reuses/extends its general eigensolver).
+  Does not strictly require Phase 4b, though revisiting Phase 4b's
+  near-degenerate handling once anisotropy is added is worth a follow-up
+  check — anisotropic coupling can shift which cases are near-degenerate.
 
 ## Phase 7 — Real-Space Field Reconstruction & Visualization
 
@@ -163,7 +371,7 @@ plan-mode scratch file) as phases complete.
   in place; the new work is the inverse-Fourier-sum and its own
   correctness check (e.g. field continuity across a layer interface as a
   sanity test).
-- **Dependencies**: Phase 3 or 4 (need at least one working patterned-layer
+- **Dependencies**: Phase 3 or 4a (need at least one working patterned-layer
   case worth visualizing) — although the *machinery* for field
   reconstruction is dimension-agnostic and could technically be built
   against Phase 1's uniform stacks first as a stepping stone.
@@ -179,7 +387,11 @@ plan-mode scratch file) as phases complete.
   Criteria.
 - **Estimated complexity**: Low-Medium — mostly systematic application of
   patterns already established in Phases 3-7, not new algorithmic risk.
-- **Dependencies**: Phases 3-7 (validates all of them).
+- **Dependencies**: Phases 3-7 (validates all of them). Also the phase
+  where every geometry type's energy-conservation and
+  convergence-rate-vs-theory checks (`testing.md`'s Physical-Invariant
+  Testing, first required starting Phase 3) get collected into one
+  systematic sweep rather than living only in each phase's own test file.
 
 ## Phase 9 — Performance & Optional GPU/Autodiff Backend (later, optional)
 
@@ -201,9 +413,18 @@ plan-mode scratch file) as phases complete.
 ## Phase Sequencing Summary
 
 ```
-Phase 1 (done) ──► Phase 2 ──► Phase 3 ──► Phase 4 ──► Phase 5
+Phase 1 (done) ──► Phase 2 ──► Phase 3 ──► Phase 4a ──► Phase 4b
+                                   │            │             │
+                                   │            └────► Phase 6 (extends Phase 4a)
                                    │            │
-                                   └────► Phase 6 (extends Phase 4)
-                                                │
-                       Phase 3/4 ──────────► Phase 7 ──► Phase 8 ──► Phase 9 (optional)
+                                   │            └────► Phase 5 (needs Phase 4a only)
+                                   │
+                       Phase 3/4a ──────────► Phase 7 ──► Phase 8 ──► Phase 9 (optional)
 ```
+
+Phase 4b is a dependency of nothing else — it hardens Phase 4a's solver
+in place (stress tests + stability handling) rather than unlocking new
+capability, so Phases 5-8 only need Phase 4a to proceed. It should still
+land before Phase 8's systematic convergence studies are trusted at high
+`num_orders`/high-contrast settings, since that's exactly the regime Phase
+4b is meant to have already stress-tested.

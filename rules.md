@@ -89,7 +89,10 @@ See `testing.md` for the full strategy. Minimum bar, restated here as a
 hard rule: **no new physics capability merges without an oracle-comparison
 test** (analytic formula, published benchmark, or S4/EMpy/RCWA.jl
 cross-check) — a test that only checks "it runs without crashing" is not
-sufficient for anything under `src/sougata_solver/`.
+sufficient for anything under `src/sougata_solver/`. Starting Phase 3, this
+bar also includes `testing.md`'s Physical-Invariant Testing tier (energy
+conservation, convergence-rate-vs-theory) — oracle-independent checks that
+must pass *in addition to*, not instead of, the oracle-comparison test.
 
 ## Git Workflow
 
@@ -214,3 +217,11 @@ code (e.g. `simulation.py`'s explicit "Phase 1 scope only" docstring,
    `RigorousCoupledWaveAnalysis.jl`, `EMTutorial`) as part of `sougata_solver`
    development** — they are read-only oracles, not code to merge from or
    modify.
+8. **Never default to S4 (or any one repo) out of habit when picking a
+   reference source for a new phase.** Use the `phase-reference-picker`
+   skill (`.claude/skills/phase-reference-picker/` at the workspace root)
+   to compare all plausibly-relevant repos under `REFERENCE/` per
+   sub-task, and to decide explicitly between transcribing a source
+   near-verbatim vs. deriving independently and using the repo only as a
+   cross-check oracle — see `references.md`'s "Choosing a Reference for a
+   New Phase" section.

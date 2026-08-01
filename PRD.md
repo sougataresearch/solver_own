@@ -46,11 +46,19 @@ depending on them at runtime.
 - Phase 3 (trench): diffraction efficiencies match a published 1D
   binary-grating benchmark (e.g. Moharam & Gaylord 1995) to within
   numerical-truncation-limited agreement, for at least TE and TM
-  polarization at oblique incidence.
-- Phase 4 (via/pillar): reflectance/transmittance and/or diffraction
-  efficiencies match an S4-driven reference simulation of an equivalent
-  structure (same lattice, radius, materials, wavelength) to within
-  numerical-truncation-limited agreement.
+  polarization at oblique incidence; energy conservation holds and the
+  measured convergence rate vs. `num_orders` matches theory (`testing.md`'s
+  Physical-Invariant Testing) — required starting this phase, not deferred
+  to Phase 8.
+- Phase 4a (via/pillar, well-conditioned case): reflectance/transmittance
+  and/or diffraction efficiencies match an S4-driven reference simulation
+  of an equivalent structure (same lattice, radius, materials, wavelength)
+  to within numerical-truncation-limited agreement, and satisfy the
+  energy-conservation invariant (`testing.md`).
+- Phase 4b (via/pillar, near-degenerate/ill-conditioned case): the same
+  agreement holds for at least one high-contrast, small-feature-to-period,
+  high-`num_orders` stress case, with any ill-conditioning explicitly
+  logged rather than silently degrading the result.
 - Phase 5 (tapered sidewalls): R/T demonstrably converges (monotonically,
   within expected discretization error) as the number of staircase slices
   increases, for both a tapered via and a tapered trench.
@@ -66,7 +74,7 @@ depending on them at runtime.
 | FR-2 | Support semi-infinite incidence/transmission half-spaces of arbitrary (possibly complex/absorbing) index. *(done)* |
 | FR-3 | Report Jones and Mueller-matrix polarimetric response. *(done)* |
 | FR-4 | Represent 2D-periodic in-plane patterns from `Circle` and `Rectangle` primitives, including nested/overlapping shapes with correct area subtraction. *(geometry done; not yet consumed by the solver)* |
-| FR-5 | Solve reflectance/transmittance/diffraction efficiencies for a layer patterned according to FR-4 (via/pillar). *(planned — Phase 4)* |
+| FR-5 | Solve reflectance/transmittance/diffraction efficiencies for a layer patterned according to FR-4 (via/pillar). *(planned — Phase 4a, hardened for near-degenerate cases in Phase 4b)* |
 | FR-6 | Represent and solve 1D-periodic lamellar (line/space) patterns (trench). *(planned — Phase 3)* |
 | FR-7 | Represent a feature (via/trench) with linearly tapered sidewalls via staircase layer discretization, and demonstrate R/T convergence with slice count. *(planned — Phase 5)* |
 | FR-8 | Support anisotropic (full 3×3 tensor) materials in both uniform and patterned layers. *(planned — Phase 6)* |
@@ -135,7 +143,7 @@ published table, or S4 cross-check) + a runnable example script. A phase in
 |------|------------|
 | Subtle sign/convention bugs in eigenmode or S-matrix math (the dominant historical bug class in RCWA implementations) | Mandatory source citation + independent-oracle test for every new formula (see `rules.md`) |
 | Fourier-factorization rule chosen incorrectly for patterned layers (wrong convergence rate / wrong answer at discontinuous interfaces — the classic "Li's rules" pitfall) | Explicit `epsilon_hat` vs. `epsilon_inv_hat` Toeplitz construction per Phase 2 of `phases.md`, validated against FFT-of-rasterized-mask numerically, not assumed correct by inspection |
-| General (non-uniform) complex eigenproblem can have degenerate/near-degenerate eigenvalues causing numerical instability | Reuse the already-validated `_select_q_branch` outgoing-mode convention; add targeted regression tests for near-degenerate cases once Phase 4 lands |
+| General (non-uniform) complex eigenproblem can have degenerate/near-degenerate eigenvalues causing numerical instability | Reuse the already-validated `_select_q_branch` outgoing-mode convention; Phase 4a scopes its own test cases away from this regime deliberately, and Phase 4b is a dedicated phase for targeted regression tests + stability handling on near-degenerate cases, rather than an implicit sub-task of Phase 4a |
 | Staircase approximation for tapered sidewalls converges slowly for steep angles | Explicit convergence-vs-slice-count test/example required before Phase 5 is considered done (see PRD Success Criteria) |
 | Solo-developer bus factor / knowledge loss between sessions | `memory.md` and `decisions.md` are mandatory living documents, updated at the end of every substantive session |
 
@@ -149,7 +157,23 @@ published table, or S4 cross-check) + a runnable example script. A phase in
   are validated.
 - Non-periodic / open (aperiodic) scattering problems (isolated particles,
   FDTD-style transient simulation) — RCWA is fundamentally a periodic-BC
-  method; this is not a general-purpose EM solver.
+  method, so `sougata_solver` itself will not grow FDTD capability. This is
+  **not** a statement that FDTD is abandoned project-wide: per the project
+  owner (2026-07-21), a time-domain (FDTD) solver is a genuine future goal
+  of the broader EM-wave-solver effort `sougata_solver` is part of — RCWA
+  was deliberately chosen first for simplicity (frequency-domain, periodic
+  structures are the lower-risk starting point). FDTD is expected to be a
+  separate effort (its own codebase/phases, not bolted onto this RCWA
+  solver's module structure) once RCWA reaches a stable state; no FDTD
+  phase, module, or timeline is defined yet — see `decisions.md` for the
+  recorded scope clarification. `REFERENCE/meep`, `REFERENCE/gprMax`,
+  `REFERENCE/fd3d`, `REFERENCE/maxwellfdfd` (FDTD/FDFD) and
+  `REFERENCE/mfem`, `REFERENCE/OpenParEM`, `REFERENCE/dolfinx`+`ufl`+`basix`+`ffcx`,
+  `REFERENCE/FreeFem-sources` (FEM) are already vendored for exactly that
+  future effort — not currently used by anything in `sougata_solver`, and
+  not evaluated as part of any RCWA phase's reference selection (per the
+  `phase-reference-picker` skill's own guidance that a different numerical
+  method is not a formula source for an RCWA phase).
 - Nonlinear optics, magneto-optic materials, thermal/mechanical coupling.
 - A GUI or web interface — this is a Python library driven by scripts.
 - Public package distribution (PyPI) / multi-user support — see
