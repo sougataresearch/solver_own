@@ -76,6 +76,27 @@ one; don't rely on memory across sessions.
   `solve_layer_eigenmodes_patterned`'s docstring and
   `tests/test_2d_pillar_stress.py` for the frozen stress cases and the
   logging tests.
+- **A diffraction order sitting exactly at the Rayleigh/Wood's-anomaly
+  threshold produces `NaN` R/T, not a degraded-but-finite answer (found
+  while writing Category 1 target 1.8's mode-classification test).** At
+  the exact threshold, `q == 0` for that order, and
+  `smatrix.py::interface_smatrix`'s `kp @ phi / q[None, :]` construction
+  divides by zero. Confirmed directly (not assumed): evaluating
+  `SimulationResult.diffraction_efficiencies()` at the exact threshold
+  wavelength returns `NaN` for every order, with
+  `RuntimeWarning: divide by zero encountered in divide` /
+  `invalid value encountered in divide` from `smatrix.py:75`. This is a
+  genuine, pre-existing solver limitation at the exact singular point (a
+  physically infinite-length evanescent decay / infinitely-slow group
+  velocity at a grazing/Wood's-anomaly order), not a bug introduced by
+  target 1.8's mode-classification work, and not something that work
+  attempted to fix. `tests/test_mode_classification.py`'s Rayleigh test
+  deliberately checks a small relative step away from the threshold on
+  each side (`0.999x`/`1.001x`) rather than the exact point. Defining a
+  supported near-grazing/near-threshold behavior (interpolation, a
+  documented exclusion zone, or similar) is `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+  Category 6 target 6.4's ("Grazing-incidence boundary test") job, not
+  yet done.
 
 ## Anticipated Gotchas (not yet encountered — flagged ahead of Phase 2-6)
 

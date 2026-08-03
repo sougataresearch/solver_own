@@ -89,12 +89,25 @@ summary instead of deleting history here.
 
 ## Phase 6 — Anisotropic Materials
 
-□ Generalize Phase 4a's eigensolver to accept a full 3×3 tensor `Epsilon2`
-□ Remove `simulation.py`'s uniform-anisotropic `NotImplementedError`
-□ Source a birefringent-material closed-form benchmark (e.g. uniaxial waveplate at normal incidence)
-□ Test: anisotropic solve matches the benchmark
-□ Test: isotropic-tensor special case reduces to Phase 1's uniform-isotropic result (regression guard)
-□ Update `memory.md` / `decisions.md` on completion
+☑ Uniform diagonal-tensor layers (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` target 1.3):
+  `solve_layer_eigenmodes_uniform_diagonal` (`eigenmodes.py`, transcribed from
+  `S4/S4/S4.cpp:1889-1906`'s uniform-anisotropic branch, diagonal-only), wired
+  into `simulation.py`; closed-form normal-incidence birefringence benchmark +
+  Fresnel-oracle-per-axis cross-check + isotropic-reduction regression
+  (`tests/test_anisotropic_uniform.py`). In-plane-coupled and
+  longitudinally-coupled tensors, and anisotropic patterned layers, remain
+  open (targets 1.4/1.5/1.6).
+☑ Generalize the uniform-layer eigensolver to accept in-plane-coupled tensor components (`solve_layer_eigenmodes_uniform_inplane`, target 1.4); longitudinal coupling (target 1.5) still pending a citable formulation; patterned-layer `Epsilon2` generalization is target 1.6
+☑ Remove `simulation.py`'s uniform-anisotropic `NotImplementedError` for the diagonal case (target 1.3); general/off-diagonal case still raises, naming targets 1.4/1.5
+☑ Source a birefringent-material closed-form benchmark (e.g. uniaxial waveplate at normal incidence) — independently derived, see `eigenmodes.solve_layer_eigenmodes_uniform_diagonal`'s docstring
+☑ Test: anisotropic solve matches the benchmark (`tests/test_anisotropic_uniform.py`)
+☑ Test: isotropic-tensor special case reduces to Phase 1's uniform-isotropic result (regression guard) (`tests/test_anisotropic_uniform.py`)
+□ Update `memory.md` / `decisions.md` on completion (in progress — see this session's `memory.md`/`progress_log.md` entries; final update once all of targets 1.3-1.8 land)
+□ Target 1.5 (longitudinal coupling) — evaluated and explicitly deferred 2026-08-03, no citable+benchmarkable source found in a bounded literature search this session; see `references.md`'s "Target 1.5 bounded literature search" entry and `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`'s 1.5 entry
+☑ Target 1.6 (patterned anisotropic layers) — done 2026-08-03: `fourier_factorization.toeplitz_matrix_component`, `eigenmodes.solve_layer_eigenmodes_patterned_inplane`, transcribed from `S4/S4/fmm/fmm_closed.cpp`'s `have_tensor` branch (lines 165-256); see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` 1.6 and `memory.md`
+☑ Target 1.7 (degeneracy policy) — done 2026-08-03: `eigenmodes._canonical_mode_order`, applied to the three anisotropic dense eigensolvers; see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` 1.7 and `memory.md`
+☑ Target 1.8 (mode classification) — done 2026-08-03: `eigenmodes.classify_propagating`, `SimulationResult.order_classification()`; found (not fixed, out of scope) an exact-Rayleigh-threshold NaN division-by-zero, now documented in `troubleshooting.md` and tied to Category 6 target 6.4; see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` 1.8 and `memory.md`
+☑ Category 1 targets 1.3-1.4, 1.6-1.8 all done 2026-08-03 (six-target session); target 1.5 explicitly deferred (no citable+benchmarkable source found)
 
 ## Phase 7 — Real-Space Field Reconstruction & Visualization
 

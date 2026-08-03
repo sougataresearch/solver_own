@@ -16,6 +16,54 @@ validates against. Update when a new phase cites a new source.
 
 ## Phases With No Vendored-Repo Source
 
+### Phase 6 anisotropy reference audit (2026-08-03)
+
+This audit was performed before changing any anisotropic solver code. The
+candidate implementations were compared rather than defaulting to S4:
+
+- `S4/S4/S4.cpp` (uniform anisotropic assembly, approximately lines
+  1866-1906) is a useful convention reference for the in-plane tensor block
+  and epsilon_zz inverse. It is **not** a full-3x3 reference: its Lua API
+  documentation (`doc/source/lua_api.rst`, material-tensor arguments)
+  explicitly says that xz, yz, zx, and zy components are ignored.
+- `RigorousCoupledWaveAnalysis.jl/src/Common/Common.jl` (the
+  `AnisotropicLayer` eigenmode path, approximately lines 134-157) and
+  `src/Common/materials.jl` support the five-component in-plane tensor
+  `[epsilon_xx, epsilon_xy, epsilon_yx, epsilon_yy, epsilon_zz]`. It is the
+  clearest compact RCWA cross-check for that restricted scope, not for full
+  longitudinal coupling.
+- `EMpy/EMpy/RCWA.py` (`AnisotropicRCWA`, beginning approximately line 455)
+  contains all nine tensor-component convolution matrices, but is 1D-only
+  and mixes a substantially different interface/mode formulation. Use it as
+  a cross-check for a narrowly matched 1D case, not as a near-verbatim source
+  for this project's 2D S-matrix implementation.
+- `Rigorous-Coupled-Wave-Analysis/TMM_functions/anisotropic.py` presents a
+  dense 4x4 full-tensor TMM sketch, but references undefined variables and
+  has no trustworthy test coverage; it is not an implementation source or
+  oracle.
+
+Decision: derive each Phase-6 substep independently only after its exact
+scope and benchmark are defined; use S4 and RCWA.jl as cross-checks for the
+five-component in-plane scope. Do not claim full 3x3 longitudinal-coupling
+support until a citable formulation and an independent benchmark are both
+available.
+
+**Target 1.5 bounded literature search (2026-08-03, before implementing
+Category 1 target 1.5)**: searched for a citable, independently-benchmarkable
+full-3x3 (longitudinal-coupling) RCWA formulation beyond the vendored-repo
+audit above. General-anisotropic-RCWA literature exists (Glytsis & Gaylord,
+"Rigorous three-dimensional coupled-wave diffraction analysis of single and
+cascaded anisotropic gratings," JOSA A 4, 2061-2080 (1987); a gyrotropic/
+bi-anisotropic RCWA formulation referenced via a University of Arizona PhD
+thesis abstract, "Rigorous Coupled Wave Analysis for Gyrotropic Materials"),
+but none were both fetchable as readable full text in this environment
+(JOSA A is paywalled; an arXiv candidate, 2510.01214, on birefringent
+holographic gratings returned only undecodable binary PDF content via
+`WebFetch`) and independently benchmarkable (no second, structurally
+different source located to cross-check against, unlike targets 1.3/1.4's
+S4 + RCWA.jl pairing). Target 1.5 remains explicitly deferred, not
+implemented — see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`'s 1.5 entry.
+
 - **Phase 5 (tapered/sloped sidewalls, `staircase.py`)**: per the
   `phase-reference-picker` skill's procedure, every RCWA-family repo under
   `REFERENCE/` (`S4`, `EMpy`, `RigorousCoupledWaveAnalysis.jl`,

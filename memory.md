@@ -5,7 +5,234 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-07-24 (Phase 5), 2026-07-23 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+As of 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Phase 6, target 1.3 (uniform diagonal-tensor anisotropic layers) is
+  complete**, per `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 1's atomic
+  sequencing (targets 1.4-1.8 remain open, tracked separately). New function
+  `eigenmodes.solve_layer_eigenmodes_uniform_diagonal(omega, kx, ky, eps_xx,
+  eps_yy, eps_zz)`, transcribed from `S4/S4/S4.cpp:1889-1906` (the
+  uniform-anisotropic-material branch, `0 != M->type`), specialized to the
+  diagonal case (off-diagonal `abcde` in-plane components zeroed): `kp` is
+  built from `1/eps_zz` (matching `Epsilon_inv` at `S4.cpp:1897`), `Epsilon2
+  = block_diag(eps_xx*I_n, eps_yy*I_n)` (matching `S4.cpp:1898,1901`), and
+  the general eigenoperator construction reuses `solve_layer_eigenmodes_patterned`'s
+  already-cited `op = Epsilon2 @ kp - coupling` structure. Wired into
+  `simulation.py`'s uniform-layer dispatch via `Material.is_diagonal`; the
+  general (in-plane-coupled or longitudinally-coupled) case still raises
+  `NotImplementedError` naming targets 1.4/1.5.
+  **Non-obvious finding, caught by the test itself, not assumed**: the
+  already-existing `Epsilon2` block-index convention (`CONVENTIONS.md`:
+  `u = [-Ey; Ex]`, block 0 <-> `-Ey`, block 1 <-> `Ex`) means `eps_xx`
+  (`Epsilon2`'s top-left block) governs the `Ey` field component
+  (s-polarization at normal incidence), and `eps_yy` governs `Ex`
+  (p-polarization) — the reverse of a naive "eps_xx acts on Ex" assumption.
+  A first draft of the validation test had this backwards; caught
+  immediately because the closed-form Fresnel-oracle comparison
+  (`tests/test_anisotropic_uniform.py::test_normal_incidence_uniaxial_slab_matches_fresnel_oracle_per_axis`)
+  failed with values that turned out to match the *other* axis exactly —
+  fixed by swapping the assertion mapping, not the physics. Validated by:
+  (a) closed-form normal-incidence birefringence formula
+  (`q_x^2=eps_xx*omega^2`, `q_y^2=eps_yy*omega^2`) at the unit level; (b) the
+  already-validated isotropic `tests/oracles/fresnel.py` oracle applied
+  per-principal-axis to a full uniaxial-slab `Simulation` at normal
+  incidence (a genuine external-oracle comparison, not a self-check, since
+  `fresnel.py` has no anisotropy concept and was reused unmodified); (c)
+  isotropic-tensor (`eps_xx=eps_yy=eps_zz`) reduction to
+  `solve_layer_eigenmodes_uniform`'s result through a full `Simulation.solve`,
+  at both normal and oblique incidence; (d) energy conservation for a
+  genuinely birefringent slab at oblique incidence and mixed polarization.
+  143 tests pass project-wide (123 prior + 20 new,
+  `tests/test_anisotropic_uniform.py`). **Targets 1.4 (in-plane coupling),
+  1.5 (longitudinal coupling — likely to be explicitly deferred, no citable
+  formulation found by the Phase 6 reference audit in `references.md`), 1.6
+  (patterned anisotropic layers), 1.7 (degeneracy policy), and 1.8 (mode
+  classification) are next**, per the approved plan sequencing them one at
+  a time.
+- **Phase 6, target 1.4 (uniform in-plane-coupled anisotropic layers) is
+  complete.** New function `eigenmodes.solve_layer_eigenmodes_uniform_inplane`
+  generalizes target 1.3's diagonal solver by populating `Epsilon2`'s
+  previously-zero off-diagonal quadrants with `eps_xy`/`eps_yx` (same
+  `S4.cpp:1889-1906` citation, now using the full `abcde[0:8]` in-plane
+  block). Wired into `simulation.py`'s uniform-layer dispatch; a
+  longitudinal-coupling guard (nonzero `eps_xz/eps_yz/eps_zx/eps_zy`) still
+  raises `NotImplementedError` naming target 1.5.
+  **New independent oracle**: `tests/oracles/rcwa_anisotropic_inplane_jl.py`,
+  hand-transcribed from `RigorousCoupledWaveAnalysis.jl/src/Common/Common.jl:134-165`
+  (`eigenmodes(...,l::AnisotropicLayer)`, the *uniform*-anisotropic-layer
+  branch — a different `Common.jl` function from Phase 4a's patterned-layer
+  oracle). **Non-obvious finding, determined empirically (not derivable
+  from the S4 citation alone)**: reconciling this oracle against
+  `solve_layer_eigenmodes_uniform_inplane`'s `q^2` required not just the
+  already-known `k0`-normalization and overall sign flip (from Phase 4a's
+  oracle), but a *third*, in-plane-coupling-specific convention: `kx`/`ky`
+  swapped **and** `eps_xy`/`eps_yx` negated when calling the oracle. This
+  was invisible in target 1.3's diagonal-only case (where it reduces to
+  just needing `eps_xx`/`eps_yy` swapped, which is what a naive read of the
+  block-index convention alone predicted) and only surfaced once
+  off-diagonal terms were exercised — found by a brute-force search over
+  swap/negate hypotheses (not guessed), confirmed to ~1e-13 across 20
+  random-parameter trials plus the diagonal-only reduction case; see the
+  oracle module's docstring for the full account. **Test-authoring mistake
+  caught before shipping**: an initial oracle-comparison test used an
+  absolute tolerance (`abs=1e-6`) sized for Phase 4a's oracle test, which
+  runs at `wavelength=1.0` (so `omega~O(10)`, `q^2~O(100)`); this test runs
+  at a realistic `wavelength=0.55e-6` (`omega~O(1e7)`, `q^2~O(1e14)`), where
+  that same absolute tolerance is meaningless — caught by a spurious-looking
+  failure with a genuinely tiny relative residual, fixed by switching to
+  `rel=1e-8`, not by loosening the check. **Second test mistake, same
+  session**: the first energy-conservation test used a non-Hermitian
+  in-plane tensor (`eps_xy != conj(eps_yx)`), which is physically a
+  gain/loss (non-power-reciprocal) medium — R+T=1 is not expected for that
+  case, and the test failed at R+T~0.96 for a real physical reason, not a
+  solver bug; fixed by using a Hermitian (lossless) tensor instead, per the
+  test's updated docstring. 158 tests pass project-wide (143 prior + 15
+  new, `tests/test_anisotropic_inplane.py`). **Target 1.5 (longitudinal
+  coupling) is next** — per the existing Phase 6 reference audit
+  (`references.md`), no vendored repo or literature source was found with a
+  citable formulation for that scope; this session will do a bounded
+  literature search before deciding to implement or explicitly defer, per
+  the approved plan.
+- **Phase 6, target 1.5 (longitudinal coupling) was evaluated and
+  explicitly deferred, 2026-08-03** — not implemented. Per `rules.md` AI
+  Coding Rule 1, a bounded literature search was done (`WebSearch`/`WebFetch`)
+  before concluding, beyond the standing vendored-repo audit in
+  `references.md`. Found that general-anisotropic-RCWA literature exists in
+  principle (Glytsis & Gaylord 1987 JOSA A; a gyrotropic-RCWA PhD thesis)
+  but nothing both readable in this environment (JOSA A paywalled; a
+  candidate arXiv preprint, 2510.01214, returned only undecodable binary
+  PDF content via `WebFetch`) and independently benchmarkable (no second
+  structurally-different source found to cross-check against, unlike
+  targets 1.3/1.4's S4+RCWA.jl pairing) — so no formula was written, per
+  Rule 1's "say so explicitly, do not invent." `simulation.py`'s
+  longitudinal-coupling guard (added with target 1.4) continues to raise
+  `NotImplementedError` naming this target. See `references.md`'s "Target
+  1.5 bounded literature search" entry for the full account. This is a
+  "not found this session" conclusion, revisitable if a readable source
+  becomes available later, not a permanent scope removal.
+- **Phase 6, target 1.6 (patterned anisotropic layers) is complete.** New
+  functions `fourier_factorization.pattern_epsilon_hat_component`/
+  `toeplitz_matrix_component` (per-tensor-component direct-rule Toeplitz
+  matrices, refactored to share the existing subtraction-rule accumulation
+  with the scalar `pattern_epsilon_hat`/`toeplitz_matrix` via a new private
+  `_pattern_fourier_sum`/`_toeplitz` helper, no behavior change to the
+  existing scalar path — full suite re-run to confirm) and
+  `eigenmodes.solve_layer_eigenmodes_patterned_inplane`. **New citation,
+  not found during the original Phase 6 reference audit**: transcribed
+  from `S4/S4/fmm/fmm_closed.cpp`'s `have_tensor` branch (lines 165-256),
+  read in full this session — the earlier audit (`references.md`'s "Phase
+  6 anisotropy reference audit") only looked at `S4.cpp`'s uniform-layer
+  path and Common.jl/EMpy/Rigorous-Coupled-Wave-Analysis, never this
+  branch of `fmm_closed.cpp` (whose isotropic sibling branch, lines 77-164,
+  was already the Phase 4a citation). It confirms the natural
+  generalization: `Epsilon2`'s four in-plane quadrants become full
+  direct-rule Toeplitz matrices (same `xx/xy/yx/yy` block-index convention
+  already established for the uniform case) and `kp`'s `Epsilon_inv`
+  becomes the **numerical matrix inverse of the direct-rule `eps_zz`
+  Toeplitz** (not a separately Fourier-factorized inverse-rule Toeplitz) —
+  consistent with, and now directly citing, the same "matrix-inverse, not
+  inverse-rule Toeplitz" pattern Phase 4a already established for the
+  isotropic 2D case. Wired into `simulation.py`'s patterned-layer dispatch:
+  isotropic pattern still uses the unmodified Phase 4a path; a
+  diagonal/in-plane-tensor pattern uses the new path; any longitudinal
+  component anywhere in the pattern (background or any shape) raises
+  `NotImplementedError` naming target 1.5. Validated by: (a) reduction to
+  Phase 4a's isotropic solver (off-diagonal Toeplitz matrices confirmed
+  exactly zero, on-diagonal ones confirmed equal); (b) reduction to target
+  1.4's uniform-tensor solver for a spatially-uniform "pattern" (a shape
+  whose material equals the background); (c) energy conservation for a
+  genuinely patterned, Hermitian (lossless) anisotropic pillar/rectangle
+  case. No new test-authoring mistakes this target — the tolerance-scale
+  and Hermitian-material lessons from target 1.4 were applied from the
+  start. 170 tests pass project-wide (158 prior + 12 new,
+  `tests/test_anisotropic_patterned.py`). **Targets 1.7 (degeneracy
+  policy) and 1.8 (mode classification) are next.**
+- **Phase 6, target 1.7 (degeneracy policy) is complete.** New helper
+  `eigenmodes._canonical_mode_order(q, phi)` applies a documented,
+  deterministic sort (rounded `Re(q)`, then `Im(q)`, then original
+  `eig`-output index as the tie-break for exact/near-degenerate
+  eigenvalues) to the three dense anisotropic eigensolvers introduced by
+  targets 1.3/1.4/1.6 (`solve_layer_eigenmodes_uniform_diagonal`,
+  `solve_layer_eigenmodes_uniform_inplane`,
+  `solve_layer_eigenmodes_patterned_inplane`) — deliberately **not**
+  applied to the pre-existing Phase 4a `solve_layer_eigenmodes_patterned`,
+  to keep this target's blast radius scoped to the anisotropic solvers it
+  actually concerns, per the approved plan. This is a policy/ordering
+  layer, not a numerical fix: `numpy.linalg.eig`'s LAPACK `geev` backend
+  was already confirmed deterministic for identical input (no randomness),
+  verified directly rather than assumed
+  (`tests/test_anisotropic_degeneracy.py::test_repeated_solve_is_deterministic`).
+  Explicitly does **not** claim eigenvalue continuity across a *changing*
+  input (e.g. a wavelength sweep crossing a degeneracy) — that remains
+  separate, already-tracked future work (`tasks.md` Category 2 target 2.3,
+  "Sweep mode matching"). Builds on, rather than replaces, Phase 4b's
+  existing `ILL_CONDITIONED_THRESHOLD` `WARNING`-logging precedent
+  (detection, not correction) for actual near-degeneracy. Validated by:
+  sort-key unit tests (explicit tie-break-by-original-index case), repeated-
+  solve bit-identical-output tests, and energy conservation for a
+  deliberately near-isotropic (`eps_xx=2.2501, eps_yy=2.25`) patterned
+  anisotropic case. 179 tests pass project-wide (170 prior + 9 new,
+  `tests/test_anisotropic_degeneracy.py`). **Target 1.8 (mode
+  classification) is next — the last of the six targets in this session's
+  approved plan.**
+- **Phase 6, target 1.8 (mode classification) is complete — the last of
+  this session's six approved targets.** New `eigenmodes.classify_propagating(q)`
+  (boolean array, reusing `_select_q_branch`'s own real/imaginary branch
+  convention rather than a separate re-derivation) and
+  `SimulationResult.order_classification()` (per-order
+  propagating/evanescent, keyed like `diffraction_efficiencies()`, using
+  `all_modes[0]`/`all_modes[-1]`'s `q`). Validated against the analytic
+  Rayleigh-threshold wavelength (`lambda_threshold = n_trans*period/m` at
+  normal incidence) for a diffraction order flipping classification
+  exactly at the predicted point, energy conservation on both sides, and
+  the already-established incidence-vs-transmission-medium-differ case
+  (different Rayleigh thresholds on each side of an interface).
+  **Honest finding, deliberately not fixed by this target**: evaluating
+  exactly at the threshold wavelength (not just near it) produces `NaN`
+  R/T — confirmed directly, not assumed: `q == 0` for that order at the
+  exact crossing, and `smatrix.py::interface_smatrix`'s `kp @ phi /
+  q[None, :]` divides by zero (`RuntimeWarning`s from `smatrix.py:75`
+  observed). This is a genuine, pre-existing solver limitation at the
+  exact Wood's-anomaly/Rayleigh singular point, not a bug this session's
+  work introduced, and not something target 1.8 (which only adds
+  *classification*, not threshold-crossing numerical handling) was scoped
+  to fix — documented in `troubleshooting.md`'s Already-Solved-Gotchas-
+  adjacent list and tied explicitly to `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+  Category 6 target 6.4 ("Grazing-incidence boundary test"), the actual
+  home for defining supported near-threshold behavior. The test suite
+  deliberately checks `0.999x`/`1.001x` of the threshold, not the exact
+  point. 186 tests pass project-wide (179 prior + 7 new,
+  `tests/test_mode_classification.py`).
+
+  **Category 1 status (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`) as of
+  2026-08-03: targets 1.1-1.4 and 1.6-1.8 are all done; target 1.5
+  (longitudinal coupling) is evaluated and explicitly deferred** (bounded
+  literature search found no source both readable in this environment and
+  independently benchmarkable — see that target's own entry above). This
+  closes the six-target plan approved at the start of this session
+  (`C:\Users\sougata.bhunia\.claude\plans\polished-enchanting-hopcroft.md`).
+  Session total: 65 new tests across five new test files
+  (`tests/test_anisotropic_uniform.py`,
+  `tests/test_anisotropic_inplane.py`,
+  `tests/test_anisotropic_patterned.py`,
+  `tests/test_anisotropic_degeneracy.py`,
+  `tests/test_mode_classification.py`), two new oracle modules
+  (`tests/oracles/rcwa_anisotropic_inplane_jl.py`, hand-transcribed from
+  `RigorousCoupledWaveAnalysis.jl`), five new `eigenmodes.py` functions
+  (`solve_layer_eigenmodes_uniform_diagonal`,
+  `solve_layer_eigenmodes_uniform_inplane`,
+  `solve_layer_eigenmodes_patterned_inplane`, `_canonical_mode_order`,
+  `classify_propagating`), two new `fourier_factorization.py` functions
+  (`pattern_epsilon_hat_component`, `toeplitz_matrix_component`), and one
+  new `simulation.py` method (`SimulationResult.order_classification`).
+  186 tests pass project-wide (123 at session start). No existing
+  oracle-comparison test was weakened or removed to make a new one pass
+  (`rules.md` AI Coding Rule 3) — confirmed by re-running the full
+  pre-session test count after every target. **No commit was made this
+  session** — the working tree already contained substantial prior
+  uncommitted work (Phase 3-5 and other in-progress changes) when this
+  session started, predating this session's changes, and committing was
+  not requested by the user; the next session/commit should account for
+  all of it together, not just this session's diff.
 - **Phase 5 (tapered/sloped sidewalls, staircase discretization) is
   complete.** New module `src/sougata_solver/staircase.py` with three
   generator functions (`staircase_circle_layers`, `staircase_rectangle_layers`,

@@ -34,12 +34,20 @@ matches, which is exactly what `tests/test_fourier_factorization.py`'s
 module), per `rules.md`'s explicit sanctioning of an "S4/EMpy/RCWA.jl
 cross-check" as an oracle.
 
-Phase 2 scope only: scalar isotropic materials. `pattern_epsilon_hat` raises
-`NotImplementedError` for anisotropic materials in a pattern; full tensor
-factorization is Phase 6, per `phases.md`.
+Phase 2 scope: scalar isotropic materials (`pattern_epsilon_hat`/
+`toeplitz_matrix`, unchanged since Phase 2). Category 1 target 1.6
+(`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`) adds per-tensor-component Toeplitz
+construction (`pattern_epsilon_hat_component`/`toeplitz_matrix_component`)
+for patterned layers containing diagonal or in-plane-coupled anisotropic
+materials, transcribed from `S4/S4/fmm/fmm_closed.cpp`'s `have_tensor`
+branch (lines 165-256) -- see that function's docstring for the full
+citation. Longitudinal coupling (eps_xz/eps_yz/eps_zx/eps_zy) remains
+out of scope pending target 1.5.
 """
 
 from __future__ import annotations
+
+from typing import Callable
 
 import numpy as np
 
@@ -58,6 +66,37 @@ def _scalar_value(material: Material, wavelength: float, inverse: bool) -> compl
     return 1.0 / eps if inverse else eps
 
 
+def _pattern_fourier_sum(
+    pattern: Pattern,
+    lattice: Lattice,
+    g1: int,
+    g2: int,
+    value_fn: Callable[[Material], complex],
+) -> complex:
+    """Shared subtraction-rule accumulation used by both
+    `pattern_epsilon_hat` (scalar `value_fn`) and
+    `pattern_epsilon_hat_component` (tensor-component `value_fn`) -- the
+    per-shape/parent bookkeeping (`Pattern.containment_tree`) is identical
+    either way; only which scalar is extracted from a `Material` differs.
+    See the module docstring for the source citation.
+    """
+    Lk = lattice.reciprocal_vectors()
+    k = g1 * Lk[0] + g2 * Lk[1]
+    kx, ky = float(k[0]), float(k[1])
+    is_dc = g1 == 0 and g2 == 0
+
+    total = value_fn(pattern.background) if is_dc else complex(0.0)
+
+    area = lattice.unit_cell_area()
+    parents = pattern.containment_tree()
+    for i, shape in enumerate(pattern.shapes):
+        parent_material = pattern.background if parents[i] is None else pattern.shapes[parents[i]].material
+        dval = value_fn(shape.material) - value_fn(parent_material)
+        total += dval * complex(shape.fourier_transform(kx, ky)) / area
+
+    return total
+
+
 def pattern_epsilon_hat(
     pattern: Pattern,
     lattice: Lattice,
@@ -70,23 +109,42 @@ def pattern_epsilon_hat(
     `inverse=True`) of the scalar permittivity pattern at reciprocal
     lattice index `(g1, g2)`. See module docstring for the source formula.
     """
-    Lk = lattice.reciprocal_vectors()
-    k = g1 * Lk[0] + g2 * Lk[1]
-    kx, ky = float(k[0]), float(k[1])
-    is_dc = g1 == 0 and g2 == 0
+    return _pattern_fourier_sum(pattern, lattice, g1, g2, lambda m: _scalar_value(m, wavelength, inverse))
 
-    total = _scalar_value(pattern.background, wavelength, inverse) if is_dc else complex(0.0)
 
-    area = lattice.unit_cell_area()
-    parents = pattern.containment_tree()
-    for i, shape in enumerate(pattern.shapes):
-        parent_material = pattern.background if parents[i] is None else pattern.shapes[parents[i]].material
-        dval = _scalar_value(shape.material, wavelength, inverse) - _scalar_value(
-            parent_material, wavelength, inverse
-        )
-        total += dval * complex(shape.fourier_transform(kx, ky)) / area
+def pattern_epsilon_hat_component(
+    pattern: Pattern,
+    lattice: Lattice,
+    g1: int,
+    g2: int,
+    wavelength: float,
+    row: int,
+    col: int,
+) -> complex:
+    """Fourier coefficient `hat{eps_rc}(G)` of tensor component `(row, col)`
+    of the (possibly anisotropic) permittivity pattern -- the direct-rule
+    (Laurent's-rule) accumulation only, matching `fmm_closed.cpp`'s
+    `have_tensor` branch (lines 214-256), which builds each of `Epsilon2`'s
+    four in-plane quadrants (`eps_xx, eps_xy, eps_yx, eps_yy`) and the
+    `eps_zz` matrix this same way -- no separate inverse-rule variant exists
+    for tensor components (Li's inverse rule is 1D-scalar-only in this
+    project, per `solve_layer_eigenmodes_1d`'s docstring; the anisotropic
+    patterned solver instead numerically inverts the direct-rule `eps_zz`
+    Toeplitz, see `eigenmodes.solve_layer_eigenmodes_patterned_inplane`).
+    """
+    return _pattern_fourier_sum(pattern, lattice, g1, g2, lambda m: complex(m.epsilon_tensor(wavelength)[row, col]))
 
-    return total
+
+def _toeplitz(n: int, g_vectors: np.ndarray, coefficient: Callable[[int, int], complex]) -> np.ndarray:
+    matrix = np.zeros((n, n), dtype=complex)
+    cache: dict[tuple[int, int], complex] = {}
+    for i in range(n):
+        for j in range(n):
+            dg = (int(g_vectors[i, 0] - g_vectors[j, 0]), int(g_vectors[i, 1] - g_vectors[j, 1]))
+            if dg not in cache:
+                cache[dg] = coefficient(dg[0], dg[1])
+            matrix[i, j] = cache[dg]
+    return matrix
 
 
 def toeplitz_matrix(
@@ -102,12 +160,26 @@ def toeplitz_matrix(
     (`(n, 2)` int array, e.g. from `fourier_basis.truncate_fourier_orders`).
     """
     n = len(g_vectors)
-    matrix = np.zeros((n, n), dtype=complex)
-    cache: dict[tuple[int, int], complex] = {}
-    for i in range(n):
-        for j in range(n):
-            dg = (int(g_vectors[i, 0] - g_vectors[j, 0]), int(g_vectors[i, 1] - g_vectors[j, 1]))
-            if dg not in cache:
-                cache[dg] = pattern_epsilon_hat(pattern, lattice, dg[0], dg[1], wavelength, inverse=inverse)
-            matrix[i, j] = cache[dg]
-    return matrix
+    return _toeplitz(
+        n, g_vectors, lambda g1, g2: pattern_epsilon_hat(pattern, lattice, g1, g2, wavelength, inverse=inverse)
+    )
+
+
+def toeplitz_matrix_component(
+    pattern: Pattern,
+    lattice: Lattice,
+    g_vectors: np.ndarray,
+    wavelength: float,
+    row: int,
+    col: int,
+) -> np.ndarray:
+    """Build the `(n, n)` direct-rule Toeplitz matrix of permittivity
+    tensor component `(row, col)`, entry `[i, j] = hat{eps_rc}(G_i - G_j)`
+    -- Category 1 target 1.6's per-component generalization of
+    `toeplitz_matrix`. See `pattern_epsilon_hat_component`'s docstring for
+    the source citation.
+    """
+    n = len(g_vectors)
+    return _toeplitz(
+        n, g_vectors, lambda g1, g2: pattern_epsilon_hat_component(pattern, lattice, g1, g2, wavelength, row, col)
+    )

@@ -198,6 +198,8 @@ whether it was ever actually implemented.
   now trackable as Phase 5 (`tasks.md` Phase 5). Check `tasks.md` Phase 5
   checklist before starting.
 
+---
+
 ## 2026-08-01
 
 ### Discussed
@@ -245,3 +247,58 @@ whether it was ever actually implemented.
 - [x] Add `OUTPUT_RCWA/`/`demo.fsp` to `.gitignore` — done 2026-08-01.
 - [x] Commit and push the full backlog (Phases 3-8 plus today's changes) to
   `origin/main` — done 2026-08-01 (`f5fd81b`).
+
+---
+
+## 2026-08-03
+
+### Discussed
+- User asked to complete `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 1
+  targets 1.3-1.8 (Phase 6 anisotropic-materials work) one by one. Read
+  `rules.md`, `phases.md`, `memory.md`, `progress_log.md`, `references.md`,
+  `CONVENTIONS.md`, `tasks.md`, and the current `eigenmodes.py`/
+  `materials.py`/`simulation.py`/`layer.py` before writing any code, per
+  `CLAUDE.md`'s workspace instructions. Planned the six targets (plan mode,
+  approved) and started with 1.3.
+- Implemented target 1.3 (uniform diagonal-tensor layers) — see `memory.md`'s
+  new entry for the full account, including a caught-before-shipping test
+  mistake (initial oracle-axis mapping was backwards; the test itself caught
+  it, not a separate review pass) around the existing `Epsilon2` block-index
+  convention (`CONVENTIONS.md`'s `u = [-Ey; Ex]` ordering).
+
+### Action items
+- [x] Target 1.3 (uniform diagonal tensor) — done 2026-08-03, see
+  `memory.md`, `tasks.md` Phase 6, `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`.
+- [x] Target 1.4 (in-plane tensor coupling: `eps_xx, eps_xy, eps_yx, eps_yy,
+  eps_zz`) — done 2026-08-03; oracle hand-transcribed from
+  `RigorousCoupledWaveAnalysis.jl`'s `AnisotropicLayer` path (`Common.jl:134-165`)
+  into `tests/oracles/rcwa_anisotropic_inplane_jl.py`. See `memory.md` for
+  the empirically-determined kx/ky-swap-and-negate convention finding and
+  two test-authoring mistakes caught (tolerance scale, non-Hermitian
+  energy-conservation material) before this was marked done.
+- [x] Target 1.5 (longitudinal coupling) — evaluated and explicitly deferred
+  2026-08-03; bounded `WebSearch`/`WebFetch` literature search found no
+  source both readable in this environment and independently
+  benchmarkable. See `references.md`'s "Target 1.5 bounded literature
+  search" entry and `memory.md`.
+- [x] Target 1.6 (patterned anisotropic layers) — done 2026-08-03. New
+  citation found this session: `S4/S4/fmm/fmm_closed.cpp`'s `have_tensor`
+  branch (lines 165-256), not covered by the original Phase 6 reference
+  audit. See `memory.md` for the full account.
+- [x] Target 1.7 (degeneracy policy) — done 2026-08-03:
+  `eigenmodes._canonical_mode_order`, scoped to the three anisotropic
+  dense eigensolvers only (not the pre-existing Phase 4a isotropic
+  solver). See `memory.md`.
+- [x] Target 1.8 (mode classification) — done 2026-08-03, last target in
+  this session's approved plan. Found (and documented, not fixed — out of
+  this target's scope) an exact-Rayleigh-threshold `NaN` division-by-zero
+  in `smatrix.py`, tied to Category 6 target 6.4. See
+  `troubleshooting.md` and `memory.md`.
+- **Session summary**: all six planned targets (1.3-1.8) addressed;
+  1.3/1.4/1.6/1.7/1.8 shipped, 1.5 explicitly deferred after a bounded
+  literature search. 186 tests pass project-wide (123 at session start,
+  65 new). Committed as two commits on top of the `f5fd81b`/`9b28627`
+  backlog already pushed to `origin/main` on 2026-08-01, rebased via
+  `git cherry-pick` after discovering the local checkout had independently
+  (and redundantly) re-committed the same Phase 3-5 material already on
+  the remote — see `memory.md`.

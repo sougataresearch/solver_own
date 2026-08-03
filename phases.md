@@ -356,6 +356,37 @@ plan-mode scratch file) as phases complete.
   Does not strictly require Phase 4b, though revisiting Phase 4b's
   near-degenerate handling once anisotropy is added is worth a follow-up
   check — anisotropic coupling can shift which cases are near-degenerate.
+- **Status**: this phase is tracked at finer grain in
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 1 (added after this phase
+  entry was originally written, for more scientific/mathematical rigor —
+  see `progress_log.md` 2026-07-19). As of 2026-08-03, targets 1.1-1.4 and
+  1.6-1.8 are shipped: uniform diagonal-tensor
+  (`solve_layer_eigenmodes_uniform_diagonal`, `S4.cpp:1889-1906`), uniform
+  in-plane-coupled (`solve_layer_eigenmodes_uniform_inplane`, cross-checked
+  against a `RigorousCoupledWaveAnalysis.jl`-derived oracle to ~1e-13,
+  `tests/oracles/rcwa_anisotropic_inplane_jl.py`), patterned anisotropic
+  layers (`solve_layer_eigenmodes_patterned_inplane` +
+  `fourier_factorization.toeplitz_matrix_component`, transcribed from a
+  previously-unread `S4/S4/fmm/fmm_closed.cpp` branch, lines 165-256), a
+  deterministic mode-ordering policy (`eigenmodes._canonical_mode_order`),
+  and public propagating/evanescent mode classification
+  (`eigenmodes.classify_propagating`,
+  `SimulationResult.order_classification()`). Target 1.5 (longitudinal
+  `eps_xz/eps_yz/eps_zx/eps_zy` coupling) is evaluated and **explicitly
+  deferred** — a bounded literature search found no source both readable
+  in this environment and independently benchmarkable (see
+  `references.md`'s "Target 1.5 bounded literature search" entry); this
+  phase's original "generalize to a full tensor `Epsilon2`" deliverable is
+  therefore met for the diagonal/in-plane scope, not the fully general
+  9-component tensor. 186 tests pass project-wide (123 at the start of
+  this session, 65 new: `tests/test_anisotropic_uniform.py`,
+  `tests/test_anisotropic_inplane.py`, `tests/test_anisotropic_patterned.py`,
+  `tests/test_anisotropic_degeneracy.py`, `tests/test_mode_classification.py`).
+  One honest, out-of-scope finding surfaced while validating target 1.8:
+  a diffraction order sitting exactly at the Rayleigh/Wood's-anomaly
+  threshold produces `NaN` R/T (a pre-existing `smatrix.py` division-by-zero
+  at `q=0`, not introduced this session) — see `troubleshooting.md` and
+  Category 6 target 6.4.
 
 ## Phase 7 — Real-Space Field Reconstruction & Visualization
 

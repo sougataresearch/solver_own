@@ -2,8 +2,9 @@
 
 A pure-Python **Rigorous Coupled-Wave Analysis (RCWA)** solver for periodic
 electromagnetic structures — thin films, multilayer stacks, 1D-periodic
-lamellar gratings (trenches), and 2D-periodic patterned layers (vias,
-pillars), including tapered/sloped sidewalls.
+lamellar gratings (trenches), 2D-periodic patterned layers (vias, pillars)
+including tapered/sloped sidewalls, and (for diagonal and in-plane-coupled
+tensors) anisotropic materials in both uniform and patterned layers.
 
 This is a from-scratch, from-first-principles implementation, not a wrapper
 around an existing solver. Every non-trivial formula in the codebase is
@@ -30,15 +31,16 @@ reflectors, 1D gratings/trenches, and 2D via/pillar arrays.
 ## Objectives
 
 1. Correctly solve uniform multilayer stacks (thin film / DBR) — **done**.
-2. Correctly solve 1D-periodic lamellar gratings (trench, line/space),
-   including sloped sidewalls — **done**.
-3. Correctly solve 2D-periodic patterned layers (via, pillar arrays),
-   including sloped sidewalls — **done**.
-4. Support dispersive, absorbing, and (eventually) anisotropic materials —
-   dispersive/absorbing done; anisotropic materials planned (Phase 6).
-5. Validate every new capability against an independent oracle (S4, analytic
-   Fresnel, `RigorousCoupledWaveAnalysis.jl`, or a published benchmark
-   table) before trusting it.
+2. Correctly solve 1D-periodic lamellar gratings (trench, line/space) with
+   sloped sidewalls — **done**.
+3. Correctly solve 2D-periodic patterned layers (via, pillar arrays), also
+   with sloped sidewalls — **done**.
+4. Support dispersive, absorbing, and anisotropic materials — dispersive/
+   absorbing **done**; anisotropic **partially done** (diagonal and
+   in-plane-coupled tensors, uniform and patterned; longitudinal coupling
+   explicitly deferred — see Features below).
+5. Validate every new capability against an independent oracle (S4, RCWA.jl,
+   analytic Fresnel, or a published benchmark table) before trusting it.
 6. Stay a small, readable, single-author codebase — not a framework.
 
 ## Features
@@ -103,8 +105,31 @@ Current (Phase 5, shipped):
   single-uniform-layer result, energy conservation, and
   convergence-vs-`num_slices` studies.
 
+Current (Phase 6, Category 1 targets 1.3-1.4/1.6-1.8, shipped; see
+[`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`](COMMERCIAL_RCWA_ATOMIC_TARGETS.md)):
+- Uniform diagonal-tensor and in-plane-coupled (`eps_xx, eps_xy, eps_yx,
+  eps_yy, eps_zz`) anisotropic layers —
+  `solve_layer_eigenmodes_uniform_diagonal`,
+  `solve_layer_eigenmodes_uniform_inplane`, validated against a closed-form
+  birefringence benchmark and an independent `RigorousCoupledWaveAnalysis.jl`-
+  derived oracle (`tests/test_anisotropic_uniform.py`,
+  `tests/test_anisotropic_inplane.py`).
+- Patterned (2D-periodic) anisotropic layers —
+  `solve_layer_eigenmodes_patterned_inplane`,
+  `fourier_factorization.toeplitz_matrix_component`
+  (`tests/test_anisotropic_patterned.py`).
+- A deterministic mode-ordering policy for near-degenerate eigenvalues
+  (`eigenmodes._canonical_mode_order`,
+  `tests/test_anisotropic_degeneracy.py`) and public propagating/evanescent
+  mode classification (`eigenmodes.classify_propagating`,
+  `SimulationResult.order_classification()`,
+  `tests/test_mode_classification.py`).
+- **Not yet supported**: longitudinal tensor coupling
+  (`eps_xz/eps_yz/eps_zx/eps_zy`) — evaluated and explicitly deferred, no
+  citable + independently-benchmarkable formulation found (see
+  `references.md`'s "Target 1.5 bounded literature search").
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
-- Anisotropic materials (full 3x3 permittivity tensor, Phase 6)
 - Real-space field reconstruction and cross-section plotting (Phase 7)
 - Expanded systematic validation sweep across all geometry types (Phase 8)
 - Optional vectorized/GPU/autodiff backend (later; see `decisions.md`)
@@ -146,16 +171,18 @@ sougata_solver/
 ├── deployment.md           environment/CI/release process
 ├── references.md            literature + reference-implementation index
 ├── troubleshooting.md      known numerical gotchas
+├── CONVENTIONS.md           frozen field/phasor/S-matrix/tensor conventions
+├── COMMERCIAL_RCWA_ATOMIC_TARGETS.md   fine-grained Phase 6+ target checklist
 ├── pyproject.toml
 ├── src/sougata_solver/        see src/sougata_solver/README.md for the module map
 │   ├── materials.py         permittivity models (isotropic + tensor)
 │   ├── geometry.py           Lattice, Lattice1D, Shape (Circle/Rectangle/Slab), Pattern
 │   ├── fourier_basis.py       G-vector truncation (2D circular + 1D)
-│   ├── fourier_factorization.py  Toeplitz permittivity matrices (Phase 2, done)
-│   ├── staircase.py             tapered-sidewall staircase layer generators (Phase 5, done)
+│   ├── fourier_factorization.py  Toeplitz permittivity matrices, scalar + per-tensor-component
 │   ├── layer.py                Layer, LayerStack, LayerEigenmodes
-│   ├── eigenmodes.py           per-layer eigenmode solve: uniform, 1D-patterned
-│   │                            (Phase 3), 2D-patterned (Phase 4a/4b), all done
+│   ├── staircase.py             tapered-sidewall staircase layer-stack generators (Phase 5, done)
+│   ├── eigenmodes.py           per-layer eigenmode solve: uniform, 1D-patterned (Phase 3),
+│   │                            2D-patterned (Phase 4a/4b), and anisotropic (Phase 6)
 │   ├── smatrix.py               interface + propagation S-matrices, star product
 │   ├── excitation.py            plane-wave decomposition, incident amplitude
 │   ├── fields.py                  Poynting flux, tangential field reconstruction
@@ -253,9 +280,12 @@ pytest
 
 ## Future Improvements
 
-Phases 1-5 (uniform stacks, Fourier factorization, 1D trenches, 2D
-via/pillar, tapered sidewalls) are done. See [`phases.md`](phases.md) for
-the complete, ordered roadmap of what remains: anisotropic materials
-(Phase 6), real-space field reconstruction/visualization (Phase 7),
-expanded systematic validation (Phase 8), and an optional
-vectorized/GPU/autodiff performance backend (Phase 9).
+See [`phases.md`](phases.md) for the complete, ordered roadmap and
+[`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`](COMMERCIAL_RCWA_ATOMIC_TARGETS.md) for
+the fine-grained target checklist. Phases 1-5 and Phase 6 Category 1
+targets 1.3-1.4/1.6-1.8 (diagonal + in-plane anisotropic materials) are
+shipped. Remaining: target 1.5 (longitudinal tensor coupling, explicitly
+deferred pending a citable formulation), real-space field reconstruction
+and cross-section plotting (Phase 7), an expanded validation suite and
+example gallery (Phase 8), and an optional vectorized/GPU/autodiff backend
+(Phase 9, later).

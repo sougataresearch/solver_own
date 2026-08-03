@@ -15,14 +15,15 @@ Roughly in the order data flows through them for a single `Simulation.solve()` c
 | [`materials.py`](materials.py) | `Material`: scalar/dispersive (`from_nk`, CSV) and tensor permittivity |
 | [`geometry.py`](geometry.py) | `Lattice`, `Shape` (`Circle`, `Rectangle`), `Pattern` — in-plane geometry and analytic Fourier transforms |
 | [`fourier_basis.py`](fourier_basis.py) | Circular G-vector truncation (`truncate_fourier_orders`) — which Fourier orders are kept |
-| [`fourier_factorization.py`](fourier_factorization.py) | `pattern_epsilon_hat`, `toeplitz_matrix` — builds the Toeplitz permittivity matrix for a patterned layer (Phase 2; not yet wired into `simulation.py`) |
+| [`fourier_factorization.py`](fourier_factorization.py) | `pattern_epsilon_hat`/`toeplitz_matrix` (scalar isotropic) and `pattern_epsilon_hat_component`/`toeplitz_matrix_component` (per-tensor-component) — builds the Toeplitz permittivity matrix for a patterned layer |
 | [`layer.py`](layer.py) | `Layer`, `LayerStack`, `LayerEigenmodes` — the data model for a stack, including the semi-infinite incidence/transmission half-spaces |
-| [`eigenmodes.py`](eigenmodes.py) | Per-layer eigenmode solve: `q` (propagation constants), `phi` (eigenvectors), `kp` (k-parallel operator). Uniform layers only today — patterned-layer solve is Phase 4 |
+| [`staircase.py`](staircase.py) | Tapered-sidewall staircase layer-stack generators (`staircase_circle_layers`, `staircase_rectangle_layers`, `staircase_slab_layers`) |
+| [`eigenmodes.py`](eigenmodes.py) | Per-layer eigenmode solve: `q` (propagation constants), `phi` (eigenvectors), `kp` (k-parallel operator). Covers uniform isotropic, uniform diagonal/in-plane-anisotropic, 1D-patterned, and 2D-patterned (isotropic and diagonal/in-plane-anisotropic) layers, plus `classify_propagating` (mode classification) and `_canonical_mode_order` (deterministic degeneracy ordering) |
 | [`excitation.py`](excitation.py) | `PlaneWaveExcitation`: angle/polarization decomposition into s/p, and inversion to the incident mode-amplitude vector |
 | [`smatrix.py`](smatrix.py) | Interface + propagation S-matrices, Redheffer star-product cascading (`SMatrixStack`) — dimension-agnostic, needs no changes for Phase 3/4 |
 | [`fields.py`](fields.py) | `z_poynting_flux` — reflected/transmitted power from mode amplitudes |
 | [`polarimetry.py`](polarimetry.py) | Jones/Mueller matrix construction from s/p amplitudes (`decompose_sp` is reused by `postprocessing/`) |
-| [`simulation.py`](simulation.py) | Top-level orchestration: `Simulation.solve()` wires the above into a `SimulationResult` (`.reflectance()`, `.transmittance()`) |
+| [`simulation.py`](simulation.py) | Top-level orchestration: `Simulation.solve()` wires the above into a `SimulationResult` (`.reflectance()`, `.transmittance()`, `.diffraction_efficiencies()`, `.order_classification()`) |
 | [`output_paths.py`](output_paths.py) | `outputs/YYYY_MM_DD/HH_MM_SS_<run>/` folder + `run_metadata.txt` helper, used by `structures/` scripts |
 
 ## Design rules specific to this folder
@@ -40,10 +41,13 @@ Roughly in the order data flows through them for a single `Simulation.solve()` c
   are solved analytically, and the incidence/transmission half-spaces are
   literal `thickness = math.inf` (`layer.py`), not a truncated domain. There
   is nothing analogous to an absorbing boundary condition to add here.
-- **`smatrix.py` and `eigenmodes.py`'s `build_kp_matrix`** are already
-  written to accept the general (patterned) case (`kp_matrix` takes a full
-  `epsilon_inv` matrix, not just a scalar) — Phase 3/4 should target that
-  existing interface rather than introducing a new one.
-- Anisotropic materials and patterned-layer eigenmode solving currently
-  raise `NotImplementedError` (`materials.py`, `simulation.py:97-101`) —
-  these are Phase 4/6, not bugs.
+- **`smatrix.py` and `eigenmodes.py`'s `build_kp_matrix`** were written to
+  accept the general (patterned) case (`kp_matrix` takes a full
+  `epsilon_inv` matrix, not just a scalar) from the start — every later
+  solver (1D, 2D patterned, anisotropic) reuses this same interface rather
+  than introducing a new one.
+- Longitudinally-coupled anisotropic materials (`eps_xz/eps_yz/eps_zx/eps_zy`)
+  still raise `NotImplementedError` in `simulation.py`, naming
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` target 1.5 — evaluated and explicitly
+  deferred (no citable + independently-benchmarkable formulation found),
+  not a bug.

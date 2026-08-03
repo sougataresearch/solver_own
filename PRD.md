@@ -43,25 +43,46 @@ depending on them at runtime.
   analytic Fresnel/TMM to numerical precision across incidence angle,
   polarization, and a dispersive-material wavelength sweep. **Met** — see
   `tests/test_analytic_fresnel.py` and `tests/oracles/fresnel.py`.
+- Phase 2 (Fourier-factorization core): direct and inverse-rule Toeplitz
+  permittivity matrices match two independent numerical references.
+  **Met** — see `tests/test_fourier_factorization.py`.
 - Phase 3 (trench): diffraction efficiencies match a published 1D
   binary-grating benchmark (e.g. Moharam & Gaylord 1995) to within
   numerical-truncation-limited agreement, for at least TE and TM
   polarization at oblique incidence; energy conservation holds and the
   measured convergence rate vs. `num_orders` matches theory (`testing.md`'s
   Physical-Invariant Testing) — required starting this phase, not deferred
-  to Phase 8.
+  to Phase 8. **Met** — see `tests/test_1d_grating.py`.
 - Phase 4a (via/pillar, well-conditioned case): reflectance/transmittance
   and/or diffraction efficiencies match an S4-driven reference simulation
   of an equivalent structure (same lattice, radius, materials, wavelength)
   to within numerical-truncation-limited agreement, and satisfy the
-  energy-conservation invariant (`testing.md`).
+  energy-conservation invariant (`testing.md`). **Met**, with a caveat
+  honestly recorded rather than fabricated: S4 itself was never runnable in
+  this environment, so the eigenoperator is instead cross-checked against
+  an independent `RigorousCoupledWaveAnalysis.jl`-derived oracle (see
+  `tests/test_2d_pillar.py`, `phases.md` Phase 4a).
 - Phase 4b (via/pillar, near-degenerate/ill-conditioned case): the same
   agreement holds for at least one high-contrast, small-feature-to-period,
   high-`num_orders` stress case, with any ill-conditioning explicitly
-  logged rather than silently degrading the result.
+  logged rather than silently degrading the result. **Met** — see
+  `tests/test_2d_pillar_stress.py`.
 - Phase 5 (tapered sidewalls): R/T demonstrably converges (monotonically,
   within expected discretization error) as the number of staircase slices
-  increases, for both a tapered via and a tapered trench.
+  increases, for both a tapered via and a tapered trench. **Met** — see
+  `tests/test_staircase.py`.
+- Phase 6 (anisotropic materials), Category 1 targets 1.3-1.4 and 1.6-1.8
+  (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`): uniform diagonal-tensor, uniform
+  in-plane-coupled, and patterned anisotropic layers reduce correctly to
+  their isotropic/simpler special cases, agree with a closed-form uniaxial
+  benchmark and an independent `RigorousCoupledWaveAnalysis.jl`-derived
+  oracle, and satisfy energy conservation. **Met for that scope.** Target
+  1.5 (longitudinal `eps_xz/eps_yz/eps_zx/eps_zy` coupling) is evaluated
+  and explicitly deferred — no citable, independently-benchmarkable
+  formulation was located, per `references.md`'s "Target 1.5 bounded
+  literature search." See `tests/test_anisotropic_uniform.py`,
+  `tests/test_anisotropic_inplane.py`, `tests/test_anisotropic_patterned.py`,
+  `tests/test_anisotropic_degeneracy.py`, `tests/test_mode_classification.py`.
 - No phase is marked "done" without: (a) a passing automated test against
   an oracle, and (b) a runnable example script producing physically
   plausible output.
@@ -73,11 +94,11 @@ depending on them at runtime.
 | FR-1 | Solve reflectance/transmittance for an arbitrary stack of uniform, dispersive, isotropic layers at arbitrary incidence angle/azimuth/polarization. *(done)* |
 | FR-2 | Support semi-infinite incidence/transmission half-spaces of arbitrary (possibly complex/absorbing) index. *(done)* |
 | FR-3 | Report Jones and Mueller-matrix polarimetric response. *(done)* |
-| FR-4 | Represent 2D-periodic in-plane patterns from `Circle` and `Rectangle` primitives, including nested/overlapping shapes with correct area subtraction. *(geometry done; not yet consumed by the solver)* |
-| FR-5 | Solve reflectance/transmittance/diffraction efficiencies for a layer patterned according to FR-4 (via/pillar). *(planned — Phase 4a, hardened for near-degenerate cases in Phase 4b)* |
-| FR-6 | Represent and solve 1D-periodic lamellar (line/space) patterns (trench). *(planned — Phase 3)* |
-| FR-7 | Represent a feature (via/trench) with linearly tapered sidewalls via staircase layer discretization, and demonstrate R/T convergence with slice count. *(planned — Phase 5)* |
-| FR-8 | Support anisotropic (full 3×3 tensor) materials in both uniform and patterned layers. *(planned — Phase 6)* |
+| FR-4 | Represent 2D-periodic in-plane patterns from `Circle` and `Rectangle` primitives, including nested/overlapping shapes with correct area subtraction. *(done — consumed by the solver since Phase 4a)* |
+| FR-5 | Solve reflectance/transmittance/diffraction efficiencies for a layer patterned according to FR-4 (via/pillar). *(done — Phase 4a, hardened for near-degenerate cases in Phase 4b)* |
+| FR-6 | Represent and solve 1D-periodic lamellar (line/space) patterns (trench). *(done — Phase 3)* |
+| FR-7 | Represent a feature (via/trench) with linearly tapered sidewalls via staircase layer discretization, and demonstrate R/T convergence with slice count. *(done — Phase 5)* |
+| FR-8 | Support anisotropic (full 3×3 tensor) materials in both uniform and patterned layers. *(partially done — Phase 6 Category 1 targets 1.3/1.4/1.6-1.8: diagonal and in-plane-coupled tensors, uniform and patterned. Longitudinal coupling, target 1.5, explicitly deferred — see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`)* |
 | FR-9 | Reconstruct real-space E/H field maps at an arbitrary depth in the stack (for cross-section visualization of trench/via structures). *(planned — Phase 7)* |
 | FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports. *(done — `structures/thin_film/sio2_on_si_thin_film.py::material_from_csv`)* |
 
