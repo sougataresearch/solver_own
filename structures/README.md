@@ -57,6 +57,8 @@ and output path. No other part of the script should normally need touching.
 | [`via_array.py`](via/via_array.py) | Uniform (untapered) circular via/hole, wavelength sweep |
 | [`tapered_via.py`](via/tapered_via.py) | Linearly-tapered circular via (staircase-discretized), `num_slices` convergence sweep; FDTD-style `TCD`/`BCD`/`SPACING`/`PERIOD` naming (via diameters) |
 | [`tapered_pillar.py`](via/tapered_pillar.py) | Linearly-tapered square pillar (staircase-discretized, `Rectangle` with equal x/y halfwidths), same FDTD-style naming (pillar side length) |
+| [`elliptical_pillar.py`](via/elliptical_pillar.py) | Uniform (untapered) elliptical Si pillar, wavelength sweep — Category 4 target 4.3's end-to-end `Ellipse` example |
+| [`triangular_pillar.py`](via/triangular_pillar.py) | Uniform (untapered) triangular Si pillar (`Polygon`), wavelength sweep — Category 4 targets 4.4/4.5's end-to-end `Polygon` example |
 
 All three tapered scripts (`tapered_trench.py`, `tapered_via.py`,
 `tapered_pillar.py`) build on `src/sougata_solver/staircase.py`'s

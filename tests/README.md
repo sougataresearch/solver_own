@@ -1,9 +1,12 @@
 # `tests/` — Test Suite
 
-`pytest`-based. Run with:
+`pytest`-based, 393 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+Category 5 (384 fast + 9 `slow`-marked convergence/benchmark studies). Run
+the fast suite with:
 
 ```bash
-pytest
+pytest                # fast suite (excludes slow)
+pytest -m slow        # convergence/benchmark studies only (several minutes)
 ```
 
 See [`testing.md`](../testing.md) for the full testing strategy and
@@ -29,6 +32,23 @@ oracle — never a self-consistency check against the same code path.
 | [`test_anisotropic_patterned.py`](test_anisotropic_patterned.py) | Category 1 target 1.6 (patterned anisotropic layers): reduction to isotropic/uniform-tensor cases, energy conservation |
 | [`test_anisotropic_degeneracy.py`](test_anisotropic_degeneracy.py) | Category 1 target 1.7: deterministic mode ordering, repeated-solve determinism |
 | [`test_mode_classification.py`](test_mode_classification.py) | Category 1 target 1.8: propagating/evanescent classification against the analytic Rayleigh threshold |
+| [`test_failure_contract.py`](test_failure_contract.py) | Category 2 target 2.1: one test per documented `ValueError`/`NotImplementedError`/`LinAlgError` condition in `design.md`'s Failure Contract table |
+| [`test_eigenvalue_diagnostics.py`](test_eigenvalue_diagnostics.py) | Category 2 target 2.2: `LayerEigenmodes.diagnostics` (`EigenmodeDiagnostics`) fields match independent recomputation, no change to solve results |
+| [`test_sweep_mode_matching.py`](test_sweep_mode_matching.py) | Category 2 target 2.3: canonical mode ordering doesn't arbitrarily permute across a small wavelength sweep, for the three anisotropic dense solvers |
+| [`test_degeneracy_warning.py`](test_degeneracy_warning.py) | Category 2 target 2.4: `eigenmodes.DEGENERATE_GAP_THRESHOLD` warning fires/doesn't fire correctly |
+| [`test_stress_regression.py`](test_stress_regression.py) | Category 2 target 2.5: one lossy high-contrast fixture through the full `Simulation.solve()` pipeline (passivity check, since layer-wise absorption isn't implemented yet) |
+| [`test_fourier_factorization_rules.py`](test_fourier_factorization_rules.py) | Category 3 target 3.1: pins `design.md`'s Fourier-factorization rule inventory table against actual solver behavior |
+| [`test_fourier_convergence.py`](test_fourier_convergence.py) | Category 3 targets 3.2/3.3: fixed high-contrast 1D lamellar and 2D pillar convergence fixtures, `slow`-marked, with recorded (not just asserted) convergence tables |
+| [`test_geometry_validation.py`](test_geometry_validation.py) | Category 4 target 4.1: construction-time validation for `Lattice`/`Lattice1D`/`Circle`/`Rectangle`/`Slab` |
+| [`test_unit_cell_bounds.py`](test_unit_cell_bounds.py) | Category 4 target 4.2: edge-crossing shapes match a from-scratch periodic-tiling raster reference; self-overlap-across-periodic-images rejection |
+| [`test_ellipse.py`](test_ellipse.py) | Category 4 target 4.3: `Ellipse` DC/area, a from-scratch rasterized cross-check, and reduction to `Circle` |
+| [`test_polygon.py`](test_polygon.py) | Category 4 target 4.5: `Polygon` reduction to `Rectangle` (square case) and a from-scratch rasterized cross-check for a triangle and a non-convex L-shape |
+| [`test_geometry_io.py`](test_geometry_io.py) | Category 4 target 4.6: `geometry_io`'s minimal JSON `Pattern`-import format — parsing and validation only |
+| [`test_profile_slicing.py`](test_profile_slicing.py) | Category 4 target 4.7: `staircase.slice_profile`'s general geometry-to-layer-slices interface, independent of `Simulation.solve` |
+| [`test_material_validation.py`](test_material_validation.py) | Category 5 target 5.1: `Material` construction- and call-time validation (tensor shape, finite values, callback output) |
+| [`test_dispersion_models.py`](test_dispersion_models.py) | Category 5 targets 5.2-5.6: Sellmeier/Cauchy/Lorentz/Drude/Drude-Lorentz dispersion models, including a causality/sign-convention check and Rakić et al. (1998)'s published Au/Ag/Al/Ti coefficients |
+| [`test_tensor_material_wiring.py`](test_tensor_material_wiring.py) | Category 5 target 5.7: a dispersive tensor material solving end to end through Category 1's uniform-diagonal and patterned-anisotropic eigensolvers |
+| [`test_material_provenance.py`](test_material_provenance.py) | Category 5 target 5.8: optional `Material.source` citation metadata, forwarded by every `from_*` classmethod and threaded into serialized `run_metadata.txt` output |
 
 ## `oracles/`
 

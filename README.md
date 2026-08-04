@@ -2,9 +2,12 @@
 
 A pure-Python **Rigorous Coupled-Wave Analysis (RCWA)** solver for periodic
 electromagnetic structures — thin films, multilayer stacks, 1D-periodic
-lamellar gratings (trenches), 2D-periodic patterned layers (vias, pillars)
-including tapered/sloped sidewalls, and (for diagonal and in-plane-coupled
-tensors) anisotropic materials in both uniform and patterned layers.
+lamellar gratings (trenches), 2D-periodic patterned layers (vias, pillars,
+now including elliptical and simple-polygon cross-sections) including
+tapered/sloped sidewalls, and (for diagonal and in-plane-coupled tensors)
+anisotropic materials in both uniform and patterned layers, with dispersive
+materials from analytic models (Sellmeier, Cauchy, Lorentz, Drude,
+Drude-Lorentz) or tabulated `n,k` data.
 
 This is a from-scratch, from-first-principles implementation, not a wrapper
 around an existing solver. Every non-trivial formula in the codebase is
@@ -36,12 +39,20 @@ reflectors, 1D gratings/trenches, and 2D via/pillar arrays.
 3. Correctly solve 2D-periodic patterned layers (via, pillar arrays), also
    with sloped sidewalls — **done**.
 4. Support dispersive, absorbing, and anisotropic materials — dispersive/
-   absorbing **done**; anisotropic **partially done** (diagonal and
-   in-plane-coupled tensors, uniform and patterned; longitudinal coupling
-   explicitly deferred — see Features below).
+   absorbing **done** (constant/tabulated `n,k` plus five analytic dispersion
+   models: Sellmeier, Cauchy, Lorentz, Drude, Drude-Lorentz); anisotropic
+   **partially done** (diagonal and in-plane-coupled tensors, uniform and
+   patterned; longitudinal coupling explicitly deferred — see Features
+   below).
 5. Validate every new capability against an independent oracle (S4, RCWA.jl,
    analytic Fresnel, or a published benchmark table) before trusting it.
 6. Stay a small, readable, single-author codebase — not a framework.
+7. Beyond geometry/materials/physics correctness, treat the *numerical
+   robustness contract* itself as a deliverable — a documented failure
+   contract (which inputs raise which exception vs. only warn), eigenvalue/
+   conditioning diagnostics, and deterministic behavior across a sweep —
+   **done** for the scope shipped so far (see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+   Category 2).
 
 ## Features
 
@@ -129,6 +140,56 @@ Current (Phase 6, Category 1 targets 1.3-1.4/1.6-1.8, shipped; see
   citable + independently-benchmarkable formulation found (see
   `references.md`'s "Target 1.5 bounded literature search").
 
+Current (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 2, Numerical methods,
+targets 2.1-2.5, shipped):
+- A documented failure contract (`design.md`) covering every
+  `ValueError`/`NotImplementedError`/`LinAlgError`/`WARNING` condition in
+  the solver, backed by `tests/test_failure_contract.py`.
+- Per-solve eigenvalue/mode-conditioning diagnostics
+  (`layer.EigenmodeDiagnostics`, attached as `LayerEigenmodes.diagnostics`)
+  and a configurable small-eigenvalue-gap `WARNING`
+  (`eigenmodes.DEGENERATE_GAP_THRESHOLD`), alongside the existing
+  ill-conditioning `WARNING` from Phase 4b.
+- Deterministic mode ordering across a small wavelength sweep for the
+  anisotropic dense eigensolvers (reusing Category 1 target 1.7's
+  canonical-ordering policy).
+
+Current (Category 3, Fourier factorization, targets 3.1-3.6, shipped):
+- A documented rule inventory (`design.md`) recording which direct/
+  inverse/numerical-inverse Fourier-factorization rule every solver branch
+  actually uses, backed by `tests/test_fourier_factorization_rules.py`.
+- Fixed high-contrast 1D and 2D convergence fixtures with measured (not
+  assumed) convergence-vs-harmonic-order data
+  (`tests/test_fourier_convergence.py`).
+- Fast Fourier Factorization / Normal Vector Method feasibility evaluated
+  and explicitly deferred (`decisions.md` ADR-012) — the current 2D solver
+  keeps ordinary Laurent's-rule Toeplitz construction.
+
+Current (Category 4, Geometry engine, targets 4.1-4.7, shipped):
+- Construction-time validation for `Lattice`/`Lattice1D`/`Circle`/
+  `Rectangle`/`Slab` and a unit-cell self-overlap policy
+  (`geometry.validate_pattern_fits_lattice`, wired into `Simulation`).
+- `Ellipse` and `Polygon` shape primitives (`geometry.py`), both with
+  closed-form analytic Fourier transforms (no raster/FFT — see
+  `decisions.md` ADR-013), each with an end-to-end example
+  (`structures/via/elliptical_pillar.py`, `structures/via/triangular_pillar.py`).
+- A minimal, safe JSON `Pattern`-import format
+  (`geometry_io.py::pattern_from_dict`/`pattern_from_json_file`).
+- A general geometry-to-layer-slices interface (`staircase.slice_profile`),
+  of which the existing tapered-sidewall generators are now thin wrappers.
+
+Current (Category 5, Material models, targets 5.1-5.8, shipped):
+- Construction- and call-time `Material` validation (tensor shape, finite
+  values, dispersion-callback output).
+- Five analytic dispersion models — `Material.from_sellmeier`/`from_cauchy`
+  (validated against BK7's published Sellmeier coefficients/index) and
+  `Material.from_lorentz`/`from_drude`/`from_drude_lorentz` (validated
+  against Rakić et al. (1998)'s published Lorentz-Drude metal model, with
+  `RAKIC_GOLD`/`RAKIC_SILVER`/`RAKIC_ALUMINUM`/`RAKIC_TITANIUM` coefficient
+  presets ready to use).
+- Optional `Material.source` citation metadata, threaded through every
+  `from_*` classmethod and into serialized `run_metadata.txt` output.
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
 - Real-space field reconstruction and cross-section plotting (Phase 7)
 - Expanded systematic validation sweep across all geometry types (Phase 8)
@@ -175,25 +236,31 @@ sougata_solver/
 ├── COMMERCIAL_RCWA_ATOMIC_TARGETS.md   fine-grained Phase 6+ target checklist
 ├── pyproject.toml
 ├── src/sougata_solver/        see src/sougata_solver/README.md for the module map
-│   ├── materials.py         permittivity models (isotropic + tensor)
-│   ├── geometry.py           Lattice, Lattice1D, Shape (Circle/Rectangle/Slab), Pattern
+│   ├── materials.py         permittivity models (isotropic + tensor) + analytic dispersion
+│   │                          models (Sellmeier/Cauchy/Lorentz/Drude/Drude-Lorentz)
+│   ├── geometry.py           Lattice, Lattice1D, Shape (Circle/Rectangle/Ellipse/Polygon/Slab),
+│   │                          Pattern, construction-time validation
+│   ├── geometry_io.py         minimal safe JSON Pattern-import format (parser only)
 │   ├── fourier_basis.py       G-vector truncation (2D circular + 1D)
 │   ├── fourier_factorization.py  Toeplitz permittivity matrices, scalar + per-tensor-component
-│   ├── layer.py                Layer, LayerStack, LayerEigenmodes
-│   ├── staircase.py             tapered-sidewall staircase layer-stack generators (Phase 5, done)
+│   ├── layer.py                Layer, LayerStack, LayerEigenmodes, EigenmodeDiagnostics
+│   ├── staircase.py             slice_profile (general layer-slicing interface) +
+│   │                             tapered-sidewall staircase generators built on it
 │   ├── eigenmodes.py           per-layer eigenmode solve: uniform, 1D-patterned (Phase 3),
-│   │                            2D-patterned (Phase 4a/4b), and anisotropic (Phase 6)
+│   │                            2D-patterned (Phase 4a/4b), and anisotropic (Phase 6);
+│   │                            conditioning/degeneracy WARNING diagnostics
 │   ├── smatrix.py               interface + propagation S-matrices, star product
 │   ├── excitation.py            plane-wave decomposition, incident amplitude
 │   ├── fields.py                  Poynting flux, tangential field reconstruction
 │   ├── polarimetry.py             Jones/Mueller (reused by postprocessing/)
 │   ├── simulation.py               top-level orchestration
 │   └── output_paths.py             outputs/YYYY_MM_DD/HH_MM_SS_<run>/ helper
-├── tests/                    pytest suite + `tests/oracles/` -- see tests/README.md
+├── tests/                    pytest suite (393 tests) + `tests/oracles/` -- see tests/README.md
 ├── structures/                YOU RUN THESE -- see structures/README.md
 │   ├── thin_film/                uniform multilayer stacks (Phase 1, done)
 │   ├── trench/                    1D lamellar gratings, tapered ridges (Phase 3/5, done)
-│   └── via/                        2D via/pillar arrays, tapered vias/pillars (Phase 4/5, done)
+│   └── via/                        2D via/pillar arrays, tapered/elliptical/polygon
+│                                    pillars (Phase 4/5, Category 4, done)
 └── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
                                   output and derive Jones/Mueller matrices, ellipsometric
                                   angles, and (planned) RI/thickness extraction
@@ -272,20 +339,40 @@ result = sim.solve(PlaneWaveExcitation(wavelength=550e-9, theta=0.0, phi=0.0))
 print(result.reflectance(), result.transmittance())
 ```
 
+A dispersive metal via a published (not hand-fit) model, or a JSON-defined
+pattern, both use the same `Material`/`Pattern` objects as above:
+
+```python
+from sougata_solver.materials import Material, RAKIC_GOLD
+gold = Material.from_drude_lorentz("Au", *RAKIC_GOLD)   # Rakić et al. 1998
+
+from sougata_solver.geometry_io import pattern_from_json_string
+pattern = pattern_from_json_string('{"background": {"eps_re": 1.0}, '
+    '"shapes": [{"type": "circle", "center": [0.35, 0.35], "radius": 0.18, '
+    '"material": {"eps_re": 12.11}}]}')  # units default to meters
+```
+
 Run the test suite:
 
 ```bash
-pytest
+pytest                # fast suite
+pytest -m slow        # convergence/benchmark studies (several minutes)
 ```
 
 ## Future Improvements
 
 See [`phases.md`](phases.md) for the complete, ordered roadmap and
 [`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`](COMMERCIAL_RCWA_ATOMIC_TARGETS.md) for
-the fine-grained target checklist. Phases 1-5 and Phase 6 Category 1
-targets 1.3-1.4/1.6-1.8 (diagonal + in-plane anisotropic materials) are
-shipped. Remaining: target 1.5 (longitudinal tensor coupling, explicitly
-deferred pending a citable formulation), real-space field reconstruction
-and cross-section plotting (Phase 7), an expanded validation suite and
-example gallery (Phase 8), and an optional vectorized/GPU/autodiff backend
-(Phase 9, later).
+the fine-grained target checklist. Phases 1-5 are shipped, and
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-5 (mathematical foundation/
+anisotropy, numerical methods, Fourier factorization, geometry engine,
+material models) are all shipped except Category 1 target 1.5 (longitudinal
+tensor coupling, explicitly deferred pending a citable formulation).
+Remaining: Category 6 (boundary conditions/excitation) through Category 19
+(future extensions) at the atomic-target level — notably Category 7's
+layer-wise absorption (no `absorbance()`/`A` computation exists yet: a
+lossy material's `R+T` is correctly `<1`, but nothing independently derives
+the missing `A`) — plus real-space field reconstruction and cross-section
+plotting (Phase 7), an expanded validation suite and example gallery
+(Phase 8), and an optional vectorized/GPU/autodiff backend (Phase 9,
+later).
