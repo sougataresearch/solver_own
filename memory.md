@@ -5,10 +5,128 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-04 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 3, targets
-3.1-3.6), 2026-08-04 (Category 2, targets 2.1-2.5), 2026-08-03 (Phase 6,
-target 1.3), 2026-07-24 (Phase 5), 2026-07-23 (Phase 4b), 2026-07-21
-(Phase 4a) and earlier entries below:
+As of 2026-08-04 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 5, targets
+5.1-5.8), 2026-08-04 (Category 4, targets 4.1-4.7), 2026-08-04 (Category 3,
+targets 3.1-3.6), 2026-08-04 (Category 2, targets 2.1-2.5), 2026-08-03
+(Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23 (Phase 4b),
+2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 5 (Material models), targets 5.1-5.8, are all complete.**
+  5.1: `Material.__init__` and `Material.epsilon_tensor` both now validate
+  (finite values, correct tensor shape) -- construction-time alone can't
+  catch a dispersion callable that only misbehaves away from the probe
+  wavelength (e.g. outside an interpolation table's domain), so
+  `epsilon_tensor` re-validates every call. 5.2/5.3: `Material.from_sellmeier`/
+  `from_cauchy`, transcribed from the vendored `EMpy/EMpy/materials.py`
+  (a genuinely useful, previously-unused-for-this-purpose vendored file) --
+  validated against BK7's published Sellmeier coefficients and its
+  independently-published `n_d=1.5168` (both confirmed via `WebSearch`,
+  computed value matched to 5 significant figures). 5.4/5.5/5.6:
+  `Material.from_lorentz`/`from_drude`/`from_drude_lorentz`, all
+  transcribed from `RigorousCoupledWaveAnalysis.jl/src/BasicMaterials/rakic.jl`
+  -- a genuine, real published metal-dispersion model (A. D. Rakić et al.,
+  Appl. Opt. 37, 5271-5283 (1998)) found in a vendored repo, including its
+  published Au/Ag/Al/Ti coefficient tables, transcribed verbatim as
+  `RAKIC_GOLD`/`RAKIC_SILVER`/`RAKIC_ALUMINUM`/`RAKIC_TITANIUM`. **Important
+  finding, independently re-derived and tested, not assumed**: target 5.4
+  explicitly required a causality/sign-convention check -- under this
+  project's `d/dt->-i*omega` phasor convention (`CONVENTIONS.md`), a
+  passive Lorentz oscillator must have `Im(eps)>0` at resonance; hand-
+  derived the exact value (`i*strength/(gamma*omega0)`) and confirmed it
+  matches Rakic's Julia sign (`-1im*ω*o.Γ`), the same class of check that
+  Category 2 target 2.5 got wrong on a first attempt (a naively-reused
+  `n=-20+2j` index that turned out to be a gain, not lossy, medium under
+  this project's convention) -- this time verified correct *before*
+  shipping, not caught after. The Drude formula was additionally cross-
+  checked between **two independently vendored sources**
+  (`Rigorous-Coupled-Wave-Analysis/TMM_examples/TMM_Drude.py` and
+  `rakic.jl`), confirmed algebraically identical before trusting either.
+  A bounded `WebSearch`/`WebFetch` attempt to also cross-check against
+  Johnson & Christy (1972)'s raw tabulated Au n,k data (a second,
+  independent published source) found the paper's bibliographic details
+  but could not fetch the actual data table in this environment (same
+  class of limitation as Category 1 target 1.5's and Category 3's bounded
+  searches) -- Rakic's own published coefficients already satisfy the
+  target's requirement on their own; not silently skipped, recorded in
+  `references.md`. 5.7: confirmed Category 1's tensor-solver gate (targets
+  1.3/1.4/1.6) is already met, then closed the one previously-untested
+  combination -- a genuinely *dispersive* tensor material (built from a
+  Category 5 dispersion model) flowing through Category 1's uniform-
+  diagonal and patterned-anisotropic eigensolvers end to end. 5.8:
+  `Material.source` (optional provenance/citation string), threaded
+  through every `from_*` classmethod and `geometry_io`'s JSON schema.
+  **Real bug found and fixed while validating "serialized output"**:
+  `output_paths.write_run_metadata` used the platform-default text
+  encoding (`cp1252` on Windows), which raised `UnicodeEncodeError` the
+  moment a real non-ASCII citation ("Rakić et al.") was written through it
+  for the first time -- fixed to explicit UTF-8, the first time any test
+  in this project exercised that code path with non-ASCII content. 393
+  tests pass project-wide (336 at the start of this category: 327 fast + 9
+  slow -- 384 fast + 9 slow now), full fast+slow suite re-run and
+  confirmed green.
+- **Category 4 (Geometry engine), targets 4.1-4.7, are all complete.**
+  4.1: `geometry._require_finite`/`_require_positive`, called from
+  `Lattice`/`Lattice1D.__init__` and `Circle`/`Rectangle`/`Slab.__post_init__`
+  -- non-finite dimensions, degenerate lattice vectors, and non-positive
+  shape sizes now raise `ValueError` at construction instead of surfacing
+  later as a NaN Fourier coefficient or a cryptic `LinAlgError`
+  (`tests/test_geometry_validation.py`, 29 tests). 4.2:
+  `geometry.validate_pattern_fits_lattice`, wired into `Simulation.__init__`
+  -- documents (and verifies against a from-scratch periodic-tiling raster
+  reference, not just argues) that a shape crossing a cell edge is already
+  handled correctly by the existing reciprocal-lattice-point Fourier
+  evaluation (a Poisson-summation consequence, no code change needed), and
+  adds an explicit, conservative self-overlap-across-periodic-images
+  rejection for the one case that genuinely isn't handled automatically
+  (`tests/test_unit_cell_bounds.py`, 6 tests). 4.3/4.4/4.5: `geometry.Ellipse`
+  and `geometry.Polygon`, both transcribed from
+  `S4/S4/pattern/pattern.c::pattern_get_fourier_transform` (lines 889-1032)
+  -- a genuine surprise found while investigating target 4.4's "analytic vs.
+  raster/FFF" design decision: the working assumption going in (informed by
+  Category 3's ADR-012 FFF/NVM investigation) was that a polygon would need
+  raster+FFT; reading S4's actual `POLYGON` case (lines 974-1008) showed a
+  closed-form boundary/edge-sum formula instead, architecturally identical
+  in kind to `Circle`/`Rectangle`'s existing analytic transforms, not the
+  discretized/FFT machinery ADR-012 was about (`decisions.md` ADR-013
+  records the resulting decision -- analytic, exact for any simple polygon
+  -- and explicitly narrows `decisions.md` ADR-005's polygon deferral rather
+  than reversing it; GDS/raster import remains out of scope). `Ellipse`
+  reduces exactly to `Circle` when `hx==hy`; a square `Polygon` reduces
+  exactly to `Rectangle` (both regression-verified, not just plausible).
+  Both validated against from-scratch rasterized references
+  (`tests/test_ellipse.py`, 19 tests; `tests/test_polygon.py`, 24 tests,
+  including a non-convex L-shape) and each has a `structures/via/` example
+  reaching R+T=1.0000 across a 21-point wavelength sweep
+  (`elliptical_pillar.py`, `triangular_pillar.py`) -- satisfying the
+  Category 4 exit criteria's "geometry-only tests and one end-to-end RCWA
+  example" per new shape directly. `Polygon.signed_distance_normal` is
+  **not** transcribed from S4's own `POLYGON` normal formula
+  (`pattern.c:256-281`), which was found to select the *farthest*, not
+  nearest, boundary segment -- contradicting this project's own
+  `Shape.signed_distance_normal` contract already established by
+  `Circle`/`Rectangle`/`Ellipse`; implemented independently instead (an
+  elementary point-to-segment-distance calculation, not risky enough to
+  need transcription per `rules.md` Documentation Standards option 2). 4.6:
+  `geometry_io.py`, a minimal JSON `Pattern`-import format (`unit`/
+  `background`/`shapes`, isotropic-scalar materials only,
+  `Circle`/`Rectangle`/`Ellipse`/`Polygon`/`Slab`) -- `json` module only,
+  never `eval`/`exec` (per `rules.md` Security Rules), every malformed-input
+  case raises a clear `ValueError` naming the offending key/shape index.
+  Deliberately not wired into `Simulation`/`Layer` construction, matching
+  the target's own "before solver integration" wording -- the returned
+  `Pattern` already works with the existing public API unmodified, verified
+  by one end-to-end test (`tests/test_geometry_io.py`, 17 tests). 4.7:
+  `staircase.slice_profile`, a shape-agnostic `pattern_at(frac) -> Pattern`
+  generalization; the three existing shape-specific taper generators
+  (`staircase_circle_layers`/`_rectangle_layers`/`_slab_layers`) were
+  refactored (not reimplemented) into thin wrappers around it -- the full
+  pre-existing `tests/test_staircase.py` suite, including Phase 5's
+  zero-taper and energy-conservation regression tests, was re-run and
+  confirmed passing unchanged after the refactor, not merely assumed safe
+  (`tests/test_profile_slicing.py`, 6 new tests, including a non-linear
+  non-taper profile proving genuine generality). 336 tests pass
+  project-wide (226 fast + 9 slow at the start of this category's work,
+  327 fast + 9 slow now -- 101 new fast tests, no new `slow` tests), full
+  fast+slow suite re-run and confirmed green.
 - **Category 3 (Fourier factorization), targets 3.1-3.6, are all complete.**
   3.1: a "Fourier-factorization rule inventory" table added to `design.md`
   (Algorithm 3a), tabulating every uniform/1D/2D solver branch's

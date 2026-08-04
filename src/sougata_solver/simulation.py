@@ -29,7 +29,7 @@ from sougata_solver.excitation import PlaneWaveExcitation
 from sougata_solver.fields import z_poynting_flux
 from sougata_solver.fourier_basis import truncate_fourier_orders, truncate_fourier_orders_1d
 from sougata_solver.fourier_factorization import toeplitz_matrix, toeplitz_matrix_component
-from sougata_solver.geometry import Lattice, Lattice1D
+from sougata_solver.geometry import Lattice, Lattice1D, validate_pattern_fits_lattice
 from sougata_solver.layer import Layer, LayerEigenmodes, LayerStack
 from sougata_solver.materials import Material
 from sougata_solver.smatrix import SMatrixStack
@@ -166,6 +166,14 @@ class Simulation:
         self.layer_stack = LayerStack(layers, incidence, transmission)
         self.num_orders = num_orders
         self.truncation = truncation
+
+        # Category 4 target 4.2 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md): reject
+        # a patterned layer whose shapes could overlap their own periodic
+        # images at construction time, not deep inside solve() -- see
+        # geometry.validate_pattern_fits_lattice's docstring for the policy.
+        for layer in self.layer_stack:
+            if layer.pattern is not None:
+                validate_pattern_fits_lattice(layer.pattern, lattice)
 
     def solve(self, excitation: PlaneWaveExcitation) -> SimulationResult:
         wavelength = excitation.wavelength

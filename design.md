@@ -133,6 +133,22 @@ above against actual solver behavior (not just the table's prose) so a
 future refactor that silently changes which matrix a solver inverts shows
 up as a test failure.
 
+### 3b. Ellipse and Polygon Fourier transforms (Category 4 targets 4.3-4.5)
+
+`Ellipse` (target 4.3) and `Polygon` (targets 4.4-4.5) extend `Shape` the
+same way `Circle`/`Rectangle` already do -- a closed-form `fourier_transform(kx,
+ky)`, no raster/FFT, no change to `Pattern`/`fourier_factorization.py`. Both
+are transcribed from `S4/S4/pattern/pattern.c::pattern_get_fourier_transform`
+(lines 889-1032, the same function `Circle`/`Rectangle`'s existing citations
+already reference): `ELLIPSE` (lines 955-964) rescales `Circle`'s `jinc`
+argument anisotropically by the semi-axis ratio; `POLYGON` (lines 974-1008)
+is a closed-form boundary/edge-sum formula, not a raster or FFT operation --
+see `decisions.md` ADR-013 for the full accuracy-contract decision (target
+4.4) made before implementing `Polygon` (target 4.5), and for why this does
+not revisit or depend on ADR-012's separate FFF/NVM deferral (a different,
+harder problem -- correcting the *eigenoperator's* Fourier factorization at
+a discontinuous interface, not a single shape's own boundary integral).
+
 ### 4. S-matrix cascading (done)
 
 Redheffer star product, transcribed from `S4/S4r/StarProduct.hpp`

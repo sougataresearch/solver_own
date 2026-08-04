@@ -389,3 +389,103 @@ whether it was ever actually implemented.
   fast + 7 slow -- 226 fast + 9 slow now). No existing test weakened.
   Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
   `references.md`, `decisions.md` (new ADR-012), and this file.
+
+### Discussed (same day, continued again)
+- User asked to complete Category 4 (Geometry engine) targets 4.1-4.7 the
+  same way. Read `geometry.py`, `decisions.md` ADR-005 (parametric-shapes-
+  only), `staircase.py`, and `test_fourier_factorization.py`'s existing
+  shape-test conventions before starting, per `CLAUDE.md`'s workspace
+  instructions. Noted upfront that targets 4.4/4.5/4.6 (polygon, imported
+  geometry) appear to directly conflict with ADR-005 -- resolved by reading
+  ADR-005's own text, which explicitly anticipates and permits exactly this
+  situation ("if a real need for imported layouts arises later, revisit
+  with a new ADR, not silently override") -- see ADR-013 below.
+
+### Action items (Category 4)
+- [x] Target 4.1 (geometry validation API) — done 2026-08-04.
+  `geometry._require_finite`/`_require_positive`, wired into
+  `Lattice`/`Lattice1D`/`Circle`/`Rectangle`/`Slab`.
+  `tests/test_geometry_validation.py` (29 tests). See `memory.md`.
+- [x] Target 4.2 (unit-cell bounds policy) — done 2026-08-04.
+  `geometry.validate_pattern_fits_lattice`, wired into `Simulation.__init__`.
+  `tests/test_unit_cell_bounds.py` (6 tests). See `memory.md`.
+- [x] Target 4.3 (Ellipse primitive) — done 2026-08-04. Transcribed from
+  `S4/S4/pattern/pattern.c`'s `ELLIPSE` case. `tests/test_ellipse.py`
+  (19 tests), `structures/via/elliptical_pillar.py`. See `memory.md`.
+- [x] Target 4.4 (Polygon design decision) — done 2026-08-04. Found S4's
+  own analytic (not raster/FFT) polygon Fourier transform while
+  investigating this target -- decided analytic, recorded as `decisions.md`
+  ADR-013 (a narrow, explicit revisit of ADR-005, not a silent override).
+- [x] Target 4.5 (Polygon primitive) — done 2026-08-04. `geometry.Polygon`,
+  reduces exactly to `Rectangle` for a square; `Polygon.signed_distance_normal`
+  independently derived rather than transcribed from S4's own version,
+  which was found to pick the farthest (not nearest) edge -- see
+  `memory.md`. `tests/test_polygon.py` (24 tests),
+  `structures/via/triangular_pillar.py`.
+- [x] Target 4.6 (imported geometry format) — done 2026-08-04.
+  `geometry_io.py`, JSON-only, no `eval`/`exec`, parser-only (not wired
+  into `Simulation`/`Layer`, per the target's own scoping).
+  `tests/test_geometry_io.py` (17 tests).
+- [x] Target 4.7 (profile slicing API) — done 2026-08-04.
+  `staircase.slice_profile`; the three existing taper generators
+  refactored into thin wrappers around it, regression-verified unchanged
+  against the full pre-existing `tests/test_staircase.py` suite.
+  `tests/test_profile_slicing.py` (6 tests).
+- **Session summary**: all seven Category 4 targets (4.1-4.7) complete.
+  336 tests pass project-wide (232 at the start of this sub-session: 226
+  fast + 9 slow -- 327 fast + 9 slow now, 101 new fast tests). No existing
+  test weakened; the `staircase.py` refactor was verified, not assumed,
+  behavior-preserving. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`,
+  `memory.md`, `tasks.md`, `references.md`, `decisions.md` (new ADR-013),
+  `architecture.md` (module table + directory listing), and this file.
+
+### Discussed (same day, continued once more)
+- User pointed out that `structures/via/elliptical_pillar.py`/
+  `triangular_pillar.py` reported `R+T=1.0000` rather than `R+T+A=1.0000` --
+  confirmed this is correct (both scripts use real, lossless `n=3.48`/`1.0`
+  materials, so `A=0` by Poynting's theorem, not by omission), but surfaced
+  a real, separate gap: no `absorbance()`/`A` computation exists anywhere
+  in the library yet (confirmed by grep, not assumed) -- tracked as
+  Category 7 targets 7.5/7.6, still open. User then asked to do Category 5
+  (Material models) targets 5.1-5.8 the same way. Read `materials.py` in
+  full, and searched all vendored `REFERENCE/` repos for Sellmeier/Cauchy/
+  Lorentz/Drude implementations before starting, per `CLAUDE.md`'s
+  workspace instructions -- found genuinely useful, previously-unused
+  sources: `EMpy/EMpy/materials.py` (Sellmeier/Cauchy),
+  `Rigorous-Coupled-Wave-Analysis/TMM_examples/TMM_Drude.py` (Drude), and
+  `RigorousCoupledWaveAnalysis.jl/src/BasicMaterials/rakic.jl` (a full,
+  published Lorentz-Drude metal model with real Au/Ag/Al/Ti coefficients,
+  citing Rakić et al. 1998).
+
+### Action items (Category 5)
+- [x] Target 5.1 (material validation) — done 2026-08-04. Construction-
+  *and* call-time validation on `Material`. `tests/test_material_validation.py`
+  (13 tests). See `memory.md`.
+- [x] Targets 5.2/5.3 (Sellmeier/Cauchy) — done 2026-08-04, transcribed
+  from `EMpy/EMpy/materials.py`. BK7 validated against an independently-
+  published `n_d=1.5168` (confirmed via `WebSearch`). 8 tests.
+- [x] Targets 5.4/5.5/5.6 (Lorentz/Drude/Drude-Lorentz) — done 2026-08-04,
+  transcribed from `rakic.jl` (Rakić et al. 1998). Causality/sign-
+  convention independently re-derived and confirmed correct *before*
+  shipping (unlike Category 2 target 2.5's after-the-fact catch). Drude
+  formula cross-checked between two independently vendored sources. A
+  bounded search for a second independent metal-optics reference (Johnson
+  & Christy 1972) found the citation but not the fetchable data — recorded
+  honestly in `references.md`, not silently skipped. 17 tests.
+- [x] Target 5.7 (tensor-material solver wiring) — done 2026-08-04. Gate
+  (Category 1 targets 1.3/1.4/1.6) confirmed already met; closed the
+  previously-untested dispersive-tensor-material x tensor-eigensolver
+  combination. 6 tests.
+- [x] Target 5.8 (material provenance) — done 2026-08-04. `Material.source`
+  threaded through every classmethod and `geometry_io`'s JSON schema.
+  **Found and fixed a real pre-existing bug**: `write_run_metadata` lacked
+  explicit UTF-8 encoding, raising `UnicodeEncodeError` on Windows the
+  first time non-ASCII citation text was actually written through it. 13
+  tests (11 + 2 in `test_geometry_io.py`).
+- **Session summary**: all eight Category 5 targets (5.1-5.8) complete.
+  393 tests pass project-wide (336 at the start of this sub-session: 327
+  fast + 9 slow -- 384 fast + 9 slow now, 57 new fast tests). No existing
+  test weakened; one genuine bug found and fixed along the way
+  (`output_paths.write_run_metadata`'s encoding). Updated
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
+  `references.md`, and this file.

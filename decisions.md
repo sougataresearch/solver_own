@@ -420,3 +420,83 @@
   target 1.5's precedent, one source alone was judged insufficient), or
   (c) a user explicitly requests reopening ADR-002 for this specific
   purpose.
+
+## ADR-013: Revisit ADR-005 for a bounded analytic `Polygon` primitive (still no GDS/raster import)
+
+- **Decision**: `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 4 targets 4.4
+  ("Polygon design") and 4.5 ("Polygon primitive") ask for exactly the
+  capability **ADR-005** deferred ("Add polygon-vertex analytic Fourier
+  transforms... explicitly deferred, not rejected outright"). Per ADR-005's
+  own instruction ("if a real need for imported layouts arises later, this
+  ADR should be revisited with a new one, not silently overridden"), this
+  is that revisit: add a `Polygon` shape using a closed-form **analytic**
+  Fourier transform (no raster+FFT, no GDS import, no arbitrary-mask
+  support) — narrower than what ADR-005 rejected, not a reversal of it.
+  GDS import, raster masks, and self-intersecting/non-simple polygons
+  remain out of scope; `Polygon` requires a simple (non-self-intersecting),
+  closed, CCW-ordered vertex list, same restriction `S4/S4/pattern/pattern.h`'s
+  own module docstring (lines 21-35) already imposes on every shape type.
+- **Reason**: Reading `S4/S4/pattern/pattern.c::pattern_get_fourier_transform`'s
+  `POLYGON` case (lines 974-1008, alongside the already-transcribed
+  `CIRCLE`/`RECTANGLE`/`ELLIPSE` cases at 951-973 in the same function)
+  while investigating target 4.4 found that S4 computes a polygon's Fourier
+  transform via a **closed-form boundary/edge-sum formula** — for vertices
+  `v_0..v_{n-1}` (CCW, in the shape's local center-relative frame) and
+  `k != 0`:
+  ```
+  S(k) = -i/(2*pi*|k|^2) * sum_{edges (p,q)} [(u_x k_y - u_y k_x) * sinc(k.u) * exp(-2*pi*i*k.rc)]
+  ```
+  where `u = v_q - v_p` (edge vector) and `rc = (v_q+v_p)/2` (edge
+  midpoint) — a standard polygon-boundary Fourier-integral identity (the
+  polygon's indicator function's gradient is a sum of delta functions on
+  its edges; a 2D Fourier transform of a bounded region's indicator can
+  always be reduced to a 1D boundary integral by Stokes' theorem, of which
+  this is the closed-form evaluation for straight edges), **not** a raster
+  or FFT operation at all. This directly resolves ADR-005's own
+  "alternatives considered" note ("Add polygon-vertex analytic Fourier
+  transforms (still avoids raster+FFT error)") in the affirmative: the
+  polygon case is architecturally identical in kind to `Circle`/`Rectangle`/
+  `Ellipse` (a closed-form function of `k` and the shape's parameters), not
+  the raster+FFT alternative ADR-002 rejected. **Contrast with ADR-012's
+  FFF/NVM deferral**: that decision was to defer specifically because
+  proper vectorial 2D Fourier factorization (the `Epsilon2`/`kp` accuracy
+  correction at a discontinuous interface) genuinely requires S4's
+  discretized/FFT `PolBasisNV`/`PolBasisJones`/`PolBasisVL` machinery; a
+  *polygon's own shape-level Fourier transform* is an unrelated, much
+  simpler geometric question (the same question `Circle.fourier_transform`
+  already answers) that happens to also have a closed form. Implementing
+  `Polygon` does not require or imply revisiting ADR-012.
+- **Accuracy contract** (target 4.4's explicit deliverable, decided before
+  writing 4.5's implementation): the analytic edge-sum formula is **exact**
+  for any simple (non-self-intersecting) polygon, to floating-point
+  precision — there is no discretization/truncation error to characterize
+  (unlike a raster+FFT approach, whose accuracy depends on grid resolution
+  and would need its own convergence study). The only precondition is
+  "simple polygon, correctly CCW-ordered vertices," matching `pattern.h`'s
+  own stated (if S4-side unchecked) requirement; `Polygon.__post_init__`
+  is not required to detect self-intersection (S4 itself does not, per
+  that file's own comment, "not checked due to its complexity, so the
+  input shapes must be sanitized elsewhere") — this project inherits that
+  same, disclosed limitation rather than silently claiming a check that
+  doesn't exist.
+- **Alternatives considered**: (a) Full GDS/layout-file import — still out
+  of scope, unchanged from ADR-005, no citable safe-parsing/format decision
+  made here (see target 4.6 instead, which is deliberately scoped to a
+  minimal *sougata_solver-native* JSON format, not a CAD/GDS format). (b)
+  Raster+FFT polygon rasterization (Meent/TORCWA-style) — rejected for the
+  same reason ADR-002 already gives (pixelization error at edges, and here
+  it would be strictly worse than the exact closed form now available).
+- **Trade-offs**: `Polygon` cannot represent curved boundaries (that's
+  `Ellipse`'s/`Circle`'s job) and requires the caller to supply a correct,
+  simple, CCW vertex list — no runtime self-intersection check, per the
+  accuracy contract above. Still bounded scope relative to full GDS import:
+  no file format, no CAD interoperability, no arbitrary raster mask.
+- **Impact**: `geometry.Polygon` (target 4.5) is implemented as an analytic
+  shape alongside `Circle`/`Rectangle`/`Ellipse`, sharing the same
+  `Shape` ABC and `Pattern`/Fourier-factorization machinery unmodified —
+  no changes needed to `fourier_factorization.py`, `eigenmodes.py`, or
+  `simulation.py`. `references.md` updated with the exact `pattern.c` line
+  citation. ADR-005's own text is left in place (not deleted), since GDS
+  import and raster masks remain genuinely out of scope — only the narrow
+  polygon-vertex sub-case it explicitly flagged as revisitable is revisited
+  here.

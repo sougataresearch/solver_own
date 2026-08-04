@@ -30,7 +30,8 @@ Layer(s)     ─┘            │                              │
 | Module | Responsibility | Status |
 |--------|-----------------|--------|
 | `materials.py` | Permittivity representation (scalar or 3×3 tensor), dispersion via callables | done |
-| `geometry.py` | `Lattice`/`Lattice1D` (reciprocal-vector math), `Shape` (`Circle`, `Rectangle`, `Slab`) with analytic Fourier transforms, `Pattern` (ordered shapes + containment/subtraction tree) | done for 1D (`Lattice1D`/`Slab`, Phase 3); 2D shapes done, wired for 1D use only so far |
+| `geometry.py` | `Lattice`/`Lattice1D` (reciprocal-vector math), `Shape` (`Circle`, `Rectangle`, `Ellipse`, `Polygon`, `Slab`) with analytic Fourier transforms, `Pattern` (ordered shapes + containment/subtraction tree), construction-time validation (`_require_finite`/`_require_positive`, Category 4 target 4.1) and `validate_pattern_fits_lattice` (self-overlap-across-periodic-boundary policy, target 4.2) | done — 1D (`Lattice1D`/`Slab`), 2D (`Circle`/`Rectangle`/`Ellipse`/`Polygon`), and validation all shipped |
+| `geometry_io.py` | Category 4 target 4.6: minimal, safe JSON `Pattern`-import format (`pattern_from_dict`/`pattern_from_json_string`/`pattern_from_json_file`) — `json` module only, never `eval`/`exec`; parser/validation only, not wired into `Simulation`/`Layer` construction | done (parser only, no solver-side wiring by design) |
 | `fourier_basis.py` | G-vector (Fourier order) truncation: `truncate_fourier_orders` (2D, circular selection matching S4's `gsel.c`), `truncate_fourier_orders_1d` (Phase 3) | done |
 | `layer.py` | `Layer` (uniform or patterned), `LayerStack` (with incidence/transmission half-spaces), `LayerEigenmodes` (result container) | done |
 | `eigenmodes.py` | Per-layer eigenmode solve: closed-form for uniform isotropic layers; `solve_layer_eigenmodes_1d` (Phase 3, block-diagonal specialization of S4's general operator); dense general non-uniform solve (2D patterns) is Phase 4a | uniform + 1D-patterned done |
@@ -39,7 +40,7 @@ Layer(s)     ─┘            │                              │
 | `fields.py` | z-Poynting flux (R/T power), tangential E-field reconstruction at one interface | done for R/T (unchanged through Phase 3); full real-space reconstruction is Phase 7 |
 | `polarimetry.py` | Jones/Mueller matrix construction from simulation results | done |
 | `simulation.py` | Orchestration: builds the Fourier-order set, solves every layer's eigenmodes, cascades the S-matrix stack, solves for transmitted/reflected amplitudes given an incident excitation; `SimulationResult.diffraction_efficiencies()` (Phase 3, per-order R/T) | done for uniform + 1D-patterned + 2D-patterned layers |
-| `staircase.py` | Phase 5: `staircase_circle_layers`/`staircase_rectangle_layers`/`staircase_slab_layers` — generate a `list[Layer]` approximating a linearly-tapered via/trench sidewall as `N` uniform-in-z slices; pure geometry/bookkeeping, no new physics formula (consumes Phase 3/4a's per-layer solvers unchanged) | done |
+| `staircase.py` | Phase 5: `slice_profile` (Category 4 target 4.7, general geometry-to-layer-slices interface, independent of the RCWA solve) plus `staircase_circle_layers`/`staircase_rectangle_layers`/`staircase_slab_layers` (now thin wrappers around it) — generate a `list[Layer]` approximating a linearly-tapered via/trench sidewall as `N` uniform-in-z slices; pure geometry/bookkeeping, no new physics formula (consumes Phase 3/4a's per-layer solvers unchanged) | done |
 
 ## Data Flow
 
@@ -116,13 +117,17 @@ this size:
 sougata_solver/src/sougata_solver/
 ├── materials.py
 ├── geometry.py
+├── geometry_io.py
 ├── fourier_basis.py
+├── fourier_factorization.py
 ├── layer.py
 ├── eigenmodes.py
 ├── smatrix.py
 ├── excitation.py
 ├── fields.py
 ├── polarimetry.py
+├── staircase.py
+├── output_paths.py
 └── simulation.py
 ```
 

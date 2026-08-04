@@ -371,25 +371,85 @@ and imported profiles remain pending.
 
 ### Small targets
 
-- [ ] **4.1 Geometry validation API:** reject non-finite dimensions, invalid
+- [x] **4.1 Geometry validation API:** reject non-finite dimensions, invalid
   lattice vectors, and invalid shape sizes; add unit tests.
-- [ ] **4.2 Unit-cell bounds policy:** define periodic wrapping/overlap behavior
+  Done 2026-08-04: `geometry._require_finite`/`_require_positive` shared
+  helpers, called from `Lattice.__init__` (finite + non-degenerate basis
+  vectors), `Lattice1D.__init__` (finite positive period), and
+  `Circle`/`Rectangle`/`Slab.__post_init__` (finite center/angle, positive
+  radius/halfwidth) — fail loud at construction, per `design.md`'s Error
+  Handling conventions already followed by `Layer.__post_init__`.
+  `tests/test_geometry_validation.py`, 29 tests.
+- [x] **4.2 Unit-cell bounds policy:** define periodic wrapping/overlap behavior
   and test shapes crossing a cell edge.
-- [ ] **4.3 Ellipse primitive:** add an ellipse with DC-area and nonzero Fourier
+  Done 2026-08-04: documented (and verified, not just argued) that a shape
+  crossing a conceptual cell edge is already handled correctly by the
+  existing reciprocal-lattice-point Fourier evaluation (Poisson summation
+  — no code change needed); added `geometry.validate_pattern_fits_lattice`,
+  a conservative self-overlap-across-periodic-images check (shape
+  `2*bounding_radius >= min(|a|,|b|)` is rejected), wired into
+  `Simulation.__init__`. `tests/test_unit_cell_bounds.py`, 6 tests,
+  including a from-scratch periodic-tiling raster reference for the
+  edge-crossing case.
+- [x] **4.3 Ellipse primitive:** add an ellipse with DC-area and nonzero Fourier
   coefficient tests.
-- [ ] **4.4 Polygon design:** choose analytic versus controlled raster/FFT
+  Done 2026-08-04: `geometry.Ellipse`, transcribed from
+  `S4/S4/pattern/pattern.c::pattern_get_fourier_transform`'s `ELLIPSE` case
+  (lines 955-964); reduces to `Circle` when `hx==hy`. `tests/test_ellipse.py`
+  (19 tests, including a from-scratch rasterized cross-check) and
+  `structures/via/elliptical_pillar.py` (R+T=1.0000 across a 21-point sweep).
+- [x] **4.4 Polygon design:** choose analytic versus controlled raster/FFT
   coefficients; document the accuracy contract before implementation.
-- [ ] **4.5 Polygon primitive:** implement one simple polygon path and validate
+  Done 2026-08-04: found S4's own analytic (not raster/FFT) polygon
+  Fourier transform (`pattern.c:974-1008`, a closed-form boundary/edge-sum
+  formula) while investigating this target — decided **analytic**, exact
+  for any simple polygon, consistent with `decisions.md` ADR-002. Recorded
+  as ADR-013, an explicit, narrow revisit of ADR-005's polygon deferral
+  (GDS/raster import remains out of scope, unchanged).
+- [x] **4.5 Polygon primitive:** implement one simple polygon path and validate
   its area/Fourier coefficients against numerical integration.
-- [ ] **4.6 Imported geometry format:** define a minimal, safe format with units
+  Done 2026-08-04: `geometry.Polygon`, transcribed per target 4.4's
+  decision (edge-sum formula + PNPoly `contains`); reduces exactly to
+  `Rectangle` for a square. `tests/test_polygon.py` (24 tests, including a
+  from-scratch rasterized cross-check for a triangle and a non-convex
+  L-shape) and `structures/via/triangular_pillar.py` (R+T=1.0000 across a
+  21-point sweep).
+- [x] **4.6 Imported geometry format:** define a minimal, safe format with units
   and validation; add parser tests before solver integration.
-- [ ] **4.7 Profile slicing API:** define and test a geometry-to-layer-slices
+  Done 2026-08-04: `geometry_io.py`, a minimal JSON `Pattern` schema
+  (`unit`/`background`/`shapes`, isotropic-scalar materials only,
+  `Circle`/`Rectangle`/`Ellipse`/`Polygon`/`Slab`), `json` module only
+  (never `eval`/`exec`, per `rules.md` Security Rules), explicit
+  `ValueError` on every malformed-input case. Deliberately not wired into
+  `Simulation`/`Layer` construction, per the target's own "before solver
+  integration" wording. `tests/test_geometry_io.py`, 17 tests.
+- [x] **4.7 Profile slicing API:** define and test a geometry-to-layer-slices
   interface independently of the RCWA solve.
+  Done 2026-08-04: `staircase.slice_profile`, a shape-agnostic
+  `pattern_at(frac) -> Pattern` generalization of the three existing
+  taper generators, which are now thin wrappers around it (refactored, not
+  reimplemented — the full pre-existing `tests/test_staircase.py` suite,
+  including Phase 5's energy-conservation regression tests, passes
+  unchanged). `tests/test_profile_slicing.py`, 6 tests, including a
+  non-linear (non-taper) profile proving genuine generality and never
+  calling `Simulation.solve`.
 
 ### Exit criteria
 
 **Category gate:** each new shape has geometry-only tests and one end-to-end
 RCWA example.
+
+**Status as of 2026-08-04**: all seven targets (4.1-4.7) are done. Both new
+shapes (`Ellipse`, `Polygon`) have geometry-only unit/cross-check tests and
+a dedicated end-to-end `structures/via/` example each, satisfying the
+category gate directly. 336 tests pass project-wide (226 fast + 9 slow at
+the start of this category's work — 327 fast + 9 slow now, 101 new fast
+tests: 29 + 6 + 19 + 24 + 17 + 6 across the seven targets' test files, no
+new `slow` tests this category), no existing oracle-comparison/regression
+test weakened (`rules.md` AI Coding Rule 3) — the `staircase.py` refactor
+(target 4.7) was verified byte-for-byte behavior-preserving against its
+full pre-existing test suite before being considered done, not merely
+assumed safe because it "should" be equivalent.
 
 ## 5. Material models — PARTIAL
 
@@ -405,26 +465,98 @@ models are not yet implemented.
 
 ### Small targets
 
-- [ ] **5.1 Material validation:** validate tensor shape, finite values, and
+- [x] **5.1 Material validation:** validate tensor shape, finite values, and
   wavelength callback output; add negative-input tests.
-- [ ] **5.2 Sellmeier model:** implement one documented Sellmeier form and test
+  Done 2026-08-04: construction-time (`__init__`, probe wavelength `1.0`)
+  *and* call-time (`epsilon_tensor`, every call) validation -- a
+  construction-time-only check can't catch a dispersion callable that
+  misbehaves (wrong shape, non-finite output) only away from the probe
+  wavelength, e.g. outside an interpolation table's domain; `epsilon_tensor`
+  re-validates every call rather than trusting the constructor-time sample.
+  `tests/test_material_validation.py`, 13 tests.
+- [x] **5.2 Sellmeier model:** implement one documented Sellmeier form and test
   known refractive-index values.
-- [ ] **5.3 Cauchy model:** implement and test a documented Cauchy form.
-- [ ] **5.4 Lorentz model:** implement a single-resonance Lorentz oscillator
+  Done 2026-08-04: `Material.from_sellmeier`, transcribed from
+  `EMpy/EMpy/materials.py::RefractiveIndex.__from_sellmeier`; validated
+  against BK7's published Sellmeier coefficients and its independently-
+  published `n_d=1.5168` at the Fraunhofer d-line (both confirmed via
+  `WebSearch` this session, not from memory) -- `n=1.51680` computed,
+  matching to 5 significant figures.
+- [x] **5.3 Cauchy model:** implement and test a documented Cauchy form.
+  Done 2026-08-04: `Material.from_cauchy`, transcribed from EMpy's own
+  documented Cauchy-form worked example (a SiN dispersion function).
+  `tests/test_dispersion_models.py` (5.2/5.3 combined: 8 tests).
+- [x] **5.4 Lorentz model:** implement a single-resonance Lorentz oscillator
   with a causality/sign-convention test.
-- [ ] **5.5 Drude model:** implement and test a Drude model against a published
+  Done 2026-08-04: `Material.from_lorentz`, transcribed from
+  `RigorousCoupledWaveAnalysis.jl/src/BasicMaterials/rakic.jl`'s oscillator
+  term. **Causality/sign-convention check, independently re-derived and
+  tested, not assumed**: under this project's `d/dt->-i*omega` convention
+  (`CONVENTIONS.md`), confirmed `Im(eps)>0` at resonance (`i*strength/
+  (gamma*omega0)`, hand-derived and matched exactly) -- the same sign
+  Category 2 target 2.5 found a naively-reused index violate. This
+  confirms Rakic's Julia sign convention already matches this project's
+  own, rather than assuming it does.
+- [x] **5.5 Drude model:** implement and test a Drude model against a published
   or tabulated reference curve.
-- [ ] **5.6 Drude-Lorentz composition:** combine existing oscillator building
+  Done 2026-08-04: `Material.from_drude`, cross-checked between **two
+  independently vendored sources** agreeing on the same formula structure
+  (`Rigorous-Coupled-Wave-Analysis/TMM_examples/TMM_Drude.py` and
+  `rakic.jl`, algebraic identity confirmed directly). Validated against
+  Rakic's own published, tabulated Au/Ag/Al/Ti coefficients (Appl. Opt. 37,
+  5271-5283 (1998)) via `from_drude_lorentz`. A second independent source
+  (Johnson & Christy 1972's raw tabulated n,k) was sought via
+  `WebSearch`/`WebFetch` but not fetchable in this environment (bounded
+  search, recorded honestly in `references.md`, not silently skipped) --
+  Rakic's own published coefficients already satisfy this target's
+  requirement on their own.
+- [x] **5.6 Drude-Lorentz composition:** combine existing oscillator building
   blocks and test that zero-strength terms reduce correctly.
-- [ ] **5.7 Tensor-material solver wiring:** complete only after Category 1's
+  Done 2026-08-04: `Material.from_drude_lorentz`, Rakic's full LD model
+  (Drude + N oscillators sharing one plasma energy), with
+  `RAKIC_GOLD`/`RAKIC_SILVER`/`RAKIC_ALUMINUM`/`RAKIC_TITANIUM` published
+  coefficient presets. `oscillators=()` reduces exactly to `from_drude`;
+  an `f=0` oscillator contributes exactly `0` -- both regression-tested,
+  plus an independent (not calling the module under test) re-evaluation of
+  all four metal presets and a full-`Simulation`-pipeline passivity check
+  for gold. `tests/test_dispersion_models.py` (5.4-5.6 combined: 17 tests).
+- [x] **5.7 Tensor-material solver wiring:** complete only after Category 1's
   corresponding tensor milestone and benchmark pass.
-- [ ] **5.8 Material provenance:** add optional source/citation metadata to
+  Done 2026-08-04: gate confirmed already met (Category 1 targets 1.3/1.4/
+  1.6 shipped and wired; only 1.5, unrelated to this target, remains
+  deferred). Closed the one previously-untested combination: a genuinely
+  *dispersive* tensor material (built from a Category-5 dispersion model)
+  flowing through Category 1's uniform-diagonal and patterned-anisotropic
+  eigensolvers end to end -- every prior anisotropic test used a constant
+  tensor. `tests/test_tensor_material_wiring.py`, 6 tests.
+- [x] **5.8 Material provenance:** add optional source/citation metadata to
   material definitions and serialized output.
+  Done 2026-08-04: `Material.source` (optional, defaults to `None`),
+  threaded through every `from_*` classmethod and `geometry_io`'s JSON
+  material schema; demonstrated flowing into `output_paths.write_run_metadata`'s
+  serialized output (already-generic `**params`, no change needed there).
+  **Real bug found and fixed along the way**: `write_run_metadata` used
+  the platform-default text encoding (`cp1252` on Windows), which raised
+  `UnicodeEncodeError` the first time non-ASCII citation text ("Rakić")
+  was actually written through it -- fixed to explicit UTF-8.
+  `tests/test_material_provenance.py` (11 tests) plus 2 more in
+  `tests/test_geometry_io.py`.
 
 ### Exit criteria
 
 **Category gate:** every analytic material model has unit tests and a
 wavelength-sweep example.
+
+**Status as of 2026-08-04**: all eight targets (5.1-5.8) are done. Every
+analytic dispersion model (Sellmeier, Cauchy, Lorentz, Drude, Drude-Lorentz)
+has dedicated unit/cross-check tests; a wavelength-sweep demonstration
+exists both directly (the visible/NIR sweeps in `tests/test_dispersion_models.py`)
+and end-to-end (the full-`Simulation`-pipeline gold thin-film test and the
+dispersive-tensor wiring tests). 393 tests pass project-wide (336 at the
+start of this category: 327 fast + 9 slow -- 384 fast + 9 slow now, 57 new
+fast tests), no existing test weakened (`rules.md` AI Coding Rule 3); one
+genuine pre-existing bug (`write_run_metadata`'s missing UTF-8 encoding)
+was found and fixed, not just documented.
 
 ## 6. Boundary conditions and excitation — PARTIAL
 

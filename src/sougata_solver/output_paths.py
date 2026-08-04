@@ -57,7 +57,13 @@ def write_run_metadata(output_dir: Path, script_path: str, **params: object) -> 
     lines = [f"script: {script_path}", f"run_at: {datetime.now().isoformat(timespec='seconds')}", ""]
     lines.extend(f"{key}: {value}" for key, value in params.items())
     path = output_dir / "run_metadata.txt"
-    path.write_text("\n".join(lines) + "\n")
+    # Explicit UTF-8 (not the platform default, cp1252 on Windows) -- found
+    # this session (Category 5 target 5.8) when a non-ASCII material
+    # citation ("Rakić et al.") raised UnicodeEncodeError under the default
+    # Windows codec; every other file write in this project already goes
+    # through NumPy/pandas-style APIs that default to UTF-8, so this was the
+    # one remaining call site not yet made explicit.
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 
 

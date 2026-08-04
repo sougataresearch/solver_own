@@ -161,5 +161,27 @@ Status snapshot (update the source-of-truth file first, then this line):
   feasibility investigation against S4's `fmm_PolBasisNV`/`PolBasisJones`/
   `PolBasisVL` concluding "defer," `decisions.md` ADR-012; target 3.6 has no
   implementation as a direct consequence of that deferral).
-□ Categories 4-19 — not yet started at atomic-target grain (see that file
+☑ Category 4 (Geometry engine) — targets 4.1-4.7 all done, 2026-08-04
+  (construction-time shape/lattice validation; unit-cell self-overlap
+  policy wired into `Simulation.__init__`; `Ellipse`/`Polygon` primitives,
+  both transcribed from a previously-unread S4 `pattern_get_fourier_transform`
+  branch found this session, each with a `structures/via/` end-to-end
+  example; `decisions.md` ADR-013 narrowly revisits ADR-005 for the
+  analytic-only `Polygon` case; a minimal safe JSON pattern-import format
+  (`geometry_io.py`, parser-only, not solver-wired yet); `staircase.py`'s
+  three shape-specific taper generators refactored into thin wrappers
+  around a new general `slice_profile` interface, regression-verified
+  unchanged).
+☑ Category 5 (Material models) — targets 5.1-5.8 all done, 2026-08-04
+  (construction- and call-time `Material` validation; Sellmeier/Cauchy
+  dispersion models transcribed from vendored `EMpy`, validated against
+  BK7's independently-published `n_d`; Lorentz/Drude/Drude-Lorentz models
+  transcribed from vendored `RigorousCoupledWaveAnalysis.jl`'s Rakic
+  Lorentz-Drude metal model plus its published Au/Ag/Al/Ti coefficients,
+  with an explicit causality/sign-convention re-derivation and check;
+  dispersive-tensor-material solver wiring confirmed end to end; optional
+  `Material.source` provenance metadata threaded through every classmethod
+  and into serialized run metadata, surfacing and fixing a real pre-existing
+  Windows-encoding bug in `output_paths.write_run_metadata` along the way).
+□ Categories 6-19 — not yet started at atomic-target grain (see that file
   for each category's own small-target checklist).
