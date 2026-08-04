@@ -302,3 +302,90 @@ whether it was ever actually implemented.
   `git cherry-pick` after discovering the local checkout had independently
   (and redundantly) re-committed the same Phase 3-5 material already on
   the remote — see `memory.md`.
+
+---
+
+## 2026-08-04
+
+### Discussed
+- User asked to complete `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 2
+  targets 2.1-2.5 (Numerical methods) one by one. Read `rules.md`,
+  `phases.md`, `architecture.md`, `memory.md`, `testing.md`, `design.md`,
+  `troubleshooting.md`, and the current `eigenmodes.py`/`layer.py`/
+  `smatrix.py`/`simulation.py` before writing any code, per `CLAUDE.md`'s
+  workspace instructions.
+
+### Action items
+- [x] Target 2.1 (failure contract) — done 2026-08-04. New "Failure
+  Contract" section in `design.md`, `tests/test_failure_contract.py` (17
+  tests). See `memory.md`.
+- [x] Target 2.2 (eigenvalue report) — done 2026-08-04.
+  `layer.EigenmodeDiagnostics`, `LayerEigenmodes.diagnostics` (new optional
+  field). `tests/test_eigenvalue_diagnostics.py` (6 tests). See `memory.md`.
+- [x] Target 2.3 (sweep mode matching) — done 2026-08-04, scoped to the
+  three anisotropic dense solvers after an attempted extension to Phase
+  4a's isotropic solver broke an existing regression test (reverted, not
+  the test relaxed — see `memory.md` and
+  `eigenmodes.solve_layer_eigenmodes_patterned`'s docstring).
+  `tests/test_sweep_mode_matching.py` (4 tests).
+- [x] Target 2.4 (degeneracy warning) — done 2026-08-04.
+  `eigenmodes.DEGENERATE_GAP_THRESHOLD`/`_warn_on_small_eigenvalue_gap`,
+  same three solvers as 2.3 (found during testing that the Phase 4a
+  isotropic solver has routine, harmless `C4v`-symmetry near-degeneracy
+  that would make the warning noisy there, so deliberately excluded).
+  `tests/test_degeneracy_warning.py` (5 tests).
+- [x] Target 2.5 (stress regression) — done 2026-08-04, with a
+  sign-convention finding: Phase 4b's `n=-20+2j` "lossy-metal-like" index
+  is actually a **gain** medium under this project's phasor convention
+  (`Im(eps)<0`), only discoverable by actually calling `Simulation.solve()`
+  end to end (which Phase 4b's own eigenvalue-only stress test never did)
+  — fixed by using a correctly-signed lossy metal for the new fixture, not
+  by touching Phase 4b's already-shipped file. `tests/test_stress_regression.py`
+  (2 tests). See `memory.md` for the full account.
+- **Session summary**: all five Category 2 targets (2.1-2.5) complete.
+  227 tests pass project-wide (186 fast at session start, 34 new fast + 7
+  unchanged `slow`). No existing oracle-comparison/regression test was
+  weakened to make a new one pass (`rules.md` AI Coding Rule 3) — one
+  attempted change (2.3's canonical-ordering extension) was reverted
+  instead, and documented as a negative finding rather than silently
+  dropped. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`,
+  `tasks.md` (new cross-cutting section pointing at the atomic-targets
+  file, since Category 2 isn't phase-scoped), and this file.
+
+### Discussed (same day, continued)
+- User asked to complete Category 3 (Fourier factorization) targets 3.1-3.6
+  the same way. Read `design.md`'s existing Algorithm 3, `references.md`,
+  `fourier_factorization.py`, and the existing 1D/2D convergence tests
+  before starting, per `CLAUDE.md`'s workspace instructions.
+
+### Action items (Category 3)
+- [x] Target 3.1 (rule inventory) — done 2026-08-04. New "Fourier-
+  factorization rule inventory" table in `design.md` (Algorithm 3a),
+  `tests/test_fourier_factorization_rules.py` (6 tests). Finding:
+  `epsilon_inv_hat` is only actually consumed as an inverse-rule Toeplitz
+  in the 1D TM block; every 2D path uses a numerical inverse of the
+  direct-rule matrix instead. See `memory.md`.
+- [x] Targets 3.2/3.3 (1D/2D convergence fixtures) — done 2026-08-04.
+  `tests/test_fourier_convergence.py` (2 `slow` tests), high-contrast
+  `n=10` 1D grating and `n=5` 2D pillar, with actually-measured (not
+  assumed) convergence tables recorded in the test docstrings. Notable
+  finding: the 2D fixture's `num_orders=25` point is an order-of-magnitude
+  non-monotonic outlier — real, measured evidence for exactly the
+  weakness targets 3.4/3.5 investigate. See `memory.md`.
+- [x] Targets 3.4/3.5 (FFF/NVM feasibility) — evaluated and explicitly
+  deferred, 2026-08-04. Bibliographic details for Popov & Nevière (2001)
+  and Lalanne (1997) confirmed via `WebSearch`; neither paper's full text
+  was fetchable (paywalled). `../REFERENCE/S4` read in full instead:
+  `fmm_PolBasisNV.cpp`/`fmm_PolBasisJones.cpp`/`fmm_PolBasisVL.cpp`
+  (~900 lines combined), all built on a discretized/FFT permittivity
+  representation that conflicts with this project's already-shipped
+  ADR-002 (analytic Fourier transforms, raster+FFT rejected). See
+  `decisions.md` ADR-012 and `references.md`.
+- [x] Target 3.6 (selected improvement) — done 2026-08-04 (no action
+  needed — both 3.4 and 3.5 concluded defer, so nothing was approved to
+  implement; recorded as this target's own explicit outcome, not skipped).
+- **Session summary**: all six Category 3 targets (3.1-3.6) complete.
+  232 tests pass project-wide (227 at the start of this sub-session: 220
+  fast + 7 slow -- 226 fast + 9 slow now). No existing test weakened.
+  Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
+  `references.md`, `decisions.md` (new ADR-012), and this file.

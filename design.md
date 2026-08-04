@@ -81,6 +81,58 @@ common source of wrong-but-plausible-looking RCWA results industry-wide,
 and is exactly why `eigenmodes.build_kp_matrix` already takes a distinct
 `epsilon_inv` argument rather than computing `inv(epsilon_hat)` internally).
 
+### 3a. Fourier-factorization rule inventory (Category 3 target 3.1)
+
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 3 target 3.1: which
+direct-rule/inverse-rule/numerical-matrix-inverse choice is actually made
+by every uniform, 1D, and 2D solver branch, with citations — built by
+reading each solver's already-cited construction in `eigenmodes.py`, not
+reconstructed from memory. "Direct rule" means a Toeplitz matrix of
+`hat{eps}(G)` (Laurent's rule); "inverse rule" means a Toeplitz matrix of
+`hat{1/eps}(G)` (a *separate* Fourier factorization of `1/eps(x,y)`, not
+derived from the direct-rule matrix); "numerical inverse" means
+`inv(direct-rule Toeplitz)`, a plain linear-algebra inverse of an
+already-built direct-rule matrix — a third, distinct option this project
+uses in two places below and which is easy to conflate with "inverse rule"
+despite being a different Fourier-factorization choice entirely (see
+`design.md`'s Algorithm 3 above and Li 1996 in `references.md`).
+
+| Solver branch | `kp`'s `epsilon_inv` argument | `Epsilon2` | Rule | Citation |
+|---|---|---|---|---|
+| `solve_layer_eigenmodes_uniform` (scalar isotropic) | `1/eps` (scalar) | `eps * I` | exact (no Fourier factorization needed — spatially uniform) | `rcwa.cpp::SolveLayerEigensystem_uniform`, 422-502 |
+| `solve_layer_eigenmodes_uniform_diagonal`/`_inplane` (uniform tensor) | `1/eps_zz` (scalar) | tensor components `* I_n` | exact (uniform layer, no Fourier factorization) | `S4.cpp:1889-1906` |
+| `solve_layer_eigenmodes_1d`, TE-like block | `epsilon_inv_hat` (inverse-rule Toeplitz) | `epsilon_hat` (direct-rule) | direct rule | `fmm_closed.cpp:110-132`, "1D proper FFF rule" branch |
+| `solve_layer_eigenmodes_1d`, TM-like block | `epsilon_inv_hat` (inverse-rule Toeplitz) | `inv(epsilon_inv_hat)` (**numerical inverse of the inverse-rule Toeplitz**) | Li's (1996) inverse rule | same citation — this is the one block in the whole project that actually uses the inverse-rule Toeplitz, and even then only after a further numerical inversion, not directly |
+| `solve_layer_eigenmodes_patterned` (2D isotropic) | `inv(epsilon_hat)` (**numerical inverse of the direct-rule Toeplitz**) | `block_diag(epsilon_hat, epsilon_hat)` (direct rule, both blocks) | ordinary Laurent's rule throughout — no Li correction | `fmm_closed.cpp:133-139,162-163`, the true-2D `!use_polarization_basis` branch |
+| `solve_layer_eigenmodes_patterned_inplane` (2D anisotropic) | `inv(epsilon_hat_zz)` (**numerical inverse of the direct-rule `eps_zz` Toeplitz**) | full tensor-component direct-rule Toeplitz blocks | ordinary Laurent's rule (tensor generalization of the row above) | `fmm_closed.cpp:165-256`, `have_tensor` branch |
+
+Two findings from actually re-checking this end to end rather than
+resummarizing existing docstrings from memory (per `rules.md` Documentation
+Standards' "verify, don't paraphrase from memory"):
+
+1. **Only one code path in this project uses `epsilon_inv_hat` (the
+   separately-Fourier-factorized inverse-rule Toeplitz) at all**: the 1D
+   TM-like block, and even there only through a further numerical
+   `inv(...)`, not as `Epsilon2`/`kp` input directly. Every 2D path (both
+   isotropic and anisotropic) uses `inv(direct-rule Toeplitz)` instead —
+   `epsilon_inv_hat`/`toeplitz_matrix(..., inverse=True)` is genuinely
+   1D-only infrastructure, exactly as already stated in `memory.md`'s
+   Phase 4a entry, now confirmed as a table entry rather than prose buried
+   in a phase-completion note.
+2. **"Numerical inverse of a direct-rule Toeplitz" is not the same
+   operation as "inverse-rule Toeplitz," even though both blocks are
+   labeled `Epsilon_inv`/`einv` in code** — the 1D TM block computes
+   `inv(epsilon_inv_hat)` (inverse of an *already-inverse-rule* matrix,
+   Li's actual correction), while every 2D path computes `inv(epsilon_hat)`
+   (inverse of the *direct*-rule matrix, ordinary Laurent's rule, no Li
+   correction) — table above makes this distinction explicit rather than
+   leaving a reader to infer it from four separate docstrings.
+
+Backed by `tests/test_fourier_factorization_rules.py`, which pins each row
+above against actual solver behavior (not just the table's prose) so a
+future refactor that silently changes which matrix a solver inverts shows
+up as a test failure.
+
 ### 4. S-matrix cascading (done)
 
 Redheffer star product, transcribed from `S4/S4r/StarProduct.hpp`
@@ -277,6 +329,78 @@ Current, deliberate conventions (keep consistent in new code):
   phase**, matching the existing style (`"Patterned layers require Phase
   2+ Fourier factorization"`) so a caller immediately knows whether it's a
   bug or a not-yet-built feature.
+
+## Failure Contract (Category 2 target 2.1)
+
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 2 target 2.1: an explicit,
+tested inventory of which numerical/input conditions raise which exception
+type, and which only emit a `WARNING`, so a caller can tell a genuine bug
+from a documented, expected failure mode without reading solver source.
+Built by grepping `src/sougata_solver/` for every `raise`/`logger.warning`
+call site (not reconstructed from memory) — verified against the code, not
+aspirational. Tested in `tests/test_failure_contract.py`.
+
+**`ValueError` — invalid input, raised at construction or immediately on
+call (fail loud, fail early, per Error Handling above):**
+
+| Site | Condition |
+|------|-----------|
+| `Layer.__post_init__` | neither or both of `material`/`pattern` given |
+| `smatrix.SMatrixStack.__init__` | `len(thicknesses) != len(all_modes)` |
+| `staircase.*` generators | `num_slices < 1` |
+| `eigenmodes.solve_layer_eigenmodes_1d` | any `ky != 0` (conical mounting, out of Phase 3 scope) |
+| `eigenmodes.solve_layer_eigenmodes_patterned` | `epsilon_hat.shape != (n, n)` |
+| `eigenmodes.solve_layer_eigenmodes_patterned_inplane` | any `epsilon_hat_*.shape != (n, n)` |
+| `materials.Material.__init__` | `eps` sample is neither a scalar nor a `(3,3)` array |
+| `materials._read_numeric_blocks` / `_wavelength_n_k_from_blocks` / `from_refractiveindex_formula_file` | malformed/empty/wrong-column-count material data files |
+
+**`NotImplementedError` — valid input, unimplemented phase/scope, always
+naming the specific phase/target per Error Handling above:**
+
+| Site | Condition |
+|------|-----------|
+| `simulation.Simulation.solve` (uniform-layer branch) | nonzero `eps_xz/eps_yz/eps_zx/eps_zy` (target 1.5, not yet available) |
+| `simulation.Simulation.solve` (patterned-layer branch) | same, for any material in a pattern |
+| `fourier_factorization._scalar_value` | anisotropic material passed to the scalar (Phase 2) Fourier-factorization path |
+| `fourier_basis.truncate_fourier_orders` | unrecognized `method` string |
+| `materials.Material.from_refractiveindex_formula_file` | dispersion formula type other than `"formula 4"` |
+
+**`numpy.linalg.LinAlgError` — never caught, always propagated (per Error
+Handling's "no broad `except`" rule) from a numerically singular/
+non-converging linear-algebra call:**
+
+| Site | Underlying call | Trigger |
+|------|------------------|---------|
+| `eigenmodes.solve_layer_eigenmodes_1d` | `np.linalg.solve(epsilon_inv_hat, I)` | exactly-singular inverse-rule Toeplitz |
+| `eigenmodes.solve_layer_eigenmodes_patterned` | `np.linalg.solve(epsilon_hat, I)` | exactly-singular direct-rule Toeplitz |
+| `eigenmodes.solve_layer_eigenmodes_patterned_inplane` | `np.linalg.solve(epsilon_hat_zz, I)` | exactly-singular `eps_zz` Toeplitz |
+| `excitation.PlaneWaveExcitation.incident_mode_amplitude` | `np.linalg.solve(kp @ phi, rhs)` | exactly-singular `kp @ phi` |
+| any `eigenmodes.solve_layer_eigenmodes_*` general solver | `np.linalg.eig(op)` | LAPACK `geev` failing to converge (rare; not observed in this project's stress testing, see Phase 4b) |
+| `smatrix._solve` (used by `interface_smatrix`/`star_product`) | `scipy.linalg.lu_factor`/`lu_solve` | exactly-singular interface/star-product system |
+
+In practice an *exactly* singular Toeplitz/interface matrix from a physical
+(non-adversarially-constructed) structure is rare — the Phase 4b stress
+sweep (`tests/test_2d_pillar_stress.py`) pushed condition numbers into the
+hundreds without ever hitting exact singularity — but this table exists so
+a future `LinAlgError` is recognized as "the documented failure mode for a
+degenerate input," not a surprise, and is never silently caught.
+
+**`logging.WARNING` (not raised, not fatal) — numerically-concerning-but-
+not-necessarily-wrong, per the Logging Strategy below:**
+
+| Site | Condition | Threshold |
+|------|-----------|-----------|
+| `eigenmodes.solve_layer_eigenmodes_patterned` | `cond(epsilon_hat)` or `cond(phi)` too large | `ILL_CONDITIONED_THRESHOLD` (`1e4`) |
+| `eigenmodes.solve_layer_eigenmodes_patterned_inplane` | `cond(epsilon_hat_zz)` or `cond(phi)` too large | `ILL_CONDITIONED_THRESHOLD` |
+| `eigenmodes.solve_layer_eigenmodes_uniform_diagonal`/`_inplane`, `solve_layer_eigenmodes_patterned_inplane` (target 2.4, new) | smallest pairwise eigenvalue gap, relative to `max|q|`, too small | `DEGENERATE_GAP_THRESHOLD` (`1e-6`) — deliberately **not** applied to `solve_layer_eigenmodes_patterned`, see that function's docstring for why (routine `C4v`-symmetry degeneracy in an ordinary case would misfire the warning) |
+
+`materials._wavelength_n_k_from_blocks` uses a plain `print("WARNING: ...")`
+for a 2-column (no-`k`-data) material file, predating the
+`logging`-module convention adopted in Phase 4b — a pre-existing, minor
+deviation from the Logging Strategy's "library never calls `print`" rule,
+noted honestly here rather than silently left undocumented; not changed by
+this target since target 2.1 is a documentation/test audit, not a
+refactor, and changing it isn't otherwise motivated by this session's work.
 
 ## Logging Strategy
 

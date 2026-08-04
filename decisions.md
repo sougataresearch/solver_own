@@ -319,3 +319,104 @@
   instead of or alongside FDTD). No other file changed — a real FDTD
   planning session (reference survey, architecture decision on
   standalone-vs-shared-codebase, etc.) is future work, not done here.
+
+## ADR-012: Fast Fourier Factorization (FFF) and the Normal Vector Method (NVM) — evaluated and deferred
+
+- **Decision**: `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 3 targets 3.4
+  (FFF) and 3.5 (NVM) are two separate feasibility-decision targets by
+  design, but converge to the same answer here for the same underlying
+  reason (below): **defer both**, do not implement either as part of
+  target 3.6. Current solvers keep ordinary Laurent's-rule Toeplitz
+  construction for every 2D branch (`solve_layer_eigenmodes_patterned`,
+  `solve_layer_eigenmodes_patterned_inplane`) and Li's (1996) inverse-rule
+  correction for the 1D branch only, exactly as already shipped and
+  documented in `design.md`'s Fourier-Factorization Rule Inventory
+  (Category 3 target 3.1).
+- **Reason**: Both techniques exist specifically to fix a real, now
+  *measured* (not hypothesized) limitation of this project's current 2D
+  Fourier factorization — `tests/test_fourier_convergence.py`'s target-3.3
+  high-contrast pillar fixture (`n=5`, `radius=0.2*period`) shows genuinely
+  poor low-order behavior (an order-of-magnitude non-monotonic outlier at
+  `num_orders=25`) before settling into ordinary, still-slow monotonic
+  convergence — the exact symptom the Li/NVM/FFF literature (below) exists
+  to improve. The investigation into *how* to fix it, done this session
+  rather than deferred on faith:
+  - **FFF** (Popov, E., & Nevière, M. (2001), "Maxwell equations in Fourier
+    space: fast-converging formulation for diffraction by arbitrary
+    shaped, periodic, anisotropic media," *J. Opt. Soc. Am. A* 18(11),
+    2886-2894 — bibliographic details confirmed via `WebSearch` this
+    session, not from memory) derives differential equations for the
+    Fourier components directly, using a normal-vector field to get fast
+    convergence for arbitrary-shaped anisotropic periodic media.
+  - **NVM**, the specific 2D-grating formulation (Lalanne, P. (1997),
+    "Improved formulation of the coupled-wave method for two-dimensional
+    gratings," *J. Opt. Soc. Am. A* 14(7), 1592-1598 — also confirmed via
+    `WebSearch`), is the earlier, narrower 2D-crossed-grating case of the
+    same family of ideas; a related, frequently-cited follow-up is Schuster
+    et al., "Normal vector method for convergence improvement using the
+    RCWA for crossed gratings," *J. Opt. Soc. Am. A* 24(9), 2880 (2007).
+  - Both JOSA A papers are paywalled in this environment (same situation
+    Category 1 target 1.5's bounded literature search already documented
+    for a different topic — see `references.md`) — the exact equations
+    were **not** read or transcribed here, so nothing claiming to
+    implement either paper's formula would meet `rules.md` AI Coding Rule
+    1's bar. What *was* read in full is `../REFERENCE/S4`'s own
+    implementation of this same family of techniques:
+    `S4/S4/S4.h:49-71` (`use_polarization_basis`,
+    `use_jones_vector_basis`, `use_normal_vector_basis`,
+    `use_normal_vector_field` options) dispatching, per `S4.cpp:1905-1930`,
+    to three separate implementation files — `fmm/fmm_PolBasisNV.cpp`
+    (266 lines, the NVM path), `fmm/fmm_PolBasisJones.cpp` (378 lines),
+    `fmm/fmm_PolBasisVL.cpp` (274 lines) — all three built **on top of**
+    `fmm/fmm_FFT.cpp` (239 lines), i.e. S4's own closed-form analytic path
+    (`fmm_closed.cpp`, already transcribed into this project) is
+    *bypassed* entirely for any of these three options in favor of a
+    discretized/rasterized (`use_discretized_epsilon`) representation of
+    the permittivity and an FFT-generated normal-vector field over a
+    `resolution`-parametrized grid (`S4.h`'s own doc comment for
+    `resolution`, default 64). This is a **different Fourier-factorization
+    architecture**, not an incremental correction to the existing analytic
+    path — confirmed by reading the actual dispatch code
+    (`S4.cpp:1905-1930`), not inferred from option names alone.
+- **Alternatives considered**: Implementing a from-scratch NVM/FFF
+  derivation independently (per `rules.md` AI Coding Rule 1's "derive
+  independently and validate" option, used successfully for `staircase.py`,
+  Phase 5) — rejected for now: unlike the staircase discretization (a
+  well-precedented, low-risk geometric technique), NVM/FFF's correctness
+  hinges on exactly the kind of subtle sign/normalization/field-decomposition
+  convention this project's `rules.md` treats as too risky to re-derive
+  without a transcribable source (the same reasoning already applied to
+  the S-matrix star product and the Toeplitz subtraction rule, per
+  `references.md`'s "Choosing a Reference for a New Phase" guidance) — and
+  the one available from-source route (transcribing S4's `PolBasisNV`/
+  `PolBasisJones`/`PolBasisVL` C++) is a genuinely large undertaking
+  (~1150 lines across the four files above, needing a new FFT-based
+  vector-field-generation subsystem this project doesn't have at all
+  today), not a single atomic target's worth of work.
+- **Trade-offs**: Deferring leaves the measured high-contrast 2D
+  convergence weakness (target 3.3's fixture) unaddressed — a real,
+  now-documented limitation, not swept under the rug (see
+  `solve_layer_eigenmodes_patterned`'s docstring and
+  `tests/test_fourier_convergence.py`). Implementing either technique
+  properly would directly conflict with **ADR-002** ("Analytic shape
+  Fourier transforms over raster+FFT of a pixelized mask"), since every
+  one of S4's three polarization-basis paths requires the discretized/FFT
+  representation ADR-002 explicitly rejected for a different reason
+  (pixelization error at smooth boundaries) — revisiting that decision
+  specifically for NVM/FFF, rather than for arbitrary-shape support, would
+  need its own explicit re-evaluation, not a silent reversal buried inside
+  a Category 3 target.
+- **Impact**: `simulation.py`'s 2D solvers are unchanged; the accuracy
+  limitation they already document (ordinary Laurent's rule, no Li/NVM
+  correction, ordinary-convergence-rate-not-improved-rate at sharp 2D
+  discontinuities) remains real and now has a measured fixture
+  demonstrating it (`tests/test_fourier_convergence.py`), not just a
+  docstring claim. Target 3.6 ("selected improvement") therefore has
+  nothing to implement — recorded as its own explicit outcome, matching
+  the register's own allowance for "explicitly decide implement/defer,"
+  not silently skipped. Revisit this ADR if: (a) either paywalled paper
+  becomes readable in this environment, (b) a second, structurally
+  different NVM/FFF source is found for independent benchmarking (per
+  target 1.5's precedent, one source alone was judged insufficient), or
+  (c) a user explicitly requests reopening ADR-002 for this specific
+  purpose.

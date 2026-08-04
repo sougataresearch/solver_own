@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from sougata_solver.layer import LayerEigenmodes
+from sougata_solver.layer import EigenmodeDiagnostics, LayerEigenmodes
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,76 @@ ILL_CONDITIONED_THRESHOLD = 1e4
 # land in the same sort bucket rather than being split by an arbitrary tiny
 # numerical difference.
 _MODE_ORDER_TOL = 1e-9
+
+# Category 2 target 2.4 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md): relative
+# eigenvalue-gap threshold (same max-|q| relative-scale convention as
+# _MODE_ORDER_TOL, two orders of magnitude above it by construction) below
+# which two numerically-distinct eigenvalues are close enough to warrant a
+# WARNING about possible near-degeneracy-driven ill-conditioning, without
+# being close enough to already be merged into one _canonical_mode_order tie
+# bucket. Configurable the same way ILL_CONDITIONED_THRESHOLD already is in
+# this module -- monkeypatch the module attribute (see
+# tests/test_2d_pillar_stress.py's precedent for that pattern) -- rather than
+# a new function parameter on every solver, to avoid widening each solver's
+# public signature for a diagnostic knob.
+DEGENERATE_GAP_THRESHOLD = 1e-6
+
+
+def _min_pairwise_gap(q: np.ndarray) -> float:
+    """True minimum pairwise distance between all eigenvalues in `q` -- not
+    merely the smallest gap between *sorted-order* neighbors, which is not
+    the same thing for complex values ordered by a real-then-imaginary sort
+    key (`_canonical_mode_order`). O(n^2), acceptable at the eigenmode
+    counts this project uses (`2*num_orders`, typically well under a
+    thousand).
+    """
+    q = np.asarray(q, dtype=complex)
+    if q.shape[0] < 2:
+        return float("inf")
+    diffs = np.abs(q[:, None] - q[None, :])
+    np.fill_diagonal(diffs, np.inf)
+    return float(np.min(diffs))
+
+
+def _eigenmode_diagnostics(q: np.ndarray, phi: np.ndarray, cond_epsilon: float) -> EigenmodeDiagnostics:
+    """Category 2 target 2.2: build the diagnostics summary attached to a
+    solver's returned `LayerEigenmodes`, from quantities the solver has
+    already computed (or can compute cheaply) -- this does not change `q`,
+    `phi`, or any other solve result, only reports about them.
+    """
+    propagating = classify_propagating(q)
+    return EigenmodeDiagnostics(
+        cond_epsilon=float(cond_epsilon),
+        cond_phi=float(np.linalg.cond(phi)),
+        min_eigenvalue_gap=_min_pairwise_gap(q),
+        num_propagating=int(np.count_nonzero(propagating)),
+        num_evanescent=int(np.count_nonzero(~propagating)),
+    )
+
+
+def _warn_on_small_eigenvalue_gap(q: np.ndarray, context: str) -> None:
+    """Category 2 target 2.4: emit one actionable WARNING when the smallest
+    pairwise eigenvalue gap, relative to the largest |q|, falls below
+    `DEGENERATE_GAP_THRESHOLD`. This is a complementary, eigenvalue-level
+    early-warning signal, not a replacement for
+    `ILL_CONDITIONED_THRESHOLD`'s existing eigenvector-conditioning check
+    (Phase 4b) -- a small eigenvalue gap is the underlying mechanism that
+    tends to *produce* an ill-conditioned `phi`, so this can fire earlier,
+    on the eigenvalues alone, before `phi`'s condition number necessarily
+    crosses its own threshold. Reuses the same "detect, don't silently
+    correct" precedent as `ILL_CONDITIONED_THRESHOLD`.
+    """
+    scale = max(1.0, float(np.max(np.abs(q)))) if q.size else 1.0
+    gap = _min_pairwise_gap(q) / scale
+    if gap < DEGENERATE_GAP_THRESHOLD:
+        logger.warning(
+            "%s: near-degenerate eigenvalues detected (smallest relative "
+            "gap=%.3e < %.0e); mode ordering/eigenvector basis may be "
+            "numerically sensitive to small input perturbations",
+            context,
+            gap,
+            DEGENERATE_GAP_THRESHOLD,
+        )
 
 
 def _canonical_mode_order(q: np.ndarray, phi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -197,7 +267,8 @@ def solve_layer_eigenmodes_uniform(omega: complex, kx: np.ndarray, ky: np.ndarra
     phi = np.eye(n2, dtype=complex)
     kp = build_kp_matrix(omega, kx, ky, 1.0 / eps)
 
-    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=None, is_scalar_isotropic=True)
+    diagnostics = _eigenmode_diagnostics(q, phi, cond_epsilon=1.0)
+    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=None, is_scalar_isotropic=True, diagnostics=diagnostics)
 
 
 def solve_layer_eigenmodes_uniform_diagonal(
@@ -297,9 +368,13 @@ def solve_layer_eigenmodes_uniform_diagonal(
     q_sq, phi = np.linalg.eig(op)
     q = _select_q_branch(q_sq)
     q, phi = _canonical_mode_order(q, phi)
+    _warn_on_small_eigenvalue_gap(q, "solve_layer_eigenmodes_uniform_diagonal")
 
     is_scalar_isotropic = eps_xx == eps_yy == eps_zz
-    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=1.0 / eps_zz, is_scalar_isotropic=is_scalar_isotropic)
+    diagnostics = _eigenmode_diagnostics(q, phi, cond_epsilon=1.0)
+    return LayerEigenmodes(
+        q=q, phi=phi, kp=kp, epsilon_inv=1.0 / eps_zz, is_scalar_isotropic=is_scalar_isotropic, diagnostics=diagnostics
+    )
 
 
 def solve_layer_eigenmodes_uniform_inplane(
@@ -379,9 +454,13 @@ def solve_layer_eigenmodes_uniform_inplane(
     q_sq, phi = np.linalg.eig(op)
     q = _select_q_branch(q_sq)
     q, phi = _canonical_mode_order(q, phi)
+    _warn_on_small_eigenvalue_gap(q, "solve_layer_eigenmodes_uniform_inplane")
 
     is_scalar_isotropic = eps_xy == 0 and eps_yx == 0 and eps_xx == eps_yy == eps_zz
-    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=1.0 / eps_zz, is_scalar_isotropic=is_scalar_isotropic)
+    diagnostics = _eigenmode_diagnostics(q, phi, cond_epsilon=1.0)
+    return LayerEigenmodes(
+        q=q, phi=phi, kp=kp, epsilon_inv=1.0 / eps_zz, is_scalar_isotropic=is_scalar_isotropic, diagnostics=diagnostics
+    )
 
 
 def solve_layer_eigenmodes_1d(
@@ -467,7 +546,10 @@ def solve_layer_eigenmodes_1d(
     phi[:n, :n] = phi_te
     phi[n:, n:] = phi_tm
 
-    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=epsilon_inv_hat, is_scalar_isotropic=False)
+    diagnostics = _eigenmode_diagnostics(q, phi, cond_epsilon=float(np.linalg.cond(epsilon_inv_hat)))
+    return LayerEigenmodes(
+        q=q, phi=phi, kp=kp, epsilon_inv=epsilon_inv_hat, is_scalar_isotropic=False, diagnostics=diagnostics
+    )
 
 
 def solve_layer_eigenmodes_patterned(
@@ -550,6 +632,49 @@ def solve_layer_eigenmodes_patterned(
     case that genuinely does hit numerical trouble surfaces as a visible
     warning to investigate, per `rules.md` AI Coding Rule 2, rather than a
     silently degraded R/T number.
+
+    **Category 2 target 2.3 (sweep mode matching) -- evaluated and
+    deliberately NOT applied here.** An initial attempt at this target
+    passed `(q, phi)` through `_canonical_mode_order` here too (the same
+    deterministic sort-by-eigenvalue policy already applied to the three
+    anisotropic solvers for target 1.7), reasoning that the sort is just a
+    column/entry permutation and should be a no-op for R/T. That reasoning
+    is correct for R/T (confirmed: `interface_smatrix`/`star_product` only
+    ever consume `phi`/`kp`/`q` from *one* layer at a time, self-
+    consistently), but it broke two existing regression tests that rely on
+    a *different* invariant this solver happens to provide: at `ky = 0`,
+    `op` is exactly block-diagonal (verified in the derivation above -- the
+    coupling and `kp` off-diagonal blocks both vanish when `ky = 0`), and
+    `numpy.linalg.eig`'s `geev` backend empirically returns the first
+    block's eigenvalues in `q[:n]` and the second block's in `q[n:]`
+    *without* being asked to sort them that way --
+    `tests/test_2d_pillar.py::test_2d_patterned_ky_zero_te_block_matches_1d`/
+    `..._tm_block_differs_from_1d` depend on exactly this natural ordering
+    to identify "the TE-like block" vs. "the TM-like block" and cross-check
+    each independently against `solve_layer_eigenmodes_1d`. Re-sorting by
+    eigenvalue destroys that block grouping. Per `rules.md` AI Coding Rule
+    3 (never weaken an existing oracle-comparison test to make a change
+    pass), the reordering was reverted here rather than the test relaxed --
+    target 2.3's canonical-ordering policy therefore stays scoped to the
+    three anisotropic solvers (`solve_layer_eigenmodes_uniform_diagonal`,
+    `solve_layer_eigenmodes_uniform_inplane`,
+    `solve_layer_eigenmodes_patterned_inplane`), matching target 1.7's
+    original scoping decision, not extended to this (Phase 4a) solver. The
+    same investigation also surfaced a second reason not to add
+    `DEGENERATE_GAP_THRESHOLD` gap-warning logging here: an ordinary,
+    otherwise well-conditioned circular-pillar-on-a-square-lattice case
+    (`tests/test_2d_pillar_stress.py::test_no_warning_for_well_conditioned_case`)
+    has a genuinely near-zero eigenvalue gap (`~1e-16` relative, confirmed
+    directly) -- an expected consequence of the pattern's `C4v` symmetry
+    (diffraction orders related by that symmetry are exactly or near-
+    exactly degenerate), not a numerical pathology, so warning on it here
+    would misclassify routine, harmless degeneracy as a problem; see
+    `tests/test_degeneracy_warning.py` for where the gap warning is
+    exercised instead (the three anisotropic solvers, where the existing
+    test suite's near-degenerate cases were deliberately engineered, not
+    incidental symmetry). `EigenmodeDiagnostics` (target 2.2) is still
+    populated here -- `min_eigenvalue_gap` is informational regardless of
+    whether a warning threshold is applied to it.
     """
     kx = np.asarray(kx, dtype=complex)
     ky = np.asarray(ky, dtype=complex)
@@ -597,7 +722,8 @@ def solve_layer_eigenmodes_patterned(
             ILL_CONDITIONED_THRESHOLD,
         )
 
-    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=einv, is_scalar_isotropic=False)
+    diagnostics = _eigenmode_diagnostics(q, phi, cond_epsilon=cond_epsilon_hat)
+    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=einv, is_scalar_isotropic=False, diagnostics=diagnostics)
 
 
 def solve_layer_eigenmodes_patterned_inplane(
@@ -711,6 +837,7 @@ def solve_layer_eigenmodes_patterned_inplane(
     q_sq, phi = np.linalg.eig(op)
     q = _select_q_branch(q_sq)
     q, phi = _canonical_mode_order(q, phi)
+    _warn_on_small_eigenvalue_gap(q, "solve_layer_eigenmodes_patterned_inplane")
 
     cond_phi = np.linalg.cond(phi)
     if cond_phi > ILL_CONDITIONED_THRESHOLD:
@@ -723,4 +850,7 @@ def solve_layer_eigenmodes_patterned_inplane(
             ILL_CONDITIONED_THRESHOLD,
         )
 
-    return LayerEigenmodes(q=q, phi=phi, kp=kp, epsilon_inv=einv_zz, is_scalar_isotropic=False)
+    diagnostics = _eigenmode_diagnostics(q, phi, cond_epsilon=cond_epsilon_hat_zz)
+    return LayerEigenmodes(
+        q=q, phi=phi, kp=kp, epsilon_inv=einv_zz, is_scalar_isotropic=False, diagnostics=diagnostics
+    )

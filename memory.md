@@ -5,7 +5,120 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+As of 2026-08-04 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 3, targets
+3.1-3.6), 2026-08-04 (Category 2, targets 2.1-2.5), 2026-08-03 (Phase 6,
+target 1.3), 2026-07-24 (Phase 5), 2026-07-23 (Phase 4b), 2026-07-21
+(Phase 4a) and earlier entries below:
+- **Category 3 (Fourier factorization), targets 3.1-3.6, are all complete.**
+  3.1: a "Fourier-factorization rule inventory" table added to `design.md`
+  (Algorithm 3a), tabulating every uniform/1D/2D solver branch's
+  direct/inverse/numerical-inverse choice with citations, backed by
+  `tests/test_fourier_factorization_rules.py` (6 tests, black-box via the
+  already-public `LayerEigenmodes.epsilon_inv` field plus one white-box
+  1D TE/TM-block discrimination test). **Finding**: `epsilon_inv_hat` (the
+  separately-Fourier-factorized inverse-rule Toeplitz) is consumed as such
+  in exactly one place project-wide — the 1D TM block; every 2D path
+  (isotropic and anisotropic) uses a numerical matrix-inverse of the
+  *direct*-rule Toeplitz instead, a different Fourier-factorization
+  operation despite both being called "epsilon_inv" in code, now made
+  explicit as a table row rather than left implicit across four docstrings.
+  3.2/3.3: `tests/test_fourier_convergence.py`, two new `slow` fixtures —
+  a high-contrast (`n=10`) 1D lamellar grating and a high-contrast (`n=5`)
+  2D pillar, each with *actually measured* (not assumed) reflectance vs.
+  harmonic-order-count tables recorded in the test docstrings. **Two
+  honest findings, both real, neither hidden**: the 1D fixture is not
+  monotonically convergent from its very first data point (a genuine
+  pre-asymptotic transient) and has not fully converged even at
+  `num_ord=320` (~6% relative error remaining at `num_ord=160`); the 2D
+  fixture is far more dramatic — `num_orders=25` gives `R=0.214`, an
+  order-of-magnitude non-monotonic outlier against its low-order
+  neighbors and the ~0.0236 eventually-converged value, a direct,
+  measured illustration of ordinary Laurent's-rule 2D Fourier
+  factorization's known weakness at sharp discontinuities (already
+  documented in `solve_layer_eigenmodes_patterned`'s docstring, now backed
+  by an actual number instead of just a citation). 3.4/3.5: Fast Fourier
+  Factorization (Popov & Nevière 2001) and the Normal Vector Method
+  (Lalanne 1997) feasibility decisions — both evaluated and **explicitly
+  deferred** (`decisions.md` ADR-012), directly motivated by 3.2/3.3's
+  measured convergence weakness (this wasn't a defer-on-faith decision;
+  the technique's applicability was concretely demonstrated first). Both
+  papers' bibliographic details were confirmed via `WebSearch` this
+  session but neither paper's full text/equations were fetchable
+  (paywalled JOSA A, same situation Category 1 target 1.5 already hit) —
+  per `rules.md` AI Coding Rule 1, nothing was transcribed from either.
+  `../REFERENCE/S4` was instead read in full for its own implementation
+  of this technique family: `S4.h:49-71`'s `use_polarization_basis`/
+  `use_normal_vector_basis`/`use_normal_vector_field` options dispatch
+  (`S4.cpp:1905-1930`) to three dedicated files
+  (`fmm/fmm_PolBasisNV.cpp`, `fmm_PolBasisJones.cpp`, `fmm_PolBasisVL.cpp`
+  — ~900 combined lines), all built on `fmm_FFT.cpp`'s
+  discretized/rasterized permittivity representation, **not** the
+  analytic closed-form path this project already transcribes
+  (`fmm_closed.cpp`). This is a materially different Fourier-factorization
+  architecture, confirmed by reading the actual dispatch code rather than
+  inferring from option names — and it directly conflicts with the
+  already-shipped **ADR-002** ("analytic shape Fourier transforms over
+  raster+FFT," explicitly rejecting raster+FFT for a different reason,
+  pixelization error at smooth boundaries). 3.6 (selected improvement)
+  therefore has nothing approved to implement — recorded as its own
+  explicit outcome per the atomic-targets register's own "explicitly
+  decide implement/defer" allowance, not silently skipped; zero solver
+  code changed, zero regression risk. 232 tests pass project-wide (227 at
+  the start of this session: 220 fast + 7 slow -- 226 fast + 9 slow now),
+  full fast+slow suite re-run and confirmed green.
+- **Category 2 (Numerical methods), targets 2.1-2.5, are all complete.**
+  2.1: a "Failure Contract" section added to `design.md` (four tables --
+  `ValueError`, `NotImplementedError`, `LinAlgError`, `WARNING` -- built by
+  grepping every `raise`/`logger.warning` site in `src/sougata_solver/`,
+  not from memory), backed by `tests/test_failure_contract.py` (17 tests).
+  2.2: `layer.EigenmodeDiagnostics` (`cond_epsilon`, `cond_phi`,
+  `min_eigenvalue_gap`, `num_propagating`, `num_evanescent`), attached as a
+  new optional `LayerEigenmodes.diagnostics` field by every `eigenmodes.py`
+  solver, reusing already-computed condition numbers where available --
+  `tests/test_eigenvalue_diagnostics.py` (6 tests) confirms the fields
+  match independent recomputation and that no other `LayerEigenmodes`
+  field changed. 2.3/2.4: `eigenmodes.DEGENERATE_GAP_THRESHOLD` (`1e-6`,
+  monkeypatch-configurable like `ILL_CONDITIONED_THRESHOLD`) and
+  `_warn_on_small_eigenvalue_gap`, plus reuse of target 1.7's
+  `_canonical_mode_order`, applied to the three anisotropic dense solvers
+  (`solve_layer_eigenmodes_uniform_diagonal`/`_inplane`,
+  `solve_layer_eigenmodes_patterned_inplane`) --
+  `tests/test_sweep_mode_matching.py` (4 tests) and
+  `tests/test_degeneracy_warning.py` (5 tests). **Two honest findings,
+  both from actually running the change against the existing suite rather
+  than assuming it would pass**: (a) extending `_canonical_mode_order` to
+  `solve_layer_eigenmodes_patterned` (Phase 4a, isotropic 2D) was tried
+  first and broke `tests/test_2d_pillar.py`'s TE/TM-block regression tests
+  (that solver's *natural*, un-sorted `eig()` output happens to keep an
+  exact block structure at `ky=0` that re-sorting destroys) -- reverted
+  per `rules.md` AI Coding Rule 3, documented in that function's own
+  docstring rather than silently dropped; (b) the same investigation found
+  an ordinary circular-pillar case has a genuinely near-zero eigenvalue gap
+  from routine lattice `C4v` symmetry, so the gap-warning was deliberately
+  **not** applied to that solver either (it would misfire on harmless,
+  expected degeneracy). 2.5: `tests/test_stress_regression.py` (2 tests),
+  a lossy high-contrast fixture run through the **full**
+  `Simulation.solve()` pipeline (Phase 4b's own stress sweep,
+  `tests/test_2d_pillar_stress.py`, only ever cross-checked eigenvalues,
+  never called `solve()`). **Third finding, a sign-convention trap, not a
+  solver bug**: the first attempt reused Phase 4b's `n=-20+2j`
+  "lossy-metal-like" index verbatim and got `R+T` up to ~17 through the
+  full pipeline -- `n=-20+2j` squares to `Im(eps)<0`, which is a **gain**
+  medium under this project's documented `d/dt -> -i*omega` phasor
+  convention (`CONVENTIONS.md`), not a lossy one, so `R+T>1` was the
+  numerically-correct answer for that (mislabeled) input; Phase 4b's own
+  eigenvalue-only test never caught this because it never computed R/T.
+  Fixed by using a correctly-signed lossy metal (`eps=-396+80j`) for the
+  new fixture; Phase 4b's already-shipped, already-passing file was left
+  untouched (Rule 3 again -- not a bug in that file's actual assertions,
+  only an imprecise docstring label). Since layer-wise absorption
+  (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7 targets 7.5/7.6) isn't
+  implemented yet, the full `R+T+A=1` lossy energy identity can't be
+  checked; the weaker, still-meaningful passivity check (`R>=0`, `T>=0`,
+  `R+T<=1`) is used instead, honestly scoped to what's actually
+  implemented. 227 tests pass project-wide (186 fast pre-session + 34 new
+  fast + 7 unchanged `slow`), full fast+slow suite re-run and confirmed
+  green after every change, not just once at the end.
 - **Phase 6, target 1.3 (uniform diagonal-tensor anisotropic layers) is
   complete**, per `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 1's atomic
   sequencing (targets 1.4-1.8 remain open, tracked separately). New function

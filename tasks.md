@@ -139,3 +139,27 @@ summary instead of deleting history here.
 □ (If pursued) Implement a torch or JAX backend against that interface
 □ (If pursued) Validate backend numerically matches the NumPy path
 □ Update `memory.md` / `decisions.md` on completion
+
+## Cross-cutting: `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-19
+
+Work tracked by that register's atomic targets (numerical-methods
+robustness, Fourier-factorization rule selection, geometry/material
+model completeness, validation, docs, etc.) is not phase-scoped the way
+Phases 1-9 above are, and is tracked at fine grain in
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` itself rather than duplicated here.
+Status snapshot (update the source-of-truth file first, then this line):
+
+☑ Category 1 (Mathematical foundation / anisotropy) — targets 1.1-1.4,
+  1.6-1.8 done; 1.5 (longitudinal coupling) explicitly deferred, 2026-08-03.
+☑ Category 2 (Numerical methods) — targets 2.1-2.5 all done, 2026-08-04
+  (failure contract, eigenvalue-diagnostics report, sweep mode-order
+  stability, degeneracy-gap warning, one lossy high-contrast full-pipeline
+  stress fixture).
+☑ Category 3 (Fourier factorization) — targets 3.1-3.6 all done, 2026-08-04
+  (rule inventory + regression tests; 1D and 2D high-contrast convergence
+  fixtures with honestly-recorded non-monotonic low-order findings; FFF/NVM
+  feasibility investigation against S4's `fmm_PolBasisNV`/`PolBasisJones`/
+  `PolBasisVL` concluding "defer," `decisions.md` ADR-012; target 3.6 has no
+  implementation as a direct consequence of that deferral).
+□ Categories 4-19 — not yet started at atomic-target grain (see that file
+  for each category's own small-target checklist).

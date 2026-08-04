@@ -64,6 +64,30 @@ different source located to cross-check against, unlike targets 1.3/1.4's
 S4 + RCWA.jl pairing). Target 1.5 remains explicitly deferred, not
 implemented — see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`'s 1.5 entry.
 
+**Category 3 targets 3.4/3.5 (FFF/NVM) feasibility investigation
+(2026-08-04, before deciding implement/defer)**: investigated whether Fast
+Fourier Factorization (Popov & Nevière 2001) or the Normal Vector Method
+(Lalanne 1997) could be implemented, given `tests/test_fourier_convergence.py`
+(target 3.3) measured a real high-contrast 2D convergence weakness in the
+current ordinary-Laurent's-rule solver. Both papers' bibliographic details
+were confirmed via `WebSearch` this session (title/author/year/journal/
+volume/pages all matched independently), but both are paywalled JOSA A
+articles — no full text/equations were fetchable in this environment, same
+situation as target 1.5's bounded literature search. `../S4` was read in
+full for its own implementation of this technique family instead:
+`S4/S4.h:49-71` (`use_polarization_basis`/`use_jones_vector_basis`/
+`use_normal_vector_basis`/`use_normal_vector_field` options), dispatching
+via `S4.cpp:1905-1930` to `fmm/fmm_PolBasisNV.cpp` (266 lines),
+`fmm/fmm_PolBasisJones.cpp` (378 lines), `fmm/fmm_PolBasisVL.cpp` (274
+lines) — all three built on `fmm/fmm_FFT.cpp` (239 lines), a
+discretized/FFT-based permittivity representation, not the analytic
+closed-form path (`fmm_closed.cpp`) already transcribed into this project.
+This is a materially different Fourier-factorization architecture, in
+direct tension with **ADR-002** (analytic shape Fourier transforms,
+raster+FFT explicitly rejected for a different reason). Decision: defer
+both (Category 3 targets 3.4/3.5), full account and revisit conditions in
+`decisions.md` ADR-012.
+
 - **Phase 5 (tapered/sloped sidewalls, `staircase.py`)**: per the
   `phase-reference-picker` skill's procedure, every RCWA-family repo under
   `REFERENCE/` (`S4`, `EMpy`, `RigorousCoupledWaveAnalysis.jl`,
@@ -114,6 +138,19 @@ implemented — see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`'s 1.5 entry.
   `epsilon_inv_hat` Toeplitz construction (see `design.md`, Algorithm 3).
   Cite the specific rule/equation when Phase 2's docstrings are written,
   not just this general reference.
+- **Lalanne, Philippe (1997)**, "Improved formulation of the coupled-wave
+  method for two-dimensional gratings," *J. Opt. Soc. Am. A* 14(7),
+  1592-1598 — the foundational 2D normal-vector-method (NVM) paper, cited
+  by Category 3 target 3.5's feasibility decision (`decisions.md` ADR-012).
+  Bibliographic details confirmed via `WebSearch`, not read as full text in
+  this environment (paywalled) — no formula transcribed from it.
+- **Popov, Evgeny, & Nevière, Michel (2001)**, "Maxwell equations in
+  Fourier space: fast-converging formulation for diffraction by arbitrary
+  shaped, periodic, anisotropic media," *J. Opt. Soc. Am. A* 18(11),
+  2886-2894 — the foundational Fast Fourier Factorization (FFF) paper,
+  cited by Category 3 target 3.4's feasibility decision (`decisions.md`
+  ADR-012). Same paywalled/not-transcribed status as the Lalanne (1997)
+  entry above.
 
 ## How to Add a Reference
 

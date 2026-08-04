@@ -37,6 +37,28 @@ class Layer:
 
 
 @dataclass
+class EigenmodeDiagnostics:
+    """Category 2 target 2.2 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`): eigenvalue/
+    mode-conditioning diagnostics reported alongside `LayerEigenmodes.q`/
+    `phi`/`kp`, never fed back into the solve itself -- purely a summary of
+    already-computed quantities so a caller doing sweep diagnostics or
+    investigating a `WARNING` logged by `eigenmodes.py`
+    (`ILL_CONDITIONED_THRESHOLD`, `DEGENERATE_GAP_THRESHOLD`) doesn't have to
+    recompute the same condition numbers/classification itself.
+    """
+
+    cond_epsilon: float          # cond() of the permittivity/Toeplitz matrix
+                                  # actually inverted to build kp; exactly 1.0
+                                  # for closed-form uniform-isotropic layers,
+                                  # which invert nothing (phi = I).
+    cond_phi: float               # cond(phi), the eigenvector matrix.
+    min_eigenvalue_gap: float     # smallest pairwise |q_i - q_j| among all
+                                   # distinct-index eigenvalues (inf if <2 modes).
+    num_propagating: int
+    num_evanescent: int
+
+
+@dataclass
 class LayerEigenmodes:
     """Result of solving one layer's eigenmode problem at one wavelength."""
 
@@ -45,6 +67,7 @@ class LayerEigenmodes:
     kp: np.ndarray             # (2n,2n) complex k-parallel operator
     epsilon_inv: np.ndarray | None  # (n,n), None when is_scalar_isotropic
     is_scalar_isotropic: bool
+    diagnostics: "EigenmodeDiagnostics | None" = None
 
 
 class LayerStack:
