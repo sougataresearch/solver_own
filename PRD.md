@@ -83,6 +83,16 @@ depending on them at runtime.
   literature search." See `tests/test_anisotropic_uniform.py`,
   `tests/test_anisotropic_inplane.py`, `tests/test_anisotropic_patterned.py`,
   `tests/test_anisotropic_degeneracy.py`, `tests/test_mode_classification.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 2-5 (numerical methods,
+  Fourier factorization, geometry engine, material models): every target
+  (2.1-2.5, 3.1-3.6, 4.1-4.7, 5.1-5.8) is **met** — see that file's own
+  per-target status entries for the exact validation evidence (each cites
+  its test file(s) directly rather than being restated here). Highlights:
+  a documented failure contract and eigenvalue-diagnostics report; a
+  Fourier-factorization rule inventory with measured convergence fixtures;
+  `Ellipse`/`Polygon` shapes and a JSON pattern-import format; five
+  analytic dispersion models validated against BK7's and Rakić et al.
+  (1998)'s independently-published values.
 - No phase is marked "done" without: (a) a passing automated test against
   an oracle, and (b) a runnable example script producing physically
   plausible output.
@@ -94,13 +104,14 @@ depending on them at runtime.
 | FR-1 | Solve reflectance/transmittance for an arbitrary stack of uniform, dispersive, isotropic layers at arbitrary incidence angle/azimuth/polarization. *(done)* |
 | FR-2 | Support semi-infinite incidence/transmission half-spaces of arbitrary (possibly complex/absorbing) index. *(done)* |
 | FR-3 | Report Jones and Mueller-matrix polarimetric response. *(done)* |
-| FR-4 | Represent 2D-periodic in-plane patterns from `Circle` and `Rectangle` primitives, including nested/overlapping shapes with correct area subtraction. *(done — consumed by the solver since Phase 4a)* |
+| FR-4 | Represent 2D-periodic in-plane patterns from `Circle`, `Rectangle`, `Ellipse`, and `Polygon` (simple, analytic, no raster/GDS import) primitives, including nested/overlapping shapes with correct area subtraction. *(done — `Circle`/`Rectangle` consumed by the solver since Phase 4a; `Ellipse`/`Polygon` added `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 4 targets 4.3/4.5)* |
 | FR-5 | Solve reflectance/transmittance/diffraction efficiencies for a layer patterned according to FR-4 (via/pillar). *(done — Phase 4a, hardened for near-degenerate cases in Phase 4b)* |
 | FR-6 | Represent and solve 1D-periodic lamellar (line/space) patterns (trench). *(done — Phase 3)* |
 | FR-7 | Represent a feature (via/trench) with linearly tapered sidewalls via staircase layer discretization, and demonstrate R/T convergence with slice count. *(done — Phase 5)* |
 | FR-8 | Support anisotropic (full 3×3 tensor) materials in both uniform and patterned layers. *(partially done — Phase 6 Category 1 targets 1.3/1.4/1.6-1.8: diagonal and in-plane-coupled tensors, uniform and patterned. Longitudinal coupling, target 1.5, explicitly deferred — see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`)* |
 | FR-9 | Reconstruct real-space E/H field maps at an arbitrary depth in the stack (for cross-section visualization of trench/via structures). *(planned — Phase 7)* |
-| FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports. *(done — `structures/thin_film/sio2_on_si_thin_film.py::material_from_csv`)* |
+| FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports, or build a dispersive material from an analytic model (Sellmeier, Cauchy, Lorentz, Drude, Drude-Lorentz). *(done — `structures/thin_film/sio2_on_si_thin_film.py::material_from_csv`; analytic models added `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 5 targets 5.2-5.6)* |
+| FR-11 | Import a `Pattern` from a minimal, safe, non-CAD JSON format (units, isotropic-scalar materials, `Circle`/`Rectangle`/`Ellipse`/`Polygon`/`Slab`). *(done — `geometry_io.py`, Category 4 target 4.6; parser only, not yet wired into `Simulation`/`Layer` construction)* |
 
 ## Non-Functional Requirements
 

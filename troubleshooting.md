@@ -97,6 +97,31 @@ one; don't rely on memory across sessions.
   documented exclusion zone, or similar) is `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
   Category 6 target 6.4's ("Grazing-incidence boundary test") job, not
   yet done.
+- **A "lossy metal" index copied from a source using the opposite time
+  convention is actually a gain medium here — `R+T>1`, not a bug (found
+  twice: Category 2 target 2.5, then guarded against in Category 5 target
+  5.4).** This project's convention is `d/dt -> -i*omega`
+  (`CONVENTIONS.md`), which requires `Im(eps) > 0` for a passive/absorbing
+  medium. `n = -20+2j` (a value copied verbatim from Phase 4b's own stress
+  sweep, itself picked without checking sign convention) squares to
+  `eps = 396-80j`, `Im(eps) < 0` — a gain medium, giving `R+T` up to ~17
+  through the full `Simulation.solve()` pipeline. **Symptom to watch for**:
+  `R+T` noticeably greater than 1 for a material you intended to be
+  absorptive. **Fix**: check the sign of `Im(eps)` (or `Im(n*conj(n))`)
+  before trusting a "lossy" material value taken from a different source
+  library/paper — don't assume every published metal index already matches
+  this project's phasor convention. Category 5's `Material.from_lorentz`/
+  `from_drude`/`from_drude_lorentz` docstrings each independently re-derive
+  and test the correct sign (`tests/test_dispersion_models.py`) rather than
+  assuming the transcribed vendored formula's sign already matches.
+- **`Path.write_text(...)` without an explicit `encoding` uses the platform
+  default (`cp1252` on Windows), which raises `UnicodeEncodeError` on
+  non-ASCII text (found when a citation containing "Rakić" was written to
+  `run_metadata.txt` for the first time, Category 5 target 5.8).** Fixed
+  in `output_paths.write_run_metadata` by passing `encoding="utf-8"`
+  explicitly; any new code that reads/writes text files in this project
+  should do the same rather than relying on the platform default, per
+  `PRD.md`'s Windows-primary-shell constraint.
 
 ## Anticipated Gotchas (not yet encountered — flagged ahead of Phase 2-6)
 
