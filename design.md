@@ -300,6 +300,23 @@ ADR-018 for why), validated against thin-film/trench/pillar fixtures
 before `auto_select_num_orders` (target 8.8) was implemented, per that
 target's own "implement only after 8.7 succeeds" wording.
 
+**Public optical outputs** (Category 10 targets 10.1-10.6):
+`SimulationResult.complex_amplitudes()` (raw Cartesian per-order `Ex`/`Ey`,
+target 10.1), `.diffraction_angles()` (`theta=None` for evanescent orders,
+target 10.2), and `.energy_balance()` (incident/reflected/transmitted/
+absorbed/residual in one dict, target 10.3) round out the per-order output
+surface alongside the pre-existing `diffraction_efficiencies()`/
+`order_classification()`. All three are either a direct reuse of an
+already-cited formula (`fields.tangential_e_field`) or a pure composition
+of already-validated methods — no new physics formula introduced. Target
+10.5 (per-order s/p amplitude conversion) is explicitly **not**
+implemented: it requires external (S4/EMpy) validation of the
+polarization convention that a bounded investigation this session could
+not conclusively achieve (`references.md`'s "Target 10.5 bounded
+external-validation attempt", `CONVENTIONS.md`'s Category 10 addendum) —
+`complex_amplitudes()`'s Cartesian-only output was chosen specifically
+because it needs no s/p convention decision at all.
+
 ## "Database Design"
 
 Not applicable — `sougata_solver` has no database and no persistent application

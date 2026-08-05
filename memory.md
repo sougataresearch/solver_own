@@ -5,14 +5,53 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 8, targets
-8.1-8.8), 2026-08-05 (Category 7, targets 7.1-7.6), 2026-08-05 (Phase 7 /
+As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 10, targets
+10.1-10.4/10.6, 10.5 deferred), 2026-08-05 (Category 8, targets 8.1-8.8),
+2026-08-05 (Category 7, targets 7.1-7.6), 2026-08-05 (Phase 7 /
 Category 9, targets 9.1-9.8), 2026-08-04
 (Category 6, targets 6.1-6.6), 2026-08-04
 (Category 5, targets 5.1-5.8), 2026-08-04 (Category 4, targets 4.1-4.7),
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 10 (Optical outputs), targets 10.1-10.4 and 10.6 are
+  complete; target 10.5 is evaluated and explicitly deferred.** New
+  `SimulationResult` methods: `complex_amplitudes()` (10.1, raw Cartesian
+  per-order `Ex`/`Ey` reflected/transmitted tangential-field components,
+  `fields.tangential_e_field` reused directly since it's linear in modal
+  amplitudes -- no per-order masking needed, unlike the bilinear
+  `diffraction_efficiencies()`), `diffraction_angles()` (10.2, `theta=None`
+  for evanescent orders via `classify_propagating`, `phi` always defined;
+  needed new `SimulationResult.kx`/`ky` fields), and `energy_balance()`
+  (10.3, pure composition of `reflectance()`/`transmittance()`/
+  `layer_absorption()`, no new formula). 10.4 (loss-accounting design) was
+  already satisfied by Category 7's ADR-017, cross-referenced not
+  re-done. 10.6: `tests/test_optical_outputs.py`'s frozen output-schema
+  tests for uniform/1D/2D fixtures. **Two genuine findings this session,
+  both recorded rather than glossed over**: (a) validating
+  `complex_amplitudes()` against `tests/oracles/fresnel.py` (a new
+  `multilayer_complex_rt` function added to that oracle) showed both
+  s- and p-polarization match the oracle exactly, but a *naively hand-
+  written* textbook `r_p` formula disagrees in sign with both -- a
+  genuine, pre-existing p-polarization sign-convention ambiguity
+  (different textbook derivations can land on either sign), not a bug in
+  either the solver or the oracle; (b) target 10.5's own "expose per-order
+  s/p conversion only after the polarization convention is externally
+  validated" gate was actually attempted this session (the first time),
+  not just cited as a standing note -- `S4/S4/S4.cpp::Simulation_MakeExcitationPlanewave`
+  (lines 3276-3353) was read in full and found to have a genuine internal
+  comment/code inconsistency (the comment's stated `E`/`H` labels are
+  swapped relative to what the code actually computes); deriving S4's
+  *effective* convention from the executed code gives a plausible match
+  to this project's own `s_hat`/`p_hat_xy`, but since S4 isn't buildable
+  in this environment for a live numeric confirmation, this doesn't meet
+  the "externally validated" bar -- target 10.5 stays deferred, and
+  `complex_amplitudes()`'s Cartesian-only design was chosen specifically
+  to sidestep this exact ambiguity. See `references.md`'s "Target 10.5
+  bounded external-validation attempt" and `CONVENTIONS.md`'s Category 10
+  addendum for the full account. 570 tests pass project-wide (559 at the
+  start of this category: no new `slow` tests, 11 new fast tests), full
+  fast suite re-run and confirmed green.
 - **Category 8 (Solver sweeps and convergence), targets 8.1-8.8, are all
   complete.** New module `src/sougata_solver/sweep.py`. 8.1: `SweepResult`
   (typed one-parameter-sweep container: `parameter_name`/`parameter_unit`/

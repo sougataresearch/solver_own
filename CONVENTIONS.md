@@ -130,6 +130,48 @@ no preferred in-plane direction at `theta=0` — see that file for the
 proof-by-symmetry argument); oblique-incidence regression additionally
 varies `phi` and checks energy conservation for mixed/elliptical states.
 
+## Public optical outputs (Category 10, targets 10.1-10.3/10.5)
+
+`SimulationResult.complex_amplitudes()` (target 10.1) exposes raw
+Cartesian `(Ex, Ey)` reflected/transmitted tangential-field components per
+order (`fields.tangential_e_field`, already cited) — deliberately **not**
+re-expressed in an s/p amplitude basis. Validated directly against
+`tests/oracles/fresnel.py::multilayer_complex_rt` at oblique incidence for
+**both** s- and p-polarization (matches to full double precision).
+
+**Non-obvious finding, worth recording explicitly**: a *naively hand-
+written* textbook `r_p = (n2*cos(ti) - n1*cos(tt)) / (n2*cos(ti) +
+n1*cos(tt))` formula disagrees in **sign** with both this solver's
+p-polarization convention and `fresnel.py`'s own admittance-based `r_p`
+(which agree with each other exactly). This is not a bug in either place
+— p-polarization Fresnel coefficients have a genuine, textbook-to-textbook
+sign-convention ambiguity depending on how the positive p-hat direction is
+chosen (unlike s-polarization, which has none), and different derivations
+(direct-angle-formula vs. admittance/impedance-based) can land on either
+sign. `tests/test_optical_outputs.py::test_complex_amplitudes_p_polarization_sign_differs_from_naive_hand_formula`
+pins this finding as a regression guard, not a "fix."
+
+This still does **not** resolve `excitation.py`'s standing "not yet
+matched to S4/EMpy" note above: `fresnel.py` is this project's own
+from-scratch oracle (independent of `sougata_solver`, but not a
+third-party source), so it doesn't meet Category 10 target 10.5's
+"externally validated" bar. A bounded attempt to close that gap by reading
+`S4/S4/S4.cpp::Simulation_MakeExcitationPlanewave` found a plausible
+derivation-level match (with a genuine internal comment/code
+inconsistency in S4 itself along the way), but no live numeric S4 run was
+possible in this environment to confirm it — see `references.md`'s
+"Target 10.5 bounded external-validation attempt" for the full account.
+Target 10.5 (per-order s/p conversion) is therefore explicitly deferred,
+not implemented; `complex_amplitudes()`'s Cartesian-only output sidesteps
+this ambiguity entirely, which is exactly why it was the target 10.1
+chose to implement.
+
+`SimulationResult.diffraction_angles()` (target 10.2) reports `theta=None`
+for an evanescent order (never a fabricated angle) and always reports
+`phi` (purely geometric, independent of propagation status).
+`SimulationResult.energy_balance()` (target 10.3) is a pure composition of
+`reflectance()`/`transmittance()`/`layer_absorption()` — no new formula.
+
 ## Real-space field reconstruction (Category 9 target 9.1, Phase 7)
 
 `fields.py`'s `modal_field_components`/`reconstruct_field_at_points` extend

@@ -26,7 +26,7 @@ from sougata_solver.eigenmodes import (
     solve_layer_eigenmodes_uniform_inplane,
 )
 from sougata_solver.excitation import PlaneWaveExcitation
-from sougata_solver.fields import propagate_amplitudes, z_poynting_flux
+from sougata_solver.fields import propagate_amplitudes, tangential_e_field, z_poynting_flux
 from sougata_solver.fourier_basis import truncate_fourier_orders, truncate_fourier_orders_1d
 from sougata_solver.fourier_factorization import toeplitz_matrix, toeplitz_matrix_component
 from sougata_solver.geometry import Lattice, Lattice1D, validate_pattern_fits_lattice
@@ -46,6 +46,8 @@ class SimulationResult:
     a_transmitted: np.ndarray
     b_reflected: np.ndarray
     thicknesses: list[float]
+    kx: np.ndarray
+    ky: np.ndarray
 
     def reflectance(self) -> float:
         """`z_poynting_flux`'s `backward` output is a genuinely-signed z-Poynting
@@ -187,6 +189,132 @@ class SimulationResult:
             net_bot = (fwd_bot + bwd_bot).real
             absorptions.append(float((net_top - net_bot) / incident_power.real))
         return absorptions
+
+    def complex_amplitudes(self) -> dict[tuple[int, int], dict[str, complex]]:
+        """Category 10 target 10.1 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`):
+        per-order complex reflected/transmitted tangential E-field
+        amplitudes, keyed like `diffraction_efficiencies()`.
+
+        **Convention, explicit per target 10.1's own wording**: these are
+        raw Cartesian `(Ex, Ey)` components (`fields.tangential_e_field`,
+        already cited/validated), in the same absolute scale as
+        `excitation.incident_field_xy()` -- i.e. dividing a returned value
+        by the incident field's corresponding component gives a genuine
+        complex reflection/transmission coefficient. Deliberately **not**
+        re-expressed in an s/p amplitude basis: `tangential_e_field` is
+        linear in the modal amplitudes, so (unlike `diffraction_efficiencies()`,
+        which is bilinear and needs per-order masking) it can be evaluated
+        once on the full `b_reflected`/`a_transmitted` vectors and read off
+        per order directly. Validated directly against
+        `tests/oracles/fresnel.py::multilayer_complex_rt` at oblique
+        incidence for **both** s- and p-polarization -- the measured ratio
+        (this order's field component divided by the corresponding
+        incident field component) matches that independent, from-scratch
+        oracle's complex `r`/`t` to full double precision for both.
+
+        This is a genuine independent-oracle match, but **not** by itself
+        the "externally validated" bar target 10.5 requires for exposing
+        an *s/p-basis* amplitude conversion: `fresnel.py` is this
+        project's own from-scratch derivation (its own docstring: "not
+        derived from EMpy or sougata_solver"), not a third-party source
+        like S4 or EMpy. See `CONVENTIONS.md`'s Category 10 addendum for
+        the full account, including a documented, non-obvious finding —
+        `fresnel.py`'s admittance-based p-polarization sign convention
+        already agrees with this solver's, even though a *naively hand-
+        written* textbook `r_p = (n2*cos(ti) - n1*cos(tt)) / (n2*cos(ti) +
+        n1*cos(tt))` formula would appear to disagree in sign (a genuine,
+        pre-existing convention-choice ambiguity in p-polarization Fresnel
+        formulas generally, not a bug in either this solver or the
+        oracle).
+        """
+        omega = self.excitation.omega()
+        modes_inc = self.all_modes[0]
+        modes_trans = self.all_modes[-1]
+        zeros_inc = np.zeros_like(self.a0)
+        ex_r, ey_r = tangential_e_field(omega, modes_inc.q, modes_inc.kp, modes_inc.phi, zeros_inc, self.b_reflected)
+        zeros_trans = np.zeros_like(self.a_transmitted)
+        ex_t, ey_t = tangential_e_field(omega, modes_trans.q, modes_trans.kp, modes_trans.phi, self.a_transmitted, zeros_trans)
+
+        amplitudes: dict[tuple[int, int], dict[str, complex]] = {}
+        for i in range(self.num_orders):
+            key = (int(self.g[i, 0]), int(self.g[i, 1]))
+            amplitudes[key] = {
+                "Ex_r": complex(ex_r[i]),
+                "Ey_r": complex(ey_r[i]),
+                "Ex_t": complex(ex_t[i]),
+                "Ey_t": complex(ey_t[i]),
+            }
+        return amplitudes
+
+    def diffraction_angles(self) -> dict[tuple[int, int], dict[str, float | None]]:
+        """Category 10 target 10.2: per-order diffraction angles (radians),
+        keyed like `diffraction_efficiencies()`.
+
+        `theta` is `None` for an evanescent order on that side (reusing
+        `eigenmodes.classify_propagating`'s already-validated real/
+        imaginary-`q` branch classification, Category 1 target 1.8) --
+        never a fabricated angle for a non-propagating order, per this
+        target's own "clear non-propagating representation" wording.
+        `phi` (the in-plane propagation azimuth) is well-defined
+        regardless of propagating status -- it is derived purely from the
+        real `(kx, ky)` grating-equation values, not from `q` -- so it is
+        always reported.
+
+        Formula (standard grating-equation geometry, not a new physics
+        claim): for a propagating order, `q` *is* that order's z-wavenumber
+        in the relevant half-space (real, `>=0` by `_select_q_branch`'s
+        outgoing-branch convention), so `theta = atan2(sqrt(kx^2+ky^2),
+        Re(q))` gives the propagation angle from `+z` directly -- no
+        separate refractive-index lookup needed, since `q` already encodes
+        it. `phi = atan2(ky, kx)`.
+        """
+        modes_inc = self.all_modes[0]
+        modes_trans = self.all_modes[-1]
+        prop_inc = classify_propagating(modes_inc.q)
+        prop_trans = classify_propagating(modes_trans.q)
+
+        angles: dict[tuple[int, int], dict[str, float | None]] = {}
+        # kx/ky are physically real (in-plane wavevector components); they
+        # carry a complex dtype only because `n_incidence` is typed complex
+        # upstream (`excitation.k_parallel`) even for a lossless incidence
+        # medium -- `.real` here matches how every other angle-independent
+        # per-order quantity in this project already treats them.
+        kx_real = self.kx.real
+        ky_real = self.ky.real
+        kr = np.sqrt(kx_real**2 + ky_real**2)
+        phi = np.arctan2(ky_real, kx_real)
+        for i in range(self.num_orders):
+            key = (int(self.g[i, 0]), int(self.g[i, 1]))
+            theta_r = float(np.arctan2(kr[i], modes_inc.q[i].real)) if prop_inc[i] else None
+            theta_t = float(np.arctan2(kr[i], modes_trans.q[i].real)) if prop_trans[i] else None
+            angles[key] = {
+                "theta_r": theta_r,
+                "phi_r": float(phi[i]),
+                "theta_t": theta_t,
+                "phi_t": float(phi[i]),
+            }
+        return angles
+
+    def energy_balance(self) -> dict[str, float]:
+        """Category 10 target 10.3: incident/reflected/transmitted/absorbed
+        power and the residual, in one dict -- pure composition of already-
+        validated methods (`reflectance()`, `transmittance()`,
+        `layer_absorption()`), no new formula. `residual` is
+        `1 - (reflected + transmitted + absorbed)`, which is exactly zero
+        (to numerical precision) whenever energy is genuinely conserved,
+        and the "conservation check where physics permits" this category's
+        exit criterion requires.
+        """
+        r = self.reflectance()
+        t = self.transmittance()
+        absorbed = sum(self.layer_absorption())
+        return {
+            "incident": 1.0,
+            "reflected": r,
+            "transmitted": t,
+            "absorbed": absorbed,
+            "residual": 1.0 - (r + t + absorbed),
+        }
 
 
 class Simulation:
@@ -358,4 +486,6 @@ class Simulation:
             a_transmitted=a_transmitted,
             b_reflected=b_reflected,
             thicknesses=thicknesses,
+            kx=kx,
+            ky=ky,
         )

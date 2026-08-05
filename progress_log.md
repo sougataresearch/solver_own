@@ -709,3 +709,54 @@ whether it was ever actually implemented.
   `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
   `decisions.md` (new ADR-018), `design.md`, `architecture.md`, and this
   file.
+
+## 2026-08-05 (Category 10)
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 10 (Optical
+  outputs, targets 10.1-10.6): complex per-order field coefficients,
+  diffraction angles, a one-call conservation report, layer-wise-
+  absorption design cross-reference, per-order s/p conversion (gated on
+  external validation), and a frozen output schema.
+- Whether raw Cartesian `(Ex, Ey)` per-order output (target 10.1) needs
+  per-order masking the way `diffraction_efficiencies()` does -- it
+  doesn't, since `fields.tangential_e_field` is linear in modal
+  amplitudes (unlike the bilinear Poynting-flux formula), so it can be
+  evaluated once on the full amplitude vectors.
+- Validating `complex_amplitudes()` against `tests/oracles/fresnel.py`
+  surfaced a genuine finding: a naively hand-written textbook `r_p`
+  Fresnel formula disagrees in sign with both this solver and the oracle
+  (which agree with each other exactly) -- a real, pre-existing
+  p-polarization sign-convention ambiguity, not a bug.
+- Whether target 10.5's long-standing "not yet matched to S4/EMpy"
+  polarization-convention gap could finally be closed this session --
+  attempted a bounded external-validation check by reading S4's actual
+  excitation-construction C++ source in full. Found S4 itself has an
+  internal comment/code inconsistency there. A plausible derivation-level
+  match to this project's convention was found, but S4 isn't buildable in
+  this environment for a live numeric confirmation, so target 10.5
+  remains explicitly deferred rather than claimed "validated" on
+  derivation alone.
+
+### Action items
+- [x] Target 10.1 (complex coefficients) — done 2026-08-05.
+  `SimulationResult.complex_amplitudes()`.
+- [x] Target 10.2 (diffraction angles) — done 2026-08-05.
+  `SimulationResult.diffraction_angles()`, new `kx`/`ky` fields.
+- [x] Target 10.3 (conservation report) — done 2026-08-05.
+  `SimulationResult.energy_balance()`.
+- [x] Target 10.4 (loss accounting design) — already satisfied by
+  Category 7 ADR-017, cross-referenced.
+- [ ] Target 10.5 (polarization conversion) — evaluated and explicitly
+  deferred, 2026-08-05. A bounded external-validation attempt against
+  S4's actual source found a plausible but unconfirmed match; see
+  `references.md`.
+- [x] Target 10.6 (output schema tests) — done 2026-08-05.
+  `tests/test_optical_outputs.py`'s frozen schema tests.
+- **Session summary**: five of six Category 10 targets (10.1-10.4, 10.6)
+  complete; target 10.5 explicitly deferred (not a gap, a documented
+  decision). 570 tests pass project-wide (559 at the start of this
+  category, 11 new fast tests, no new `slow` tests). No existing test
+  weakened. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`,
+  `tasks.md`, `design.md`, `references.md`, `CONVENTIONS.md`, and this
+  file.

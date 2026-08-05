@@ -224,5 +224,15 @@ Status snapshot (update the source-of-truth file first, then this line):
   cross-section, pillar (x,y) field map) and one `postprocessing/` plotting
   script, both run end-to-end and visually verified). This is also Phase 7
   (`phases.md`), now marked DONE.
-□ Categories 10-19 — not yet started at atomic-target grain (see that
+☐ Category 10 (Optical outputs) — targets 10.1-10.4/10.6 done, 2026-08-05
+  (complex per-order Cartesian field coefficients validated against a new
+  `tests/oracles/fresnel.py::multilayer_complex_rt` function for both
+  polarizations; per-order diffraction angles with a `None` non-
+  propagating representation; a one-call conservation report; a frozen
+  output schema across uniform/1D/2D fixtures). Target 10.5 (per-order
+  s/p conversion) explicitly deferred -- a bounded attempt to externally
+  validate the polarization convention against S4's actual source found a
+  plausible but numerically-unconfirmed match (S4 not buildable in this
+  environment); see `references.md`.
+□ Categories 11-19 — not yet started at atomic-target grain (see that
   file for each category's own small-target checklist).

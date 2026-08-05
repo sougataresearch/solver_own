@@ -16,6 +16,51 @@ validates against. Update when a new phase cites a new source.
 
 ## Phases With No Vendored-Repo Source
 
+### Target 10.5 bounded external-validation attempt (2026-08-05, before deciding implement/defer)
+
+Category 10 target 10.5 explicitly gates on "the polarization convention
+is externally validated" before exposing per-order s/p amplitude
+conversion. `excitation.py`'s s/p unit-vector convention has been flagged
+since Phase 1/`CONVENTIONS.md` as "not yet matched to S4/EMpy's
+convention" — this was the first session to actually attempt closing that
+gap, per `rules.md`'s bounded-investigation discipline (same treatment as
+targets 1.5 and 3.4/3.5).
+
+- Read `S4/S4/S4.cpp::Simulation_MakeExcitationPlanewave` (lines
+  3276-3353) in full. Found a genuine internal inconsistency in S4 itself:
+  the function's own comment block claims `H = {-e_p, e_s, 0}` at normal
+  incidence, but the code it executes actually computes `H_xy = -e_s *
+  Rcol_x + e_p * Rcol_y` — the comment's `e_s`/`e_p` labels are swapped
+  relative to what the code multiplies. Deriving the *effective* E-field
+  s/p directions from the code as executed (not the comment, using `E ⟂
+  H, both ⟂ k`) gives `s_hat ≈ (-sin(phi), cos(phi), 0)` and
+  `p_hat_xy ≈ -cos(theta)*(cos(phi), sin(phi))` — an apparent exact match
+  to this project's own convention (`excitation.py::incident_field_xy`).
+- This is a plausible derivation-level match, **not** a numeric external
+  validation: it rests on resolving S4's own comment/code discrepancy by
+  inference, and S4 is not buildable in this environment (no `cmake`/Lua
+  toolchain, confirmed since Phase 4a — `troubleshooting.md`'s
+  Environment-Specific Notes), so no actual S4 run could confirm it
+  numerically. Per `rules.md` AI Coding Rule 5 ("never fabricate
+  benchmark/validation numbers"), a plausible-but-unconfirmed derivation
+  does not meet target 10.5's "externally validated" bar.
+- A separate, related finding (not itself external validation, but worth
+  recording): this solver's p-polarization sign convention was found to
+  match `tests/oracles/fresnel.py::multilayer_complex_rt`'s (this
+  project's own independent, from-scratch, admittance-based Fresnel
+  oracle) exactly — but that oracle is not third-party (S4/EMpy), so this
+  doesn't satisfy target 10.5 either, even though it's a genuine positive
+  signal and now backs Category 10 target 10.1's complex-amplitude
+  validation. See `CONVENTIONS.md`'s Category 10 addendum and
+  `tests/test_optical_outputs.py`.
+- **Decision: target 10.5 remains explicitly deferred, not implemented** —
+  the s/p-basis conversion output is not exposed; `complex_amplitudes()`
+  (target 10.1) exposes raw Cartesian `(Ex, Ey)` components instead, which
+  need no s/p convention choice at all. Revisit if S4 becomes buildable in
+  a future environment (a live numeric cross-check would resolve this
+  conclusively) or if EMpy's own s/p convention can be similarly derived
+  and additionally agrees.
+
 ### Category 7 (Layer handling) targets 7.4/7.6 (2026-08-05)
 
 Neither of Category 7's two implementation targets needed a new external

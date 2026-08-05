@@ -939,31 +939,92 @@ no existing test weakened.
 
 - Total R/T, per-order diffraction efficiencies, Jones/Mueller processing,
   and ellipsometric quantities.
+- Complex per-order field coefficients, diffraction angles, a one-call
+  conservation report, and a frozen output schema (targets 10.1-10.4, 10.6).
 
 **Current scope**
 
-The primary power outputs exist; standardized complex-order and loss outputs
-remain pending.
+The primary power outputs, complex-coefficient outputs, diffraction
+angles, and a one-call conservation report are all implemented and
+tested. Per-order s/p amplitude conversion (target 10.5) remains
+explicitly deferred pending genuine external (S4/EMpy) validation of the
+polarization convention.
 
 ### Small targets
 
-- [ ] **10.1 Complex coefficients:** expose complex per-order reflection and
+- [x] **10.1 Complex coefficients:** expose complex per-order reflection and
   transmission amplitudes with an explicitly documented convention.
-- [ ] **10.2 Diffraction angles:** add angles for propagating orders and a clear
+  Done 2026-08-05: `SimulationResult.complex_amplitudes()` -- raw
+  Cartesian `(Ex, Ey)` tangential-field components per order
+  (`fields.tangential_e_field`, already cited), deliberately not
+  re-expressed in an s/p basis. Validated against
+  `tests/oracles/fresnel.py::multilayer_complex_rt` (a new function added
+  to that oracle, alongside the existing power-only `multilayer_rt`) at
+  oblique incidence for **both** s- and p-polarization, to full double
+  precision. **Non-obvious finding recorded, not hidden**: a naively
+  hand-written textbook `r_p` formula disagrees in sign with both this
+  solver and the oracle (which agree with each other) -- a genuine,
+  pre-existing p-polarization sign-convention ambiguity, not a bug. See
+  `CONVENTIONS.md`'s Category 10 addendum.
+- [x] **10.2 Diffraction angles:** add angles for propagating orders and a clear
   non-propagating representation for evanescent orders.
-- [ ] **10.3 Conservation report:** expose incident/reflected/transmitted/loss
+  Done 2026-08-05: `SimulationResult.diffraction_angles()` --
+  `theta=None` for an evanescent order (reusing `classify_propagating`,
+  Category 1 target 1.8), `phi` always defined (purely geometric). New
+  `SimulationResult.kx`/`ky` fields (populated by `Simulation.solve()`)
+  needed to support this. Validated: zeroth order matches the input
+  incidence angle exactly; an evanescent order (reusing
+  `test_mode_classification.py`'s Rayleigh-threshold fixture) reports
+  `theta=None` on both sides; a propagating order matches the classical
+  1D grating equation `sin(theta_m) = sin(theta_inc) - m*wavelength/period`.
+- [x] **10.3 Conservation report:** expose incident/reflected/transmitted/loss
   components and residual in one result method.
-- [ ] **10.4 Loss accounting design:** define layer-wise absorption before adding
+  Done 2026-08-05: `SimulationResult.energy_balance()` -- pure
+  composition of `reflectance()`/`transmittance()`/`layer_absorption()`
+  (Category 7), no new formula. Residual near-zero for a lossless
+  fixture, matches `layer_absorption()` for a lossy one.
+- [x] **10.4 Loss accounting design:** define layer-wise absorption before adding
   values to the public result.
+  Already satisfied by Category 7 targets 7.5/7.6 (`design.md`'s
+  "Layer-Wise Absorption Design", `decisions.md` ADR-017) -- no new work
+  needed, cross-referenced here for completeness.
 - [ ] **10.5 Polarization conversion:** expose per-order s/p conversion only
   after the polarization convention is externally validated.
-- [ ] **10.6 Output schema tests:** freeze a compact output fixture for uniform,
+  Evaluated and explicitly deferred, 2026-08-05 -- a bounded attempt to
+  externally validate `excitation.py`'s s/p convention against S4's
+  actual source (`S4/S4/S4.cpp::Simulation_MakeExcitationPlanewave`)
+  found a plausible derivation-level match, but S4 is not buildable in
+  this environment for a live numeric confirmation, and S4's own code
+  comments are internally inconsistent at the relevant lines -- not
+  sufficient to meet this target's own "externally validated" bar per
+  `rules.md` AI Coding Rule 5. See `references.md`'s "Target 10.5 bounded
+  external-validation attempt" for the full account. `complex_amplitudes()`
+  (target 10.1) exposes raw Cartesian components instead, which need no
+  s/p convention choice at all.
+- [x] **10.6 Output schema tests:** freeze a compact output fixture for uniform,
   1D, and 2D cases.
+  Done 2026-08-05: `tests/test_optical_outputs.py`'s
+  `test_output_schema_uniform_thin_film`/`_1d_trench`/`_2d_pillar` --
+  every public `SimulationResult` output method combined into one schema,
+  checked for consistent keys across `diffraction_efficiencies`/
+  `complex_amplitudes`/`diffraction_angles`/`order_classification`, and
+  cross-consistency with `reflectance()`/`transmittance()`/`energy_balance()`.
 
 ### Exit criteria
 
 **Category gate:** all public outputs carry units/conventions and satisfy a
 conservation check where physics permits.
+
+**Status as of 2026-08-05**: targets 10.1-10.4 and 10.6 are done; target
+10.5 is evaluated and explicitly deferred (no genuine external validation
+of the polarization convention was achievable in this environment). Every
+new output method documents its units/convention in its own docstring
+(`Ex`/`Ey` in the same scale as `incident_field_xy()`; `theta`/`phi` in
+radians; `energy_balance()`'s fractions dimensionless) and satisfies a
+conservation check where physics permits (`energy_balance()`'s residual,
+`diffraction_efficiencies()` summing to `reflectance()`/`transmittance()`).
+570 tests pass project-wide (559 at the start of this category: no new
+`slow` tests this category), no existing test weakened.
 
 ## 11. Semiconductor OCD features — PARTIAL
 

@@ -29,19 +29,19 @@ def _admittance(n: complex, kz: complex, k0: float, polarization: str) -> comple
     raise ValueError(f"polarization must be 's' or 'p', got {polarization!r}")
 
 
-def multilayer_rt(
+def _complex_rt(
     wavelength: float,
     theta0: float,
     polarization: str,
     n_incidence: complex,
     layers: list[tuple[complex, float]],
     n_substrate: complex,
-) -> tuple[float, float]:
-    """Reflectance and transmittance of an N-layer isotropic stack.
-
-    `layers` is an ordered list of `(refractive_index, thickness)` for the
-    internal layers, from the incidence side to the substrate side.
-    """
+) -> tuple[complex, complex, complex, complex]:
+    """Shared characteristic-matrix computation; returns `(r, t, eta0,
+    eta_sub)` so both the power-only `multilayer_rt` and the complex-
+    coefficient `multilayer_complex_rt` (Category 10 target 10.1's
+    validation) reuse exactly the same derivation, not two independently
+    hand-typed formulas that could silently drift apart."""
     k0 = 2.0 * math.pi / wavelength
     n_incidence = complex(n_incidence)
     n_substrate = complex(n_substrate)
@@ -78,7 +78,40 @@ def multilayer_rt(
 
     r = (eta0 * b - c) / (eta0 * b + c)
     t = 2.0 * eta0 / (eta0 * b + c)
+    return r, t, eta0, eta_sub
 
+
+def multilayer_rt(
+    wavelength: float,
+    theta0: float,
+    polarization: str,
+    n_incidence: complex,
+    layers: list[tuple[complex, float]],
+    n_substrate: complex,
+) -> tuple[float, float]:
+    """Reflectance and transmittance of an N-layer isotropic stack.
+
+    `layers` is an ordered list of `(refractive_index, thickness)` for the
+    internal layers, from the incidence side to the substrate side.
+    """
+    r, t, eta0, eta_sub = _complex_rt(wavelength, theta0, polarization, n_incidence, layers, n_substrate)
     reflectance = abs(r) ** 2
     transmittance = (eta_sub.real / eta0.real) * abs(t) ** 2
     return reflectance, transmittance
+
+
+def multilayer_complex_rt(
+    wavelength: float,
+    theta0: float,
+    polarization: str,
+    n_incidence: complex,
+    layers: list[tuple[complex, float]],
+    n_substrate: complex,
+) -> tuple[complex, complex]:
+    """Category 10 target 10.1: raw complex amplitude reflection/
+    transmission coefficients `(r, t)` (same characteristic-matrix
+    derivation as `multilayer_rt`, before squaring to power) -- the
+    standard textbook Fresnel `r`/`t` convention, used as the independent
+    oracle for `SimulationResult.complex_amplitudes()`."""
+    r, t, _eta0, _eta_sub = _complex_rt(wavelength, theta0, polarization, n_incidence, layers, n_substrate)
+    return r, t
