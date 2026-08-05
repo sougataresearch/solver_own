@@ -16,6 +16,18 @@ validates against. Update when a new phase cites a new source.
 
 ## Phases With No Vendored-Repo Source
 
+### Category 13 (Performance optimization) targets 13.1-13.6 (2026-08-05)
+
+No new external citation was needed. Every implemented target (13.1,
+13.3, 13.4) is either a measurement or a batched re-expression of an
+already-cited formula (`eigenmodes.solve_layer_eigenmodes_uniform`,
+`eigenmodes.build_kp_matrix`, `smatrix.interface_smatrix`/
+`propagation_smatrix`/`star_product`, `excitation.incident_mode_amplitude`
+— see `decisions.md` ADR-023's exact list); 13.5 is a measured,
+documented finding using Python's standard-library `concurrent.futures`;
+13.6 is a process checkpoint (explicit approval sought, not granted),
+not a technical decision needing a citation.
+
 ### Category 12 (Linear algebra) targets 12.1-12.5 (2026-08-05)
 
 No new external citation was needed for any Category 12 target — every

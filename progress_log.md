@@ -851,3 +851,55 @@ whether it was ever actually implemented.
   Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
   `design.md`, `decisions.md` (new ADR-021), `architecture.md`,
   `references.md`, and this file.
+
+## 2026-08-05 (Category 13)
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 13 (Performance
+  optimization, targets 13.1-13.6): a repeatable benchmark suite, an
+  eigenmode-reuse cache (implementing Category 12 target 12.3's deferred
+  design), a bounded vectorized wavelength sweep, and measured
+  parallelism/GPU decisions.
+- Whether the "eigenmode-cache" opportunity Category 12 flagged as a
+  design note was actually worth implementing -- measured a genuine
+  ~3.3x speedup on a polarization sweep before committing to it, matching
+  the same "measure before optimizing" discipline `rules.md`'s
+  Performance Requirements demands.
+- How to safely vectorize "a single simple sweep" (target 13.4's own
+  wording) without touching the general dense-eigensolve path -- scoped
+  to uniform-isotropic-only (thin-film) stacks specifically, since that
+  eigensolve is already closed-form and trivially batchable, unlike the
+  general patterned/anisotropic case.
+- Whether process- or thread-based parallelism would give a safe sweep
+  speedup -- measured both directly rather than assuming either would
+  help; found threading modestly helps (GIL released during LAPACK
+  calls) while multiprocessing is actually counterproductive on this
+  machine, likely from oversubscribing NumPy's already-multithreaded
+  BLAS backend.
+- Target 13.6 (GPU decision checkpoint) explicitly requires seeking the
+  project owner's approval before any GPU work, once CPU targets are
+  met -- asked directly; approval was not granted, so GPU/autodiff
+  backend work stays deferred to Phase 9.
+
+### Action items
+- [x] Target 13.1 (benchmark suite) — done 2026-08-05.
+  `profiling/benchmark_suite.py`.
+- [x] Target 13.2 (Fourier-matrix reuse) — already satisfied by Category
+  7's Toeplitz cache, cross-referenced.
+- [x] Target 13.3 (eigenmode reuse) — done 2026-08-05.
+  `Simulation._eigenmode_cache`, `decisions.md` ADR-022.
+- [x] Target 13.4 (safe vectorized sweep) — done 2026-08-05.
+  `vectorized.sweep_wavelength_vectorized`, `decisions.md` ADR-023.
+- [x] Target 13.5 (parallelism decision) — done 2026-08-05, measured and
+  documented, not implemented. `decisions.md` ADR-024.
+- [x] Target 13.6 (GPU decision checkpoint) — done 2026-08-05, explicit
+  approval sought and not granted; GPU work stays deferred to Phase 9.
+- **Session summary**: all six Category 13 targets resolved (three
+  implemented and tested, one already satisfied, two measured/decided
+  without implementation). 627 tests pass project-wide (612 at the start
+  of this category, 15 new fast tests, no new `slow` tests). No existing
+  test weakened; one real bug (a missing `omega^2*I` term in the
+  vectorized eigenmode helper) found and fixed by the equivalence test
+  itself before being trusted. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`,
+  `memory.md`, `tasks.md`, `decisions.md` (new ADR-022, ADR-023,
+  ADR-024), `architecture.md`, `references.md`, and this file.

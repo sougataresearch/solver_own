@@ -1209,34 +1209,93 @@ justification (the 12.1 profiler numbers, the 12.2 equivalence tests, the
 project-wide (600 at the start of this category: no new `slow` tests, 12
 new fast tests), no existing test weakened.
 
-## 13. Performance optimization — NOT COMPLETED
+## 13. Performance optimization — PARTIAL
 
 ### Already present
 
 - A pure NumPy/SciPy CPU baseline suitable for correctness validation.
+- A repeatable benchmark suite, an eigenmode-reuse cache, a validated
+  vectorized wavelength sweep, and a measured parallelism decision.
 
 **Current scope**
 
-No profiling-driven caching, vectorization, parallelism, or GPU path exists.
+Profiling-driven caching and a bounded, safe vectorized sweep are
+implemented and validated. Parallelism was measured and documented, not
+implemented (the measured evidence didn't justify shipping a parallel
+sweep API on this machine). A GPU/autodiff backend remains explicitly
+deferred, pending the project owner's own future decision to pursue it
+(Phase 9, "later, optional").
 
 ### Small targets
 
-- [ ] **13.1 Benchmark suite:** establish repeatable runtime/memory benchmarks
+- [x] **13.1 Benchmark suite:** establish repeatable runtime/memory benchmarks
   for thin-film, trench, pillar, and tapered structures.
-- [ ] **13.2 Fourier-matrix reuse:** cache one validated sweep-invariant matrix;
+  Done 2026-08-05: `profiling/benchmark_suite.py` -- extends Category
+  12's `baseline_profile.py` with the one structure type it didn't cover
+  (a Phase 5 staircase-discretized tapered via), alongside thin-film/
+  trench/pillar. Fixed geometry/material/excitation inputs every run
+  (no randomness), so runs are directly comparable.
+- [x] **13.2 Fourier-matrix reuse:** cache one validated sweep-invariant matrix;
   compare cached and uncached spectra.
-- [ ] **13.3 Eigenmode reuse:** cache one validated sweep-invariant mode set.
-- [ ] **13.4 Safe vectorized sweep:** vectorize a single simple sweep and compare
+  Already satisfied by Category 7 targets 7.3/7.4's Toeplitz-matrix cache
+  (`decisions.md` ADR-016, `tests/test_layer_cache.py`) -- no new work
+  needed, cross-referenced here for completeness.
+- [x] **13.3 Eigenmode reuse:** cache one validated sweep-invariant mode set.
+  Done 2026-08-05: `Simulation._eigenmode_cache`, implementing the design
+  Category 12 target 12.3 flagged but deliberately left unimplemented.
+  Keyed by `(id(layer), omega, kx, ky)` -- correctly excludes thickness
+  (never consumed by an eigenmode solve) and polarization (only consumed
+  downstream), so it survives `sweep.sweep_thickness`/`sweep_polarization`
+  automatically. Measured: a 20-point polarization sweep at
+  `num_orders=49`, ~3.3x faster cached vs. forced-uncached.
+  `decisions.md` ADR-022, `tests/test_eigenmode_cache.py`.
+- [x] **13.4 Safe vectorized sweep:** vectorize a single simple sweep and compare
   every result with scalar solves.
-- [ ] **13.5 Parallelism decision:** profile and document whether process/thread
+  Done 2026-08-05: `vectorized.sweep_wavelength_vectorized` -- a
+  narrowly-scoped batched wavelength sweep for uniform-isotropic-only
+  (thin-film) stacks, `num_orders=1`, every batched function a direct
+  formula-identical re-expression of an already-cited scalar function
+  (no new physics). Confirmed bit-for-bit-scale (`1e-12`) agreement with
+  the scalar `sweep.sweep_wavelength` across five polarization states,
+  oblique/azimuthal incidence, a multi-layer stack, and a lossy material.
+  **Found and fixed before trusting it**: a first draft omitted the
+  `omega^2*I` term from `build_kp_matrix`'s actual formula -- caught by
+  the very first equivalence-test run (`LinAlgError`, not a silent wrong
+  answer). Measured: a 401-point sweep, ~31x faster than the scalar loop.
+  `decisions.md` ADR-023, `tests/test_vectorized_sweep.py`.
+- [x] **13.5 Parallelism decision:** profile and document whether process/thread
   parallelism gives a safe benefit.
-- [ ] **13.6 GPU decision checkpoint:** seek explicit approval and choose a
+  Done 2026-08-05: measured (not assumed) on a 14-core machine --
+  threading gives a modest, safe (~1.3-1.5x, results confirmed identical)
+  benefit since NumPy/LAPACK releases the GIL during the heavy linear
+  algebra; multiprocessing is measured **counterproductive** at both a
+  cheap (`num_orders=49`) and heavy (`num_orders=81`) per-task
+  granularity, most plausibly from oversubscription against NumPy's
+  already-multithreaded BLAS backend. No parallel-sweep API implemented
+  -- this target asks only to profile and document. `decisions.md`
+  ADR-024.
+- [x] **13.6 GPU decision checkpoint:** seek explicit approval and choose a
   backend only after CPU targets are met.
+  Done 2026-08-05: explicit approval sought from the project owner after
+  CPU targets 13.1-13.5 were met, per this target's own wording -- **not
+  granted**; GPU/autodiff backend work remains deferred (Phase 9,
+  "later, optional"), matching the project's existing correctness-first,
+  no-premature-optimization stance. Revisit only if explicitly requested.
 
 ### Exit criteria
 
 **Category gate:** every optimization has numerical-equivalence tests and a
 benchmark showing why it exists.
+
+**Status as of 2026-08-05**: targets 13.1-13.6 are all resolved (13.1,
+13.3, 13.4 implemented and tested; 13.2 already satisfied by Category 7;
+13.5 measured and documented, not implemented; 13.6 explicit approval
+sought and not granted, deferred per the project owner's decision). Every
+implemented optimization (13.3, 13.4) has a numerical-equivalence test
+(`tests/test_eigenmode_cache.py`, `tests/test_vectorized_sweep.py`) and a
+measured benchmark showing why it exists (~3.3x and ~31x respectively).
+627 tests pass project-wide (612 at the start of this category: no new
+`slow` tests, 15 new fast tests), no existing test weakened.
 
 ## 14. Validation — PARTIAL
 

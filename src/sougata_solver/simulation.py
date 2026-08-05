@@ -342,6 +342,13 @@ class Simulation:
         # global state" rule): a fresh `Simulation` starts with an empty
         # cache, so no entry can outlive the instance it belongs to.
         self._toeplitz_cache: dict = {}
+        # Category 13 target 13.3 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md):
+        # instance-scoped per-layer eigenmode cache, implementing the
+        # design Category 12 target 12.3 flagged but deliberately left
+        # unimplemented (`design.md`'s "Linear-Algebra Baseline &
+        # Factorization-Reuse Design"). Same "no hidden global state"
+        # rationale as `_toeplitz_cache` above.
+        self._eigenmode_cache: dict = {}
 
         # Category 4 target 4.2 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md): reject
         # a patterned layer whose shapes could overlap their own periodic
@@ -368,6 +375,111 @@ class Simulation:
             self._toeplitz_cache[key] = toeplitz_matrix_component(pattern, self.lattice, g, wavelength, row, col)
         return self._toeplitz_cache[key]
 
+    def _cached_layer_eigenmodes(
+        self, layer: Layer, g: np.ndarray, wavelength: float, omega: complex, kx: np.ndarray, ky: np.ndarray, is_1d: bool
+    ) -> LayerEigenmodes:
+        """Category 13 target 13.3: cache one layer's `LayerEigenmodes`
+        result, keyed by `(id(layer), omega, kx, ky)` -- deliberately
+        **not** including `layer.thickness` (which never affects an
+        eigenmode solve; only the downstream `propagation_smatrix` step
+        consumes it, per `build_kp_matrix`'s signature) and **not**
+        including the excitation's polarization amplitudes (which only
+        affect the incident-mode-amplitude inversion, `a0`, downstream of
+        every eigenmode solve). This makes the cache automatically valid,
+        with no extra invalidation logic, across a fixed-wavelength/angle
+        `sweep.sweep_polarization` (target 8.4) or a fixed-wavelength/angle
+        `sweep.sweep_thickness` (target 8.5) -- both leave `omega`/`kx`/`ky`
+        and every `id(layer)` unchanged, even though `sweep_thickness`
+        mutates a `Layer`'s `thickness` attribute in place (the same object
+        identity, so the cache key is unaffected, correctly).
+
+        `id(layer)` (not `id(layer.material)`/`id(layer.pattern)`
+        directly) is used as the object-identity key component, matching
+        `_cached_toeplitz`'s established convention (`decisions.md`
+        ADR-016) -- since a `Layer`'s `material`/`pattern` reference never
+        changes after construction, keying on the `Layer` itself is
+        equivalent and keeps this cache's key shape uniform across every
+        dispatch branch below (uniform isotropic/diagonal/in-plane, 1D,
+        2D isotropic/anisotropic) without needing a different key shape
+        per branch.
+        """
+        key = ("eigenmodes", id(layer), omega, kx.tobytes(), ky.tobytes())
+        if key not in self._eigenmode_cache:
+            self._eigenmode_cache[key] = self._solve_one_layer_eigenmodes(layer, g, wavelength, omega, kx, ky, is_1d)
+        return self._eigenmode_cache[key]
+
+    def _solve_one_layer_eigenmodes(
+        self, layer: Layer, g: np.ndarray, wavelength: float, omega: complex, kx: np.ndarray, ky: np.ndarray, is_1d: bool
+    ) -> LayerEigenmodes:
+        if layer.is_uniform():
+            material = layer.material
+            if material.is_isotropic:
+                eps_scalar = material.epsilon_tensor(wavelength)[0, 0]
+                return solve_layer_eigenmodes_uniform(omega, kx, ky, eps_scalar)
+            elif material.is_diagonal:
+                # Diagonal-tensor uniform layers (Category 1 target 1.3,
+                # COMMERCIAL_RCWA_ATOMIC_TARGETS.md) -- no in-plane
+                # (eps_xy/eps_yx) or longitudinal (eps_xz/eps_yz/eps_zx/
+                # eps_zy) coupling yet; those are separate, not-yet-shipped
+                # targets 1.4/1.5.
+                eps_tensor = material.epsilon_tensor(wavelength)
+                return solve_layer_eigenmodes_uniform_diagonal(
+                    omega, kx, ky, eps_tensor[0, 0], eps_tensor[1, 1], eps_tensor[2, 2]
+                )
+            else:
+                eps_tensor = material.epsilon_tensor(wavelength)
+                longitudinal = eps_tensor[[0, 1, 2, 2], [2, 2, 0, 1]]
+                if np.any(longitudinal != 0):
+                    raise NotImplementedError(
+                        "Longitudinally-coupled anisotropic uniform layers (nonzero "
+                        "eps_xz/eps_yz/eps_zx/eps_zy) require Category 1 target 1.5 "
+                        "(COMMERCIAL_RCWA_ATOMIC_TARGETS.md), not yet available"
+                    )
+                # In-plane-coupled (eps_xy/eps_yx nonzero, no longitudinal
+                # coupling) uniform layers (Category 1 target 1.4).
+                return solve_layer_eigenmodes_uniform_inplane(
+                    omega,
+                    kx,
+                    ky,
+                    eps_tensor[0, 0],
+                    eps_tensor[0, 1],
+                    eps_tensor[1, 0],
+                    eps_tensor[1, 1],
+                    eps_tensor[2, 2],
+                )
+        elif is_1d:
+            epsilon_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=False)
+            epsilon_inv_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=True)
+            return solve_layer_eigenmodes_1d(omega, kx, ky, epsilon_hat, epsilon_inv_hat)
+        else:
+            materials_in_pattern = [layer.pattern.background] + [s.material for s in layer.pattern.shapes]
+            if all(m.is_isotropic for m in materials_in_pattern):
+                # 2D patterned layers use only the direct-rule Toeplitz --
+                # see solve_layer_eigenmodes_patterned's docstring: S4's
+                # true-2D, no-polarization-basis closed-form path (the
+                # one transcribed here) doesn't consume the inverse-rule
+                # Toeplitz at all, unlike the 1D case above.
+                epsilon_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=False)
+                return solve_layer_eigenmodes_patterned(omega, kx, ky, epsilon_hat)
+            else:
+                # Anisotropic patterned layer (Category 1 target 1.6,
+                # COMMERCIAL_RCWA_ATOMIC_TARGETS.md).
+                has_longitudinal = any(
+                    np.any(m.epsilon_tensor(wavelength)[[0, 1, 2, 2], [2, 2, 0, 1]] != 0)
+                    for m in materials_in_pattern
+                )
+                if has_longitudinal:
+                    raise NotImplementedError(
+                        "Longitudinally-coupled anisotropic patterned layers require "
+                        "Category 1 target 1.5 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md), not yet available"
+                    )
+                exx = self._cached_toeplitz_component(layer.pattern, g, wavelength, 0, 0)
+                exy = self._cached_toeplitz_component(layer.pattern, g, wavelength, 0, 1)
+                eyx = self._cached_toeplitz_component(layer.pattern, g, wavelength, 1, 0)
+                eyy = self._cached_toeplitz_component(layer.pattern, g, wavelength, 1, 1)
+                ezz = self._cached_toeplitz_component(layer.pattern, g, wavelength, 2, 2)
+                return solve_layer_eigenmodes_patterned_inplane(omega, kx, ky, exx, exy, eyx, eyy, ezz)
+
     def solve(self, excitation: PlaneWaveExcitation) -> SimulationResult:
         wavelength = excitation.wavelength
         omega = excitation.omega()
@@ -388,82 +500,9 @@ class Simulation:
 
         zeroth_order_index = int(np.flatnonzero((g[:, 0] == 0) & (g[:, 1] == 0))[0])
 
-        all_modes: list[LayerEigenmodes] = []
-        for layer in self.layer_stack:
-            if layer.is_uniform():
-                material = layer.material
-                if material.is_isotropic:
-                    eps_scalar = material.epsilon_tensor(wavelength)[0, 0]
-                    all_modes.append(solve_layer_eigenmodes_uniform(omega, kx, ky, eps_scalar))
-                elif material.is_diagonal:
-                    # Diagonal-tensor uniform layers (Category 1 target 1.3,
-                    # COMMERCIAL_RCWA_ATOMIC_TARGETS.md) -- no in-plane
-                    # (eps_xy/eps_yx) or longitudinal (eps_xz/eps_yz/eps_zx/
-                    # eps_zy) coupling yet; those are separate, not-yet-shipped
-                    # targets 1.4/1.5.
-                    eps_tensor = material.epsilon_tensor(wavelength)
-                    all_modes.append(
-                        solve_layer_eigenmodes_uniform_diagonal(
-                            omega, kx, ky, eps_tensor[0, 0], eps_tensor[1, 1], eps_tensor[2, 2]
-                        )
-                    )
-                else:
-                    eps_tensor = material.epsilon_tensor(wavelength)
-                    longitudinal = eps_tensor[[0, 1, 2, 2], [2, 2, 0, 1]]
-                    if np.any(longitudinal != 0):
-                        raise NotImplementedError(
-                            "Longitudinally-coupled anisotropic uniform layers (nonzero "
-                            "eps_xz/eps_yz/eps_zx/eps_zy) require Category 1 target 1.5 "
-                            "(COMMERCIAL_RCWA_ATOMIC_TARGETS.md), not yet available"
-                        )
-                    # In-plane-coupled (eps_xy/eps_yx nonzero, no longitudinal
-                    # coupling) uniform layers (Category 1 target 1.4).
-                    all_modes.append(
-                        solve_layer_eigenmodes_uniform_inplane(
-                            omega,
-                            kx,
-                            ky,
-                            eps_tensor[0, 0],
-                            eps_tensor[0, 1],
-                            eps_tensor[1, 0],
-                            eps_tensor[1, 1],
-                            eps_tensor[2, 2],
-                        )
-                    )
-            elif is_1d:
-                epsilon_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=False)
-                epsilon_inv_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=True)
-                all_modes.append(solve_layer_eigenmodes_1d(omega, kx, ky, epsilon_hat, epsilon_inv_hat))
-            else:
-                materials_in_pattern = [layer.pattern.background] + [s.material for s in layer.pattern.shapes]
-                if all(m.is_isotropic for m in materials_in_pattern):
-                    # 2D patterned layers use only the direct-rule Toeplitz --
-                    # see solve_layer_eigenmodes_patterned's docstring: S4's
-                    # true-2D, no-polarization-basis closed-form path (the
-                    # one transcribed here) doesn't consume the inverse-rule
-                    # Toeplitz at all, unlike the 1D case above.
-                    epsilon_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=False)
-                    all_modes.append(solve_layer_eigenmodes_patterned(omega, kx, ky, epsilon_hat))
-                else:
-                    # Anisotropic patterned layer (Category 1 target 1.6,
-                    # COMMERCIAL_RCWA_ATOMIC_TARGETS.md).
-                    has_longitudinal = any(
-                        np.any(m.epsilon_tensor(wavelength)[[0, 1, 2, 2], [2, 2, 0, 1]] != 0)
-                        for m in materials_in_pattern
-                    )
-                    if has_longitudinal:
-                        raise NotImplementedError(
-                            "Longitudinally-coupled anisotropic patterned layers require "
-                            "Category 1 target 1.5 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md), not yet available"
-                        )
-                    exx = self._cached_toeplitz_component(layer.pattern, g, wavelength, 0, 0)
-                    exy = self._cached_toeplitz_component(layer.pattern, g, wavelength, 0, 1)
-                    eyx = self._cached_toeplitz_component(layer.pattern, g, wavelength, 1, 0)
-                    eyy = self._cached_toeplitz_component(layer.pattern, g, wavelength, 1, 1)
-                    ezz = self._cached_toeplitz_component(layer.pattern, g, wavelength, 2, 2)
-                    all_modes.append(
-                        solve_layer_eigenmodes_patterned_inplane(omega, kx, ky, exx, exy, eyx, eyy, ezz)
-                    )
+        all_modes: list[LayerEigenmodes] = [
+            self._cached_layer_eigenmodes(layer, g, wavelength, omega, kx, ky, is_1d) for layer in self.layer_stack
+        ]
 
         thicknesses = [layer.thickness for layer in self.layer_stack]
         stack = SMatrixStack(thicknesses, all_modes)

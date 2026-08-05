@@ -255,5 +255,17 @@ Status snapshot (update the source-of-truth file first, then this line):
   path; an opt-in `svd_diagnostics` function; and a sparse/iterative-
   methods feasibility decision **rejected** on a measured 100%-dense-
   matrix structural finding, `decisions.md` ADR-021).
-□ Categories 13-19 — not yet started at atomic-target grain (see that
+☑ Category 13 (Performance optimization) — targets 13.1-13.6 all
+  resolved, 2026-08-05 (a repeatable benchmark suite extending Category
+  12's profiler with a tapered-via case; an eigenmode-reuse cache
+  implementing Category 12 target 12.3's deferred design, ~3.3x measured
+  on a polarization sweep, `decisions.md` ADR-022; a narrowly-scoped
+  vectorized thin-film wavelength sweep, ~31x measured, with a real bug
+  caught and fixed by its own equivalence test, `decisions.md` ADR-023;
+  a measured parallelism decision -- threading modestly helps,
+  multiprocessing measured counterproductive on this machine,
+  `decisions.md` ADR-024; a GPU decision checkpoint where explicit
+  approval was sought from the project owner and not granted, deferring
+  GPU/autodiff work to Phase 9).
+□ Categories 14-19 — not yet started at atomic-target grain (see that
   file for each category's own small-target checklist).

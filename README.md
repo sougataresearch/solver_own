@@ -285,11 +285,31 @@ Current (Category 12, Linear algebra, targets 12.1-12.5, shipped):
   deferred) on a measured structural finding — the Toeplitz coupling
   matrices are 100% dense (`decisions.md` ADR-021).
 
+Current (Category 13, Performance optimization, targets 13.1-13.6, resolved):
+- A repeatable benchmark suite
+  ([`profiling/benchmark_suite.py`](profiling/benchmark_suite.py)),
+  covering thin-film, trench, pillar, and tapered structures.
+- An instance-scoped eigenmode-reuse cache (`Simulation._eigenmode_cache`)
+  — ~3.3x measured on a polarization sweep at `num_orders=49`.
+- A narrowly-scoped vectorized wavelength sweep for uniform-isotropic-only
+  (thin-film) stacks
+  ([`src/sougata_solver/vectorized.py`](src/sougata_solver/vectorized.py))
+  — ~31x measured on a 401-point sweep, confirmed bit-for-bit-scale
+  equivalent to the scalar loop.
+- A measured parallelism decision: threading gives a modest, safe
+  benefit; multiprocessing was measured **counterproductive** on the
+  development machine (`decisions.md` ADR-024) — no parallel-sweep API
+  was added.
+- A GPU/autodiff backend decision checkpoint: explicit approval was
+  sought from the project owner (per this target's own requirement) and
+  **not granted** — GPU work stays deferred to Phase 9.
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
 - Expanded systematic validation sweep across all geometry types and an
   example gallery (Phase 8, `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories
-  13-19)
-- Optional vectorized/GPU/autodiff backend (later; see `decisions.md`)
+  14-19)
+- Optional vectorized/GPU/autodiff backend (later, not currently
+  approved; see `decisions.md` ADR-024)
 
 ## Target Users
 
@@ -358,9 +378,11 @@ sougata_solver/
 │   │                                 .energy_balance() (Category 10)
 │   ├── ocd.py                       CD-first OCD parameters, trapezoid trench, rounded-rectangle
 │   │                                 corner geometry (Category 11)
+│   ├── vectorized.py                 narrowly-scoped batched wavelength sweep for
+│   │                                  uniform-isotropic-only stacks (Category 13 target 13.4)
 │   └── output_paths.py             outputs/YYYY_MM_DD/HH_MM_SS_<run>/ helper
-├── tests/                    pytest suite (612 tests) + `tests/oracles/` -- see tests/README.md
-├── profiling/                  diagnostic timing scripts (Category 12 target 12.1),
+├── tests/                    pytest suite (627 tests) + `tests/oracles/` -- see tests/README.md
+├── profiling/                  diagnostic timing/benchmark scripts (Category 12/13),
 │                                 never asserted against a hard limit -- see profiling/README.md
 ├── structures/                YOU RUN THESE -- see structures/README.md
 │   ├── thin_film/                uniform multilayer stacks (Phase 1, done)
@@ -474,20 +496,22 @@ pytest -m slow        # convergence/benchmark studies (several minutes)
 See [`phases.md`](phases.md) for the complete, ordered roadmap and
 [`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`](COMMERCIAL_RCWA_ATOMIC_TARGETS.md) for
 the fine-grained target checklist. Phases 1-7 are shipped, and
-`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-12 (mathematical
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-13 (mathematical
 foundation/anisotropy, numerical methods, Fourier factorization, geometry
 engine, material models, boundary conditions/excitation, layer handling,
 solver sweeps/convergence, field calculations, optical outputs,
-semiconductor OCD features, linear algebra) are all shipped except three
-explicitly-evaluated-and-deferred targets, each with its own documented
-reason (not silently skipped): Category 1 target 1.5 (longitudinal tensor
-coupling — no citable + independently-benchmarkable formulation found),
-Category 10 target 10.5 (per-order s/p conversion — a bounded external-
-validation attempt against S4's actual source found a plausible but
-numerically-unconfirmed match), and Category 11 target 11.8 (stochastic
-line-edge/line-width roughness — fundamentally in tension with RCWA's
-periodic-Fourier formulation). Remaining: Categories 13-19 (future
-extensions) at the atomic-target level, plus an expanded validation suite
-and example gallery (Phase 8's remaining scripted convergence studies/
-DBR/TSV examples) and an optional vectorized/GPU/autodiff backend
-(Phase 9, later).
+semiconductor OCD features, linear algebra, performance optimization) are
+all shipped/resolved except three explicitly-evaluated-and-deferred
+targets, each with its own documented reason (not silently skipped):
+Category 1 target 1.5 (longitudinal tensor coupling — no citable +
+independently-benchmarkable formulation found), Category 10 target 10.5
+(per-order s/p conversion — a bounded external-validation attempt against
+S4's actual source found a plausible but numerically-unconfirmed match),
+and Category 11 target 11.8 (stochastic line-edge/line-width roughness —
+fundamentally in tension with RCWA's periodic-Fourier formulation) — plus
+Category 13 target 13.6's GPU/autodiff backend, where explicit approval
+was sought and not granted (a process checkpoint outcome, not an
+unresolved gap). Remaining: Categories 14-19 (future extensions) at the
+atomic-target level, plus an expanded validation suite and example
+gallery (Phase 8's remaining scripted convergence studies/DBR/TSV
+examples).

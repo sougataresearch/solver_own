@@ -158,6 +158,21 @@ depending on them at runtime.
   a measured 100%-dense-matrix structural finding (`decisions.md`
   ADR-021). See `tests/test_linear_algebra_audit.py`,
   `tests/test_svd_diagnostics.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 13 (performance
+  optimization): targets 13.1-13.6 all **resolved** — a repeatable
+  benchmark suite (`profiling/benchmark_suite.py`) covering thin-film,
+  trench, pillar, and tapered structures; an instance-scoped eigenmode-
+  reuse cache measured ~3.3x faster on a polarization sweep
+  (`decisions.md` ADR-022); a narrowly-scoped vectorized wavelength
+  sweep for uniform-isotropic-only stacks, confirmed bit-for-bit-scale
+  equivalent to the scalar path and measured ~31x faster on a 401-point
+  sweep (`decisions.md` ADR-023); a measured parallelism decision —
+  threading helps modestly, multiprocessing measured counterproductive
+  on the development machine, no parallel API added (`decisions.md`
+  ADR-024); and a GPU/autodiff backend decision checkpoint where
+  explicit approval was sought from the project owner and **not
+  granted**, per that target's own requirement. See
+  `tests/test_eigenmode_cache.py`, `tests/test_vectorized_sweep.py`.
 - No phase is marked "done" without: (a) a passing automated test against
   an oracle, and (b) a runnable example script producing physically
   plausible output.

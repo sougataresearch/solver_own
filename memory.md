@@ -5,9 +5,10 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 12, targets
-12.1-12.5 all done), 2026-08-05 (Category 11, targets 11.1-11.7, 11.8
-deferred), 2026-08-05 (Category 10, targets 10.1-10.4/10.6, 10.5
+As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 13, targets
+13.1-13.6 all resolved, GPU explicitly not approved), 2026-08-05 (Category
+12, targets 12.1-12.5 all done), 2026-08-05 (Category 11, targets
+11.1-11.7, 11.8 deferred), 2026-08-05 (Category 10, targets 10.1-10.4/10.6, 10.5
 deferred), 2026-08-05 (Category 8, targets 8.1-8.8),
 2026-08-05 (Category 7, targets 7.1-7.6), 2026-08-05 (Phase 7 /
 Category 9, targets 9.1-9.8), 2026-08-04
@@ -16,6 +17,42 @@ Category 9, targets 9.1-9.8), 2026-08-04
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 13 (Performance optimization), targets 13.1-13.6, are all
+  resolved.** 13.1: `profiling/benchmark_suite.py`, extending Category
+  12's baseline profiler with the one structure type it hadn't covered
+  (a Phase 5 tapered via). 13.2: already satisfied by Category 7's
+  Toeplitz cache, cross-referenced not re-done. 13.3: `Simulation._eigenmode_cache`,
+  implementing the design Category 12 target 12.3 flagged but left
+  unimplemented -- keyed by `(id(layer), omega, kx, ky)`, correctly
+  excluding thickness/polarization (neither affects an eigenmode solve),
+  so it survives `sweep_thickness`/`sweep_polarization` sweeps
+  automatically. Measured ~3.3x speedup on a 20-point polarization sweep
+  at `num_orders=49`. `decisions.md` ADR-022. 13.4: `vectorized.sweep_wavelength_vectorized`,
+  a narrowly-scoped batched wavelength sweep for uniform-isotropic-only
+  (thin-film) stacks -- every batched function a direct, formula-
+  identical re-expression of an already-cited scalar function, no new
+  physics. **Bug found and fixed by the equivalence test itself, exactly
+  as intended**: a first draft omitted the `omega^2*I` term from
+  `build_kp_matrix`'s actual formula, caught immediately by a
+  `LinAlgError` on the first real fixture tried (not a silent wrong
+  answer) -- fixed by re-reading the source line-by-line. Confirmed
+  bit-for-bit-scale agreement with the scalar sweep across five
+  polarization states, oblique/azimuthal incidence, a multi-layer stack,
+  and a lossy material; measured ~31x speedup on a 401-point sweep.
+  `decisions.md` ADR-023. 13.5: measured (not assumed) that threading
+  gives a modest, safe ~1.3-1.5x benefit (NumPy/LAPACK releases the GIL)
+  while multiprocessing is **counterproductive** at both a cheap
+  (`num_orders=49`) and heavy (`num_orders=81`) per-task granularity on
+  this 14-core machine, most plausibly from oversubscription against
+  NumPy's already-multithreaded BLAS backend -- no parallel-sweep API
+  implemented, since this target asks only to profile and document.
+  `decisions.md` ADR-024. 13.6: explicit approval for GPU/autodiff
+  backend work was sought from the project owner (per this target's own
+  wording, only after CPU targets were met) and **not granted** -- GPU
+  work remains deferred to Phase 9 "later, optional," not silently
+  skipped or silently implemented. 627 tests pass project-wide (612 at
+  the start of this category: no new `slow` tests, 15 new fast tests),
+  full fast suite re-run and confirmed green.
 - **Category 12 (Linear algebra), targets 12.1-12.5, are all complete.**
   New top-level `profiling/` directory (12.1): `baseline_profile.py`
   measures eigensolve/matrix-solve/end-to-end `Simulation.solve()` time

@@ -894,3 +894,159 @@
   re-investigate the same question without new evidence — the density
   measurement above is the reason to trust "no" rather than re-deriving it
   from first principles again.
+
+## ADR-022: Instance-scoped per-layer eigenmode cache, implementing Category 12 target 12.3's design (Category 13 target 13.3)
+
+- **Decision**: `Simulation._eigenmode_cache` caches each layer's full
+  `LayerEigenmodes` result, keyed by `(id(layer), omega, kx.tobytes(),
+  ky.tobytes())` — deliberately excluding `layer.thickness` (never
+  consumed by an eigenmode solve, only by the downstream
+  `propagation_smatrix` step) and the excitation's polarization
+  amplitudes (only consumed downstream, by `incident_mode_amplitude`).
+  Implements exactly the design `design.md`'s "Linear-Algebra Baseline &
+  Factorization-Reuse Design" (Category 12 target 12.3) flagged but left
+  unimplemented, since 12.3 explicitly asked only for the design.
+- **Reason**: Category 12's own measurements showed the eigensolve, not
+  the Toeplitz-matrix construction, dominates runtime at moderate-to-large
+  `num_orders` — `sweep.sweep_polarization` (target 8.4) and
+  `sweep.sweep_thickness` (target 8.5) both hold `omega`/`kx`/`ky` fixed
+  across their entire sweep (polarization only affects the incident
+  amplitude vector; thickness only affects propagation), so every layer's
+  eigenmode solve is genuinely invariant across both — a real, not
+  hypothetical, redundant-computation opportunity distinct from the
+  angle-sweep scenario ADR-016's Toeplitz cache already covers.
+- **Validation**: measured directly (not assumed) — a 20-point
+  polarization sweep at `num_orders=49` on a single-patterned-layer pillar
+  fixture: 1.52 s forced-uncached vs. 0.46 s cached (~3.3x). Equivalence
+  to forced-uncached recomputation confirmed to `1e-12`
+  (`tests/test_eigenmode_cache.py`), plus direct cache-entry-count checks
+  for both the polarization-sweep and thickness-sweep scenarios (exactly
+  one entry per layer, not one per sweep point), and a negative control
+  confirming the cache correctly does *not* claim reuse across a genuine
+  wavelength sweep (where `omega`/`kx`/`ky` do change every point).
+- **Alternatives considered**: keying on `(id(layer.material)` or
+  `id(layer.pattern))` directly instead of `id(layer)` — rejected as an
+  unnecessary key-shape branch per dispatch type; `id(layer)` is uniform
+  across every eigenmode-solve branch (uniform isotropic/diagonal/
+  in-plane, 1D, 2D isotropic/anisotropic) since a `Layer`'s `material`/
+  `pattern` reference never changes after construction, matching
+  `_cached_toeplitz`'s established object-identity-keying convention
+  (ADR-016).
+- **Trade-offs**: same caller-facing contract as ADR-016's Toeplitz
+  cache — a `Layer`'s `material`/`pattern` object must not be mutated in
+  place after being wired into a `Simulation` (already an existing
+  assumption, not a new one this ADR introduces).
+- **Impact**: `Simulation._eigenmode_cache` (new instance attribute),
+  `Simulation._cached_layer_eigenmodes`/`_solve_one_layer_eigenmodes` (new
+  private methods, the latter extracted unchanged from `solve()`'s
+  previous inline per-layer dispatch logic — a pure refactor, confirmed
+  bit-for-bit equivalent to the pre-refactor numeric results before
+  trusting it).
+
+## ADR-023: Narrowly-scoped vectorized wavelength sweep for uniform-isotropic-only stacks (Category 13 target 13.4)
+
+- **Decision**: `vectorized.sweep_wavelength_vectorized` batches a
+  wavelength sweep across NumPy's native stacked-matrix `@`/
+  `np.linalg.solve` for the one case where it's safe and simple: every
+  layer uniform and isotropic, `num_orders=1` (a thin-film/multilayer
+  stack, which never diffracts) — raises `ValueError` immediately for any
+  patterned or anisotropic layer, or `num_orders != 1`, rather than
+  silently falling back to something slower or subtly wrong.
+- **Reason**: per `rules.md`'s Performance Requirements, vectorization
+  work belongs to Phase 9 "unless a specific correctness-validated
+  capability is measurably too slow" — the thin-film wavelength sweep is
+  exactly this project's most common real use case
+  (`structures/thin_film/*.py`), and every batched function is a direct,
+  formula-identical re-expression of an already-cited, already-validated
+  scalar function (`eigenmodes.solve_layer_eigenmodes_uniform`,
+  `eigenmodes.build_kp_matrix`, `smatrix.interface_smatrix`/
+  `propagation_smatrix`/`star_product`,
+  `excitation.incident_mode_amplitude`) — no new physics formula, only a
+  leading batch axis. `SweepResult` (Category 8) already provided the
+  right output shape to slot this into without any caller-facing API
+  change.
+- **Validation** (`rules.md`'s "add a regression test comparing both
+  paths"): `tests/test_vectorized_sweep.py` confirms bit-for-bit-scale
+  (`atol=1e-12`) agreement with `sweep.sweep_wavelength`'s scalar loop
+  across five polarization states, oblique/azimuthal incidence, a
+  multi-layer (3 interior layer) stack, and a lossy material — every
+  combination the scalar path already supports for this layer-type
+  restriction.
+- **Found and fixed before trusting it, exactly the discipline this rule
+  requires**: a first draft of the batched eigenmode-solve helper omitted
+  the `omega^2 * I` term from `build_kp_matrix`'s actual formula
+  (`kp = omega^2*I - kappa`, not just `-kappa`) — caught immediately by
+  the very first equivalence test run (`LinAlgError: Singular matrix`,
+  not a silent wrong answer), fixed by re-reading `build_kp_matrix`'s
+  exact source line-by-line rather than reconstructing the formula from
+  memory a second time.
+- **Measured benefit**: a 401-point wavelength sweep on a 2-interior-layer
+  thin-film stack: 1.89 s scalar-loop vs. 0.060 s vectorized (~31x).
+- **Alternatives considered**: extending this to patterned/anisotropic
+  layers — explicitly rejected as out of scope; those paths' dense
+  general eigensolve (`np.linalg.eig`, not a closed-form scalar formula)
+  doesn't batch the same simple way, and attempting it now would be
+  exactly the "general vectorized backend" work `rules.md` reserves for
+  Phase 9, not this bounded proof.
+- **Impact**: new `src/sougata_solver/vectorized.py` module. No change to
+  any existing public API; `sweep_wavelength_vectorized` is purely
+  additive.
+
+## ADR-024: Parallelism evaluated and not implemented -- threading helps modestly, multiprocessing measured counterproductive (Category 13 target 13.5)
+
+- **Decision**: no parallel-sweep API is added. Target 13.5 asks only to
+  "profile and document" a parallelism decision, not to implement one —
+  this ADR is that documentation.
+- **Measurement** (a 20-point wavelength sweep, `num_orders=49` 2D pillar,
+  the general — not vectorizable, see ADR-023 — patterned-layer path, on
+  a 14-core machine):
+
+  | Approach | Time | vs. serial |
+  |---|---|---|
+  | Serial | 1.644 s | 1x |
+  | `ThreadPoolExecutor`, 4/8/14 workers | 1.263 / 1.197 / 1.116 s | ~1.3-1.5x |
+  | `ProcessPoolExecutor`, 4/8/14 workers | 5.475 / 7.239 / 10.811 s | **0.15-0.3x (slower)** |
+
+  A second check at `num_orders=81` (10 points, ~3s/point, a much heavier
+  per-task granularity meant to rule out "process overhead just needs a
+  bigger task"): serial `30.7s` vs. 8-worker process pool `44.1s` — **still
+  slower**, not just at the cheap end.
+- **Reason threading helps (modestly, not linearly)**: NumPy/SciPy's
+  LAPACK-backed dense linear algebra (`np.linalg.eig`, `scipy.linalg.lu_factor`/
+  `lu_solve`) releases the Python GIL during the underlying compiled
+  calls, so genuinely concurrent execution happens for a real fraction of
+  each `solve()` call — but not all of it (`Simulation.solve()`'s own
+  Python-level orchestration, dict/list bookkeeping, and object
+  construction stay GIL-bound), capping the achievable speedup well below
+  the core count.
+- **Reason multiprocessing is measured counterproductive here, at both
+  task sizes tested**: the most plausible explanation (not independently
+  confirmed by a separate BLAS-thread-count measurement, so stated as a
+  plausible mechanism, not a proven one) is oversubscription — NumPy's
+  BLAS/LAPACK backend is itself already internally multithreaded per
+  process on this machine; spawning `N` additional OS processes, each
+  independently trying to use multiple BLAS threads, creates far more
+  concurrent threads than the 14 physical cores can usefully run,
+  producing net slowdown from context-switching/cache-thrashing rather
+  than the expected embarrassingly-parallel speedup. Process-spawn and
+  result-pickling overhead is a secondary, compounding cost at the
+  cheaper (`num_orders=49`) granularity specifically.
+- **Validation**: `serial == threaded == processed` results confirmed
+  identical (not just similarly-timed) across all three approaches before
+  drawing any performance conclusion — correctness was never in question,
+  only whether either approach is *worth doing*.
+- **Alternatives considered**: pinning per-process BLAS thread counts
+  (`OMP_NUM_THREADS=1`/`OPENBLAS_NUM_THREADS=1` per worker) before
+  re-measuring multiprocessing — a real, standard fix for exactly this
+  oversubscription pattern, and might well flip the conclusion — but not
+  pursued: it adds environment-configuration complexity this "profile and
+  document" target doesn't call for building, and doing so without
+  re-measuring would itself violate the "never fabricate benchmark
+  numbers" discipline. Left as a concrete, documented option for a future
+  session if parallel sweeps become a real, requested need.
+- **Impact**: no code change. If a future session wants a parallel sweep
+  API, start from `ThreadPoolExecutor` (measured safe and modestly
+  beneficial here) over `ProcessPoolExecutor` (measured counterproductive
+  as naively applied), and re-measure — don't assume either conclusion
+  transfers to a different machine's core count/BLAS configuration
+  without checking.

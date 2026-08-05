@@ -1,7 +1,7 @@
 # `tests/` — Test Suite
 
-`pytest`-based, 622 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
-Category 12 (612 fast + 10 `slow`-marked convergence/benchmark studies). Run
+`pytest`-based, 637 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+Category 13 (627 fast + 10 `slow`-marked convergence/benchmark studies). Run
 the fast suite with:
 
 ```bash
@@ -65,6 +65,8 @@ oracle — never a self-consistency check against the same code path.
 | [`test_overlay.py`](test_overlay.py) | Category 11 target 11.7: overlay (layer-to-layer misregistration) via existing `Shape.center` offsets, including a shift-by-one-lattice-period periodicity self-consistency check |
 | [`test_linear_algebra_audit.py`](test_linear_algebra_audit.py) | Category 12 targets 12.2/12.5: `eigenmodes._dense_inverse` equivalence to the pre-refactor `np.linalg.solve`-based results, and the Toeplitz-matrix density measurement `decisions.md` ADR-021 relies on |
 | [`test_svd_diagnostics.py`](test_svd_diagnostics.py) | Category 12 target 12.4: `eigenmodes.svd_diagnostics` against synthetic near-rank-deficient matrices and Phase 4b's most-ill-conditioned pillar fixture |
+| [`test_eigenmode_cache.py`](test_eigenmode_cache.py) | Category 13 target 13.3: `Simulation._eigenmode_cache` equivalence to forced-uncached recomputation, and cache-entry-count checks across polarization/thickness/wavelength sweeps |
+| [`test_vectorized_sweep.py`](test_vectorized_sweep.py) | Category 13 target 13.4: `vectorized.sweep_wavelength_vectorized` against the scalar `sweep.sweep_wavelength` across polarization states, oblique/azimuthal incidence, a multi-layer stack, and a lossy material |
 
 ## `oracles/`
 
