@@ -38,12 +38,17 @@ assertion.
 `testing.md`'s Physical-Invariant Testing tier defines the lossy energy
 identity as `R + T + sum(DE) + A = 1`, with `A` computed from the imaginary
 part of the layer permittivities (Poynting-flux divergence) -- that `A`
-computation is **not implemented** in this project yet (layer-wise
-absorption is `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7 targets 7.5/
-7.6, still open), so the full identity cannot be checked here. What *can*
-be checked without it, and is checked below, is the necessary (not
-sufficient) consequence of passivity for a lossy medium: `R >= 0`,
-`T >= 0`, and `R + T <= 1` (a passive/lossy structure can only remove
+computation **was not implemented** at the time this file was written
+(layer-wise absorption was `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7
+targets 7.5/7.6, then still open), so the full identity could not be
+checked here. It is implemented now (`SimulationResult.layer_absorption()`,
+`decisions.md` ADR-017) -- see `tests/test_layer_absorption.py` for the
+full-identity checks, including this same lossy metal fixture. This file's
+own assertions are left as originally written (`rules.md` AI Coding Rule
+3): what *can* be checked without it, and is checked below, is the
+necessary (not sufficient) consequence of passivity for a lossy medium:
+`R >= 0`, `T >= 0`, and `R + T <= 1` (a passive/lossy structure can only
+remove
 power, never add it) -- a genuine, if weaker, correctness signal, honestly
 scoped to what's actually implemented rather than a fabricated full-balance
 check.

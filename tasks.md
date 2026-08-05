@@ -109,15 +109,15 @@ summary instead of deleting history here.
 ☑ Target 1.8 (mode classification) — done 2026-08-03: `eigenmodes.classify_propagating`, `SimulationResult.order_classification()`; found (not fixed, out of scope) an exact-Rayleigh-threshold NaN division-by-zero, now documented in `troubleshooting.md` and tied to Category 6 target 6.4; see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` 1.8 and `memory.md`
 ☑ Category 1 targets 1.3-1.4, 1.6-1.8 all done 2026-08-03 (six-target session); target 1.5 explicitly deferred (no citable+benchmarkable source found)
 
-## Phase 7 — Real-Space Field Reconstruction & Visualization
+## Phase 7 — Real-Space Field Reconstruction & Visualization (DONE)
 
-□ Extend `fields.py` with a real-space grid reconstruction function using `SMatrixStack.partial_smatrix_up_to`
-□ Test: field continuity across a layer interface (no discontinuity where physically none should exist)
-□ Test: reconstructed field-derived R/T matches the already-validated `SimulationResult.reflectance()`/`transmittance()` (cross-check, not a new independent oracle)
-□ Add `matplotlib` as a dev/example dependency (not a core `sougata_solver` dependency — confirm this placement in `pyproject.toml`)
-□ Write a cross-section field-intensity plotting example for a trench
-□ Write a cross-section field-intensity plotting example for a via
-□ Update `memory.md` / `decisions.md` on completion
+☑ Extend `fields.py` with a real-space grid reconstruction function using `SMatrixStack.partial_smatrix_up_to` — `fields.modal_field_components`/`reconstruct_field_at_points`, `smatrix.interior_amplitudes` (independently derived, `decisions.md` ADR-015)
+☑ Test: field continuity across a layer interface (no discontinuity where physically none should exist) — `tests/test_field_reconstruction.py`
+☑ Test: reconstructed field-derived R/T matches the already-validated `SimulationResult.reflectance()`/`transmittance()` (cross-check, not a new independent oracle) — found and documented a missing-0.5-factor convention in `fields.z_poynting_flux` along the way (see `troubleshooting.md`)
+☑ Add `matplotlib` as a dev/example dependency (not a core `sougata_solver` dependency — confirm this placement in `pyproject.toml`) — already present from earlier phases, reused unmodified
+☑ Write a cross-section field-intensity plotting example for a trench — `structures/trench/trench_field_cross_section.py` + `postprocessing/plot_field_cross_section.py`
+☑ Write a cross-section field-intensity plotting example for a via — `structures/via/pillar_field_cross_section.py` + `postprocessing/plot_field_cross_section.py`
+☑ Update `memory.md` / `decisions.md` on completion — done 2026-08-05, `decisions.md` ADR-015
 
 ## Phase 8 — Expanded Validation Suite & Example Gallery
 
@@ -183,5 +183,35 @@ Status snapshot (update the source-of-truth file first, then this line):
   `Material.source` provenance metadata threaded through every classmethod
   and into serialized run metadata, surfacing and fixing a real pre-existing
   Windows-encoding bug in `output_paths.write_run_metadata` along the way).
-□ Categories 6-19 — not yet started at atomic-target grain (see that file
-  for each category's own small-target checklist).
+☑ Category 6 (Boundary conditions and excitation) — targets 6.1-6.6 all
+  done, 2026-08-04 (a "Worked polarization examples" table added to the
+  already-existing `CONVENTIONS.md`; a full polarization-state x azimuth x
+  angle regression suite using symmetry invariants, not just energy
+  conservation; a characterized-and-tested grazing-incidence boundary
+  (`ValueError`, not `NaN`, exactly at `theta=90 deg`, traced to a
+  floating-point coincidence); an oblique-incidence extension of Category
+  1's Rayleigh-threshold test; a Stokes-reciprocity-verified finding that
+  bottom illumination needs no new API, `decisions.md` ADR-014).
+☑ Category 7 (Layer handling) — targets 7.1-7.6 all done, 2026-08-05
+  (construction-time thickness validation; a repeated-layer-identity
+  regression guard; an instance-scoped Toeplitz-matrix cache gated on a
+  measured timing case per `rules.md`'s Performance Requirements exception
+  clause, `decisions.md` ADR-016, with an honest mid-session correction to
+  the first (wrongly-framed) measurement; `SimulationResult.layer_absorption()`,
+  a flux-divergence combination of already-validated Category 9 pieces,
+  `decisions.md` ADR-017, closing the `R+T+sum(A)=1` energy-identity gap
+  `test_stress_regression.py` had flagged since Category 2; a found-and-
+  documented numerical-overflow limitation for thick/highly-lossy/high-
+  `num_orders` interior-amplitude reconstruction, `troubleshooting.md`).
+☑ Category 9 (Field calculations) — targets 9.1-9.8 all done, 2026-08-05
+  (real-space field reconstruction transcribed from S4's
+  `GetInPlaneFieldVector`/`GetFieldAtPoint`; interior-layer amplitude
+  recovery independently derived from `SMatrixStack.partial_smatrix_up_to`,
+  `decisions.md` ADR-015; a found-and-documented missing-0.5-factor
+  convention in `fields.z_poynting_flux` relative to the textbook
+  real-space flux formula; two `structures/` example scripts (trench (x,z)
+  cross-section, pillar (x,y) field map) and one `postprocessing/` plotting
+  script, both run end-to-end and visually verified). This is also Phase 7
+  (`phases.md`), now marked DONE.
+□ Categories 8, 10-19 — not yet started at atomic-target grain (see that
+  file for each category's own small-target checklist).

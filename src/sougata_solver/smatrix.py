@@ -146,6 +146,43 @@ def star_product(n2: int, a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return c
 
 
+def interior_amplitudes(
+    s_partial: np.ndarray, n2: int, a0: np.ndarray, b_reflected: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Category 9 target 9.3 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, Phase 7):
+    recover the forward/backward mode amplitudes `(a_i, b_i)` at the
+    interface a partial S-matrix `s_partial`
+    (`SMatrixStack.partial_smatrix_up_to`) was cascaded up to, given the
+    already-known incident amplitude `a0` and the already-solved full-stack
+    reflected amplitude `b_reflected`.
+
+    Independently derived, not transcribed from S4 (which solves this
+    differently, `S4.cpp::SolveInterior`, a block-tridiagonal direct
+    solve) -- see `decisions.md` ADR-015 for the full reasoning and the
+    three-part validation (`tests/test_field_reconstruction.py`) this
+    formula's independent-derivation status requires per `rules.md` AI
+    Coding Rule 1.
+
+    `s_partial` satisfies `[a_i; b0] = s_partial @ [a0; b_i]`
+    (`CONVENTIONS.md`'s S-matrix direction convention, applied to the
+    substack from the incidence half-space up to this interface). `b0` is
+    the same physical quantity as `b_reflected` (both describe the
+    backward amplitude in the incidence half-space, which cannot depend on
+    where the stack is conceptually split), giving two equations for the
+    two unknowns::
+
+        b_i = inv(S11) @ (b_reflected - S10 @ a0)
+        a_i = S00 @ a0 + S01 @ b_i
+    """
+    s00 = s_partial[:n2, :n2]
+    s01 = s_partial[:n2, n2:]
+    s10 = s_partial[n2:, :n2]
+    s11 = s_partial[n2:, n2:]
+    b_i = _solve(s11, b_reflected - s10 @ a0)
+    a_i = s00 @ a0 + s01 @ b_i
+    return a_i, b_i
+
+
 class SMatrixStack:
     """Builds and caches the full S-matrix cascade for a layer stack at one
     wavelength. Layer `0` and `len(modes)-1` are the semi-infinite

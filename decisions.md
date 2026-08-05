@@ -500,3 +500,222 @@
   import and raster masks remain genuinely out of scope — only the narrow
   polygon-vertex sub-case it explicitly flagged as revisitable is revisited
   here.
+
+## ADR-014: Bottom (reverse-side) illumination — already supported, no new API needed
+
+- **Decision**: Category 6 target 6.6 asks whether reverse illumination
+  (exciting from the transmission side instead of the incidence side) is
+  required, and to design it separately if so. Answer, confirmed by direct
+  test rather than assumed: **it is already achievable through the
+  existing public `Simulation` constructor, with zero new code** — build
+  `Simulation(lattice, list(reversed(layers)), num_orders, incidence=<old
+  transmission material>, transmission=<old incidence material>)` and
+  solve as usual. `Layer.thickness`/`Layer.pattern` carry no inherent
+  z-direction, so reversing the layer list and swapping which material
+  plays the incidence/transmission role is a complete, correct description
+  of the mirrored problem — no new `Simulation` parameter, no
+  `reverse=True` flag, no separate design needed.
+- **Reason**: Verified directly (`tests/test_bottom_incidence.py`), not
+  just argued: for a lossless, reciprocal, asymmetric two-film stack
+  (air/1.46-quarter-wave/2.35-quarter-wave/glass), the reversed-stack
+  simulation's transmittance at normal incidence matches the original
+  orientation's transmittance to `~1e-15` — the Stokes transmittance-
+  reciprocity relation for a lossless reciprocal medium, an independent
+  physical law this project did not have to invent, confirming the
+  "just reverse the list" recipe is physically correct, not merely
+  "runs without crashing." Reflectance is **not** claimed equal in
+  general (and isn't, in general, when tested at oblique incidence with
+  mismatched incidence/transmission indices — a genuinely different R is
+  the physically expected result there, not a bug) — only the
+  direction-independent quantity (T at normal incidence) is used as the
+  validation check, per `rules.md`'s "never fabricate a benchmark" rule.
+- **Alternatives considered**: Adding a `reverse_illumination: bool`
+  parameter to `Simulation`, or a `Simulation.solve_from_transmission_side(...)`
+  convenience method — rejected as unnecessary API surface (per `rules.md`'s
+  "don't add features not needed" guidance): the existing constructor
+  already expresses this exactly, and a wrapper would only rename
+  `list(reversed(layers))` plus a keyword swap without adding capability.
+  Revisit only if a concrete future use case shows the manual recipe is
+  genuinely error-prone in practice (e.g. a script class of bugs from
+  forgetting to reverse the layer list), not preemptively.
+- **Trade-offs**: None substantive — this is a documentation-and-test
+  finding, not a code change. The recipe is one extra thing a user must
+  know (documented in `design.md`'s API section and `CONVENTIONS.md`)
+  rather than a self-explanatory constructor flag.
+- **Impact**: No `simulation.py` change. `design.md`'s "API Design"
+  section and `CONVENTIONS.md` both gain a short note with the recipe;
+  `tests/test_bottom_incidence.py` freezes the reciprocity check as a
+  permanent regression guard (a future refactor that broke this symmetry
+  would be a real bug, not a style change).
+
+## ADR-015: Interior-layer amplitude recovery via `partial_smatrix_up_to`, independently derived (not S4's `SolveInterior`)
+
+- **Decision**: Category 9 target 9.3 (Phase 7) needs forward/backward
+  modal amplitudes at an arbitrary interior interface. `phases.md`'s own
+  Phase 7 deliverable already specifies the mechanism: use
+  `SMatrixStack.partial_smatrix_up_to` (already implemented). This ADR
+  records the specific formula built on top of it
+  (`smatrix.interior_amplitudes`) and, per `rules.md` AI Coding Rule 1,
+  flags it as **independently derived, not transcribed** — S4 itself
+  solves this differently (`S4.cpp::SolveInterior`, called from
+  `Simulation_ComputeLayerSolution`), a block-tridiagonal direct solve
+  across every layer at once, a materially different algorithm from the
+  star-product partial-stack approach this project's own architecture
+  already committed to (`phases.md`, `architecture.md`'s dimension-agnostic
+  `SMatrixStack`).
+- **Reason**: Given the known full-stack incident amplitude `a0` and
+  reflected amplitude `b_reflected` (both already computed by
+  `Simulation.solve`), and the partial S-matrix `s_partial` from the
+  incidence half-space up to interface `i`
+  (`[a_i; b0] = s_partial @ [a0; b_i]`, `CONVENTIONS.md`'s S-matrix
+  direction convention applied to that substack) — `b0` in this equation
+  is the *same physical quantity* as `b_reflected` (both describe the
+  backward amplitude in the incidence half-space; the physical field there
+  cannot depend on where the stack is conceptually split), giving two
+  equations solvable for the two unknowns `(a_i, b_i)`:
+  ```text
+  b_i = inv(S11) @ (b_reflected - S10 @ a0)
+  a_i = S00 @ a0 + S01 @ b_i
+  ```
+  This is standard Redheffer-star-product algebra (the same block
+  structure `smatrix.star_product` already uses), not a re-derivation of
+  anything S4-specific — chosen over porting `SolveInterior` because this
+  project's `SMatrixStack` already only builds left-cascaded partial
+  products (`_partial`, one per layer boundary), not S4's full per-layer
+  data structures, so this is the formula that composes with what already
+  exists, per `rules.md`'s preference for building on already-validated
+  blocks over introducing a second, parallel amplitude-solving mechanism.
+- **Validation** (the "extra test scrutiny" AI Coding Rule 1 requires for
+  independently-derived formulas, per `rules.md`): three independent
+  checks, not just "runs without crashing" — (a) recovering amplitudes at
+  the *last* interior interface and propagating them to the final layer's
+  bottom must reproduce `a_transmitted` from the full solve exactly (an
+  internal-consistency check with zero free parameters); (b) tangential
+  `E`/`H` field continuity at an interface with no surface current (target
+  9.5); (c) integrated real-space Poynting flux at an interior plane
+  matches the already-oracle-validated per-order `z_poynting_flux`-based
+  `R`/`T` (target 9.6, the category's own exit criterion). See
+  `tests/test_field_reconstruction.py` for all three.
+- **Alternatives considered**: Porting `SolveInterior` verbatim — rejected
+  as unnecessary complexity (a full block-tridiagonal solver) for a
+  capability the existing partial-stack architecture already supports with
+  a few lines of algebra; revisit only if the star-product approach is
+  found to be numerically worse-conditioned than direct block solving for
+  some case the validation above doesn't cover.
+- **Trade-offs**: One `_solve` (LU-based, per `troubleshooting.md`'s "never
+  form `inv(A)` directly" rule) per interior-amplitude query, same
+  numerical-stability profile as every other S-matrix operation in this
+  project — no new instability class introduced.
+- **Impact**: `smatrix.interior_amplitudes` (new function),
+  `fields.py`'s depth-propagation ansatz (`CONVENTIONS.md`, same section)
+  builds directly on its output.
+
+## ADR-016: Instance-scoped Toeplitz-matrix cache on `Simulation`, gated on a measured timing case (Category 7 targets 7.3/7.4)
+
+- **Decision**: cache exactly one artifact — the Toeplitz matrices built by
+  `fourier_factorization.toeplitz_matrix`/`toeplitz_matrix_component` —
+  keyed by `(kind, id(pattern), wavelength, ...)` on a plain dict attribute
+  created fresh in `Simulation.__init__` (`self._toeplitz_cache`). Full
+  design in `design.md`'s "Layer/Toeplitz Caching Design" section.
+- **Reason**: `rules.md`'s Performance Requirements forbid introducing
+  caching before Phase 9 "unless a specific correctness-validated
+  capability is measurably too slow to use." Measured directly (not
+  assumed), and corrected once after an initial measurement mistake (see
+  `design.md`'s "Layer/Toeplitz Caching Design" for the full account): a
+  20-point angle sweep at fixed wavelength for a single patterned layer
+  (`num_orders=49`) takes ~1.44s uncached vs. ~1.01s cached, a ~30%
+  reduction — real because `toeplitz_matrix`/`toeplitz_matrix_component`
+  depend only on `(pattern, wavelength)`, not on incidence angle, so the
+  same Toeplitz matrix is legitimately reusable across an entire angle
+  sweep (Category 8 target 8.3, planned, not yet implemented). A Category 8
+  sweep calling `solve()` hundreds of times would multiply that ~30%
+  per-call saving into real wall-clock minutes. This satisfies the rule's
+  exception clause; caching was not added speculatively just because
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` lists targets 7.3/7.4.
+- **Validation**: `tests/test_layer_cache.py` — (a) equivalence: a stack
+  solved with the cache populated matches the same stack solved with the
+  cache forcibly cleared before every layer (i.e. every Toeplitz matrix
+  recomputed from scratch), to numerical precision, per `rules.md`'s
+  "validate the optimized path against the unoptimized one before
+  trusting it"; (b) a call-counting monkeypatch of
+  `fourier_factorization.toeplitz_matrix` confirms repeated identical
+  `Pattern` objects trigger exactly one real computation, not `N`.
+- **Alternatives considered**: caching the full per-layer eigenmode solve
+  instead of just the Toeplitz matrix — rejected as exceeding target 7.4's
+  explicit scope ("cache one safe artifact (for example, a Toeplitz
+  matrix)") and as unnecessary: the measured cost above is dominated by
+  Toeplitz reconstruction, not the eigensolve, for the repeated-pattern
+  case that motivates this ADR. A value-based (structural-hash) cache key
+  instead of `id(pattern)` — rejected because `Pattern`/`Shape` are
+  unfrozen, unhashable dataclasses; building a structural hash would be new
+  machinery unjustified by the one measured use case, and `id()`-based
+  caching already has the right semantics for how repeated layers are
+  actually constructed in this codebase (target 7.2's tests).
+- **Trade-offs**: the cache never expires within a `Simulation` instance's
+  lifetime; if a caller mutates a `Pattern` object in place after solving
+  once and re-solves the same `Simulation` instance, they get a stale
+  cached Toeplitz matrix for that `Pattern`'s `id()`. Documented as a
+  caller-facing contract (`design.md`), not solver-enforced, matching the
+  same construction-time-immutability assumption Category 4's shape
+  validation already makes.
+- **Impact**: `Simulation._cached_toeplitz`/`_cached_toeplitz_component`
+  (new private methods), `Simulation._toeplitz_cache` (new instance
+  attribute), no change to any public API or existing call signature.
+
+## ADR-017: Layer-wise absorption as a flux-divergence combination of already-validated Phase 7 pieces (Category 7 targets 7.5/7.6)
+
+- **Decision**: `SimulationResult.layer_absorption()` computes per-interior-
+  layer absorbed power as `net_flux(top) - net_flux(bottom)`, normalized
+  to incident power, using only already-implemented, already-validated
+  Phase 7 building blocks (`smatrix.interior_amplitudes`,
+  `fields.propagate_amplitudes`, `fields.z_poynting_flux`) — no new
+  physics formula, no volumetric `Im(eps)*|E|^2` integral. Full derivation
+  in `design.md`'s "Layer-Wise Absorption Design" section.
+- **Reason**: per `rules.md` AI Coding Rule 1's preference (already applied
+  in ADR-015) for composing already-validated blocks over deriving a new
+  formula whenever the existing architecture already supports it — a
+  volumetric integral would need a new spatial-integration formula and
+  would need separately reconciling against the already-found
+  `z_poynting_flux` factor-of-2 convention (Category 9 target 9.6), adding
+  formula risk this flux-divergence approach avoids entirely.
+- **Validation**: the energy-balance identity itself, per target 7.5's
+  "define... the validation method before exposing an API" wording — `R +
+  T + sum(layer_absorption()) == 1` for `tests/test_stress_regression.py`'s
+  already-vetted lossy fixture (`eps=-396+80j`, sign-checked against
+  `CONVENTIONS.md`'s passivity convention), finally closing the gap that
+  same test file's docstring explicitly flagged ("layer-wise absorption...
+  is Category 7 targets 7.5/7.6, still open" — no longer true after this
+  ADR); and `layer_absorption() ~= [0, 0, ...]` for a lossless stack, to
+  numerical precision.
+- **Alternatives considered**: a volumetric `omega*Im(eps)*|E|^2` integral
+  over each layer — rejected per the Reason above; a per-layer method
+  requiring the caller to keep the original `Simulation` object around
+  (matching how `tests/test_field_reconstruction.py` builds its own
+  `SMatrixStack` externally) — rejected in favor of extending
+  `SimulationResult` with a new `thicknesses` field so
+  `layer_absorption()` is self-sufficient, consistent with
+  `diffraction_efficiencies()`/`order_classification()`'s existing
+  `SimulationResult`-method pattern.
+- **Trade-offs**: `layer_absorption()` internally rebuilds an
+  `SMatrixStack` from `self.thicknesses`/`self.all_modes` (already stored
+  on `SimulationResult` after this ADR) rather than reusing one built
+  during `Simulation.solve()` — a small, one-off, already-cheap
+  reconstruction (S-matrix cascade is not the identified bottleneck; see
+  ADR-016), not called unless a caller actually wants per-layer absorption.
+- **Impact**: `SimulationResult.thicknesses` (new field, populated by
+  `Simulation.solve()`), `SimulationResult.layer_absorption()` (new
+  method), no change to any existing field or method.
+- **Known limitation, found while validating this ADR, documented rather
+  than silently worked around**: `layer_absorption()` inherits
+  `interior_amplitudes`/`propagate_amplitudes`'s numerical-stability
+  envelope. For a thick, highly lossy, high-`num_orders` layer, the
+  deepest evanescent modes' backward-propagated amplitude can numerically
+  overflow (`max(Im(q))*thickness` reaching ~38 for the `eps=-396+80j`
+  fixture at `thickness=0.3`, `num_orders=25`), producing a nonsensical
+  `layer_absorption()` value even though `R`/`T` themselves stay correct
+  (they never reconstruct an interior amplitude). Full account and a
+  regression guard on the failure symptom: `troubleshooting.md`,
+  `tests/test_layer_absorption.py::test_interior_amplitude_reconstruction_can_numerically_overflow_for_thick_lossy_layers`.
+  Not in scope to fix here — the validation tests for this ADR instead use
+  a parameter regime (`thickness=0.05`) confirmed to stay well clear of
+  this envelope.

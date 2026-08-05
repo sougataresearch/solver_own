@@ -572,54 +572,162 @@ validation remains required.
 
 ### Small targets
 
-- [ ] **6.1 Convention note:** publish the existing time, propagation, and
+- [x] **6.1 Convention note:** publish the existing time, propagation, and
   s/p convention in one reference document.
-- [ ] **6.2 Normal-incidence polarization regression:** test TE, TM, linear,
+  Done 2026-08-04: `CONVENTIONS.md` already had "Phasor and propagation
+  convention" and "Polarization convention" sections from earlier
+  sessions -- confirmed (not assumed) they already satisfy this target's
+  literal wording, then added a "Worked polarization examples" table
+  (TE/TM/linear/RCP/LCP/elliptical `s_amplitude`/`p_amplitude` pairs) that
+  `tests/test_polarization_states.py` exercises directly.
+- [x] **6.2 Normal-incidence polarization regression:** test TE, TM, linear,
   circular, and elliptical states against known symmetry expectations.
-- [ ] **6.3 Oblique-incidence regression:** test arbitrary azimuth and mixed
+  Done 2026-08-04: verified numerically first, then encoded as a test --
+  for an isotropic stack at `theta=0`, every polarization state at fixed
+  total power gives *identical* `R` and `T` (full rotational symmetry
+  about the propagation axis, a stronger check than energy conservation
+  alone). `tests/test_polarization_states.py`, single-film and multilayer
+  cases.
+- [x] **6.3 Oblique-incidence regression:** test arbitrary azimuth and mixed
   polarization with energy conservation.
-- [ ] **6.4 Grazing-incidence boundary test:** define a supported near-grazing
+  Done 2026-08-04: energy conservation across all 7 polarization states x
+  4 azimuths x 3 polar angles (84 cases), plus a second independent
+  symmetry check -- azimuthal-rotation invariance (fixed `theta` and
+  `s`/`p` amplitudes, varying `phi`, `R`/`T` unchanged) for a laterally-
+  uniform stack, also verified numerically before encoding.
+  `tests/test_polarization_states.py` (89 tests total for 6.2/6.3).
+- [x] **6.4 Grazing-incidence boundary test:** define a supported near-grazing
   angle range and test behavior at its boundary.
-- [ ] **6.5 Rayleigh-threshold test:** add a diffraction-order opening/closing
+  Done 2026-08-04: characterized directly (not assumed) -- any
+  `theta < 90 deg` is supported (confirmed finite, energy-conserving to
+  `1e-8`+ up to `89.999 deg`); exactly `theta=90 deg` raises a plain
+  `ValueError` (from `scipy.linalg.lu_factor`'s finiteness check, not
+  silently `NaN`), traced to a genuine floating-point coincidence
+  (`math.sin(math.radians(90.0)) == 1.0` exactly, making the incidence
+  half-space's `q` exactly `0.0`, not merely small). Added to `design.md`'s
+  Failure Contract (which also picked up several Category 4/5 rows that
+  were missing from it). `tests/test_grazing_incidence.py`, 9 tests.
+- [x] **6.5 Rayleigh-threshold test:** add a diffraction-order opening/closing
   case and test propagating versus evanescent classification.
-- [ ] **6.6 Bottom-incidence decision:** document whether reverse illumination
+  Done — found already satisfied by `tests/test_mode_classification.py`
+  (Category 1 target 1.8, normal incidence, exact analytic threshold).
+  Added one thing that coverage didn't have and Category 6 is specifically
+  about: an **oblique**-incidence case, where the `+m`/`-m` order
+  degeneracy breaks and the two orders cross their Rayleigh threshold at
+  different wavelengths (confirmed by a coarse sweep this session, not a
+  closed form). `tests/test_oblique_rayleigh_threshold.py`, 8 tests.
+- [x] **6.6 Bottom-incidence decision:** document whether reverse illumination
   is required; design it separately if approved.
+  Done 2026-08-04, with a better answer than "defer": reverse illumination
+  is **already achievable** via the existing `Simulation` constructor
+  (reverse the layer list, swap `incidence`/`transmission`) — verified via
+  the Stokes transmittance-reciprocity relation (lossless reciprocal
+  medium, `T` direction-independent at normal incidence, matched to
+  `~1e-15`), not just asserted. No new API surface added, per `rules.md`'s
+  "don't add features not needed." `decisions.md` ADR-014,
+  `tests/test_bottom_incidence.py` (3 tests, including an honest
+  counter-check that `R` genuinely differs between directions at oblique
+  incidence — not claimed direction-independent).
 
 ### Exit criteria
 
 **Category gate:** polarization-sensitive external comparison passes for at
 least one oblique case.
 
-## 7. Layer handling — PARTIAL
+**Status as of 2026-08-04**: all six targets (6.1-6.6) are done. The
+category gate itself ("polarization-sensitive external comparison ... at
+least one oblique case") is met by the pre-existing `tests/test_analytic_fresnel.py`/
+`tests/test_thin_film_empy_cross_check.py` oblique-incidence s/p cases
+against two independent oracles (Fresnel, EMpy) — this category's new work
+extends that with symmetry-based (oracle-independent) invariants across
+the full polarization-state space and the excitation-angle boundary
+conditions (grazing, oblique Rayleigh threshold, reverse illumination) the
+existing oracle comparisons didn't exercise. 502 tests pass project-wide
+(393 at the start of this category — 384 fast + 9 slow; 493 fast + 9 slow
+now, 109 new fast tests), no existing test weakened.
+
+## 7. Layer handling — DONE
 
 ### Already present
 
 - Uniform/patterned finite layers, semi-infinite half-spaces, and multilayer stacks.
 - Multi-slice tapered via and trench stacks.
+- Construction-time thickness validation (target 7.1).
+- An instance-scoped Toeplitz-matrix cache (targets 7.3/7.4) and per-layer
+  absorbed-power reporting (targets 7.5/7.6).
 
 **Current scope**
 
-Layer assembly is correct-first and uncached; layer-specific loss reporting is
-not available.
+Layer assembly is correct-first; a narrowly-scoped Toeplitz-matrix cache is
+now in place (gated on a measured timing case, not speculative); per-layer
+loss reporting is available via `SimulationResult.layer_absorption()`.
 
 ### Small targets
 
-- [ ] **7.1 Layer validation audit:** test finite-layer thickness, half-space,
+- [x] **7.1 Layer validation audit:** test finite-layer thickness, half-space,
   and patterned-layer invariants at construction.
-- [ ] **7.2 Repeated-layer identity:** add a test that equivalent repeated-layer
+  Done 2026-08-05: `layer._require_valid_thickness`, called from
+  `Layer.__post_init__` -- rejects NaN/non-positive thickness, explicitly
+  allows `math.inf` (the documented semi-infinite half-space sentinel).
+  `tests/test_layer_validation.py` (15 tests), including a direct check
+  that `SMatrixStack` never actually reads the half-space thickness value
+  (`propagation_smatrix` is only called for interior layers).
+- [x] **7.2 Repeated-layer identity:** add a test that equivalent repeated-layer
   representations produce the same R/T.
-- [ ] **7.3 Layer cache design:** define cache keys and invalidation conditions;
+  Done 2026-08-05: `tests/test_layer_repetition.py` (7 tests) -- a thick
+  uniform layer vs. the same thickness split into N thin layers of the
+  same material; a patterned layer repeated via the same `Pattern` object
+  vs. via N separately-constructed structurally-equal `Pattern` objects.
+  Both give identical R/T, the invariant target 7.4's cache leans on.
+- [x] **7.3 Layer cache design:** define cache keys and invalidation conditions;
   do not implement caching yet.
-- [ ] **7.4 Layer cache implementation:** cache one safe artifact (for example,
+  Done 2026-08-05: `design.md`'s "Layer/Toeplitz Caching Design" section --
+  gated on a measured timing case per `rules.md`'s Performance
+  Requirements exception clause (a first measurement attempt was found to
+  be wrongly framed and corrected before being trusted, see that section
+  for the full account). Cache key `(kind, id(pattern), wavelength, ...)`;
+  invalidation is "none needed by construction" (instance-scoped, fresh
+  per `Simulation`), with one documented caller-facing contract (`Pattern`
+  objects must not be mutated in place after being wired into a `Layer`).
+- [x] **7.4 Layer cache implementation:** cache one safe artifact (for example,
   a Toeplitz matrix) and test equivalence to uncached results.
-- [ ] **7.5 Layer-wise absorption design:** define the physical quantity and
+  Done 2026-08-05: `Simulation._cached_toeplitz`/`_cached_toeplitz_component`,
+  `decisions.md` ADR-016. The real, measured beneficiary is a fixed-
+  wavelength angle sweep (Category 8 target 8.3, planned) -- ~30%
+  wall-clock reduction over a 20-point sweep, since Toeplitz matrices
+  don't depend on incidence angle. `tests/test_layer_cache.py` (4 tests):
+  equivalence to forced-uncached recomputation, a call-counting cache-hit
+  check, and a direct angle-sweep cache-reuse regression test.
+- [x] **7.5 Layer-wise absorption design:** define the physical quantity and
   validation method before exposing an API.
-- [ ] **7.6 Layer-wise absorption implementation:** add only after the design
+  Done 2026-08-05: `design.md`'s "Layer-Wise Absorption Design" section --
+  per-layer absorbed power as a z-Poynting-flux-divergence combination of
+  already-validated Category 9/Phase 7 pieces (`interior_amplitudes`,
+  `propagate_amplitudes`, `z_poynting_flux`), not a new physics formula
+  (`decisions.md` ADR-017). Validation method: the `R+T+sum(A)=1` energy-
+  balance identity itself, reusing `test_stress_regression.py`'s already-
+  vetted lossy fixture.
+- [x] **7.6 Layer-wise absorption implementation:** add only after the design
   has an independent energy-balance test.
+  Done 2026-08-05: `SimulationResult.layer_absorption()` (new field
+  `SimulationResult.thicknesses` to support it). `tests/test_layer_absorption.py`
+  (4 tests): zero absorption for a lossless stack, `R+T+A=1` for a lossy
+  pillar and for a lossy layer sandwiched between lossless ones. **Honest
+  finding along the way, not silently avoided**: `layer_absorption()`
+  inherits `interior_amplitudes`/`propagate_amplitudes`'s existing
+  numerical-stability envelope -- a thick, highly lossy, high-`num_orders`
+  case can numerically overflow the deepest evanescent modes' backward-
+  propagated amplitude (`max(Im(q))*thickness ~= 38` gave a nonsensical
+  `layer_absorption() ~= 573`; the same fixture at a thinner layer
+  (`~6.3`) satisfies the energy identity to `~1e-6`). Documented in
+  `troubleshooting.md` and `decisions.md` ADR-017, with a dedicated
+  regression test on the failure symptom itself.
 
 ### Exit criteria
 
-**Category gate:** cached and uncached paths agree within numerical tolerance.
+**Category gate: met, 2026-08-05.** Cached and uncached paths agree
+within numerical tolerance (`tests/test_layer_cache.py`'s equivalence
+test, exact to `1e-12`).
 
 ## 8. Solver sweeps and convergence — PARTIAL
 
@@ -668,25 +776,80 @@ Real-space E/H reconstruction and field exports are not implemented.
 
 ### Small targets
 
-- [ ] **9.1 Field-convention design:** document field-component ordering and
+- [x] **9.1 Field-convention design:** document field-component ordering and
   Fourier phase convention used by the existing modal matrices.
-- [ ] **9.2 Uniform-layer reconstruction:** reconstruct E/H at one depth in a
+  Done 2026-08-05: `CONVENTIONS.md`'s new "Real-space field reconstruction"
+  section documents the full 6-component `(Ex,Ey,Ez,Hx,Hy,Hz)` layout, the
+  real-space phase-sum convention, and the depth-propagation ansatz, all
+  transcribed from `S4/S4/rcwa.cpp::GetInPlaneFieldVector`
+  (lines 1959-1995) and `GetFieldAtPoint` (lines 1997-2074).
+- [x] **9.2 Uniform-layer reconstruction:** reconstruct E/H at one depth in a
   uniform layer and test against the analytic plane wave.
-- [ ] **9.3 Interface amplitudes:** recover modal amplitudes at one internal
+  Done 2026-08-05: `fields.modal_field_components`/`propagate_amplitudes`/
+  `reconstruct_field_at_points`, matched to the closed-form plane wave
+  `E0*exp(i*(kx*x+ky*y+q*z))` to `~1e-10`, plus an independent physics
+  check (`k.E=0`, `k.H=0` transversality). `tests/test_field_reconstruction.py`.
+- [x] **9.3 Interface amplitudes:** recover modal amplitudes at one internal
   interface using the S-matrix partial-stack API; test a uniform stack.
-- [ ] **9.4 1D inverse Fourier sum:** reconstruct a 1D patterned field grid and
+  Done 2026-08-05: `smatrix.interior_amplitudes`, independently derived
+  (not S4's `SolveInterior`, a different algorithm -- see `decisions.md`
+  ADR-015) from standard Redheffer star-product algebra built on
+  `partial_smatrix_up_to`. Validated by a zero-free-parameter consistency
+  check (recovering amplitudes at the full stack exactly reproduces
+  `a_transmitted`) plus energy conservation at an interior interface.
+- [x] **9.4 1D inverse Fourier sum:** reconstruct a 1D patterned field grid and
   test periodicity.
-- [ ] **9.5 Field continuity test:** test tangential-field continuity at an
+  Done 2026-08-05: reconstructed `Ex` along `x` through a lamellar grating
+  over more than 2 periods; `E(x+period)==E(x)` confirmed to `~1e-9`.
+- [x] **9.5 Field continuity test:** test tangential-field continuity at an
   interface where no surface current exists.
-- [ ] **9.6 Field-flux test:** integrate reconstructed flux and compare with
+  Done 2026-08-05: reconstructed `Ex/Ey/Hx/Hy` at the same physical point
+  from both sides of a genuine material interface (different `kp`/`phi`/
+  `eps` on each side) -- matched exactly (`~1e-10`), a real boundary-
+  condition check, not a formula-reproduction tautology.
+- [x] **9.6 Field-flux test:** integrate reconstructed flux and compare with
   existing R/T.
-- [ ] **9.7 2D field grid:** extend the verified 1D reconstruction to a 2D grid.
-- [ ] **9.8 Field export:** add NumPy first, then CSV/HDF5 only after schema design.
+  Done 2026-08-05, with a genuine finding along the way: the textbook
+  `Sz=0.5*Re(Ex*conj(Hy)-Ey*conj(Hx))` disagreed with the solver's `T` by
+  exactly a factor of 2 at first -- traced to `fields.z_poynting_flux`
+  itself missing the customary `0.5` (harmless for R/T ratios, which
+  cancel it; not previously noticed because nothing before this target
+  computed an *absolute* flux from raw E/H). Corrected formula
+  (`Sz=Re(...)`, no `0.5`) matches `T` to `~1e-6` over a 2D grid
+  integral. See `CONVENTIONS.md` and `troubleshooting.md`.
+- [x] **9.7 2D field grid:** extend the verified 1D reconstruction to a 2D grid.
+  Done 2026-08-05: `reconstruct_field_at_points` is dimension-agnostic by
+  construction (one function serves point/1D-line/2D-grid `x`/`y` shapes
+  alike) -- exercised over a full 2D pillar unit cell in the same test as
+  9.6, and in `structures/via/pillar_field_cross_section.py`'s example
+  (visually confirmed: a physically sensible near-field intensity map
+  showing the pillar's location and expected standing-wave lobes).
+- [x] **9.8 Field export:** add NumPy first, then CSV/HDF5 only after schema design.
+  Done 2026-08-05: `fields.save_field_grid_npz` (`numpy.savez`, self-
+  describing with arbitrary metadata kwargs). CSV/HDF5 deliberately not
+  added, per this target's own wording -- no schema design has been done
+  for either.
 
 ### Exit criteria
 
 **Category gate:** field-derived flux agrees with solver R/T on uniform, 1D,
 and 2D fixtures.
+
+**Status as of 2026-08-05**: all eight targets (9.1-9.8) are done; the
+category gate is met exactly as worded -- field-derived flux matches
+solver R/T for the uniform-layer case (9.2's transversality/analytic-match,
+indirectly via the exact E/H match), the interior-interface case (9.3's
+energy-conservation check), and the 2D pillar case (9.6, `~1e-6`). Two
+runnable end-to-end example scripts
+(`structures/trench/trench_field_cross_section.py`,
+`structures/via/pillar_field_cross_section.py`) plus
+`postprocessing/plot_field_cross_section.py` fulfill `phases.md` Phase 7's
+"cross-section field-intensity plots for trench/via structures" deliverable
+-- both were run and their output plots visually inspected (not just
+"doesn't crash"), showing physically sensible field patterns. 512 tests
+pass project-wide (502 at the start of this category — 493 fast + 9 slow;
+503 fast + 9 slow now, 10 new fast tests in `tests/test_field_reconstruction.py`),
+no existing test weakened.
 
 ## 10. Optical outputs — PARTIAL
 

@@ -251,6 +251,21 @@ This API is intentionally **not** builder-pattern or fluent-interface
 styled — plain constructors and dataclasses only, consistent with the "no
 framework magic" non-functional requirement in `PRD.md`.
 
+**Bottom (reverse-side) illumination** (Category 6 target 6.6,
+`decisions.md` ADR-014): already possible with the existing constructor,
+no new parameter — reverse the layer list and swap which material plays
+`incidence`/`transmission`:
+
+```python
+sim_bottom = Simulation(lattice, list(reversed(layers)), num_orders,
+                          incidence=transmission_material, transmission=incidence_material)
+```
+
+Verified (not just asserted) correct via the Stokes transmittance-
+reciprocity relation (`tests/test_bottom_incidence.py`): at normal
+incidence, the reversed simulation's transmittance matches the original's
+to `~1e-15`.
+
 ## "Database Design"
 
 Not applicable — `sougata_solver` has no database and no persistent application
@@ -369,6 +384,11 @@ call (fail loud, fail early, per Error Handling above):**
 | `eigenmodes.solve_layer_eigenmodes_patterned_inplane` | any `epsilon_hat_*.shape != (n, n)` |
 | `materials.Material.__init__` | `eps` sample is neither a scalar nor a `(3,3)` array |
 | `materials._read_numeric_blocks` / `_wavelength_n_k_from_blocks` / `from_refractiveindex_formula_file` | malformed/empty/wrong-column-count material data files |
+| `materials.Material.epsilon_tensor` | dispersion callable returns a non-finite value, or a shape mismatching the material's constructed kind, at the queried wavelength (Category 5 target 5.1 — a probe-wavelength-only check at construction can't catch this) |
+| `geometry.Lattice`/`Lattice1D`/`Circle`/`Rectangle`/`Ellipse`/`Polygon`/`Slab` construction | non-finite dimension, degenerate (zero-area) lattice, or non-positive shape size (Category 4 target 4.1) |
+| `geometry.validate_pattern_fits_lattice` (called from `Simulation.__init__`) | a shape's `2*bounding_radius` is not smaller than the lattice's shortest primitive vector — could overlap its own periodic image (Category 4 target 4.2) |
+| `geometry_io.pattern_from_dict`/`pattern_from_json_string`/`pattern_from_json_file` | any malformed field in the JSON pattern schema — missing key, wrong type, unknown shape/unit (Category 4 target 4.6) |
+| `smatrix.interface_smatrix` (via `scipy.linalg.lu_factor`'s internal `asarray_chkfinite`, not `numpy.linalg.LinAlgError`) | **exact grazing incidence** (`theta=90 deg`) — the incidence half-space's zeroth-order `q` is exactly `0.0` (confirmed a genuine floating-point coincidence for `n=1`, not merely "very small"; see `tests/test_grazing_incidence.py`, Category 6 target 6.4), so `kp @ phi / q` produces a non-finite matrix that `lu_factor` refuses outright rather than silently returning a wrong answer. Any `theta < 90 deg` is supported, confirmed finite and energy-conserving up to `89.999 deg`. |
 
 **`NotImplementedError` — valid input, unimplemented phase/scope, always
 naming the specific phase/target per Error Handling above:**
@@ -443,3 +463,187 @@ convention going forward:
 - **`structures/*.py`/`postprocessing/*.py` scripts may use `print`** freely
   — they are scripts, not library code, and this matches the existing
   convention.
+
+## Layer/Toeplitz Caching Design (Category 7 targets 7.3/7.4)
+
+**This section exists in tension with `rules.md`'s Performance
+Requirements** ("do not introduce caching, memoization, or algorithmic
+shortcuts... before Phase 9, unless a specific correctness-validated
+capability is measurably too slow to use... and even then, validate the
+optimized path against the unoptimized one before trusting it"). Per that
+rule, this design is gated on an actual measurement, not implemented
+speculatively just because `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` lists it as
+a target — the same treatment Category 3 targets 3.4/3.5/3.6 got when a
+similar tension came up (`decisions.md` ADR-012).
+
+**Measurement (justifying doing 7.4 now, not deferring to Phase 9), and one
+correction made honestly rather than silently along the way.** The first
+measurement attempt used a repeated-pattern (DBR-like) stack of `N`
+identical patterned layers *within a single `Simulation.solve()` call* and
+attributed the entire "extra time per repeated layer" to redundant Toeplitz
+reconstruction. Isolating the two costs directly (`toeplitz_matrix` alone
+vs. `solve_layer_eigenmodes_patterned` alone, same pattern, `num_orders=49`)
+shows that framing was wrong: `toeplitz_matrix` takes ~0.007 s, but the
+per-layer eigensolve (dense `2n x 2n` `eig()`, **not** in this target's
+cache scope — layer *order* still matters for the eigensolve's downstream
+S-matrix cascade even when two layers' permittivity representation is
+identical) takes ~0.059 s, roughly 8x more. Caching only the Toeplitz
+matrix for that specific scenario (20 identical patterned layers in one
+`solve()` call, `num_orders=49`) therefore only saves **~4%** of total
+wall-clock time (0.916 s -> 0.880 s), not the much larger number a naive
+reading of the first measurement would have implied — recorded here so a
+future session doesn't repeat the same measurement mistake.
+
+The actual dominant beneficiary, found by measuring the right scenario
+instead: `toeplitz_matrix`/`toeplitz_matrix_component` depend only on
+`(pattern, wavelength)`, **not** on `kx`/`ky` (incidence angle) — so an
+angle sweep at fixed wavelength (`phases.md`/`tasks.md` Category 8 target
+8.3, planned, not yet implemented) reuses the *same* cached Toeplitz
+matrix across every sweep point, for even a single patterned layer (no
+repeated layers needed):
+
+| `num_orders` | 20-point angle sweep, uncached | cached | reduction |
+|---|---|---|---|
+| 9  | 0.0639 s | 0.0451 s | ~29% |
+| 49 | 1.4372 s | 1.0067 s | ~30% |
+
+(Measured by clearing `Simulation._toeplitz_cache` before every `solve()`
+call in the sweep to force the pre-caching behavior, vs. leaving it
+populated — the same `Simulation` instance, same excitation angles, same
+pattern, only the cache state differs.) This is the real, measured case
+that justifies implementing exactly the caching target 7.4 already scopes
+("cache one safe artifact (for example, a Toeplitz matrix)"), not a
+broader eigensolve or S-matrix cache — a Category 8 angle/wavelength sweep
+calling `solve()` hundreds of times would multiply a ~30%-of-solve()-time
+saving into a real, non-hypothetical wall-clock reduction, even though the
+*within-one-call*, repeated-identical-layer case (the first, wrongly-
+framed measurement) turns out to be a much smaller effect on its own.
+
+**Cache scope.** Exactly the Toeplitz matrices built by
+`fourier_factorization.toeplitz_matrix`/`toeplitz_matrix_component` —
+never the eigenmode solve or S-matrix cascade, which still depend on
+layer *order* (interface conditions on either side) even when two layers'
+own permittivity representation is identical.
+
+**Cache key.** `(kind, id(pattern), wavelength, ...)`, where `kind` is
+`"toeplitz"` (1D/2D-isotropic path, plus an `inverse` bool) or
+`"toeplitz_component"` (Category 1 target 1.6's anisotropic path, plus a
+`(row, col)` tensor-component pair) — a string tag namespaces the two
+call shapes so they can never collide in one dict. `id(pattern)` (Python
+object identity), not a value-based structural hash, is used deliberately:
+`Pattern`/`Shape` are plain mutable dataclasses (not `frozen=True`), so
+they have no `__hash__` to build a value-based key from without adding new
+machinery; object-identity caching also has an exactly-right false-positive
+rate for this project's actual repeated-layer use case (target 7.2's test
+confirms: reusing the *same* `Pattern` object across several `Layer`s is
+how a DBR-like repeated unit cell is naturally constructed, and identity
+comparison can never wrongly conflate two different `Pattern` objects that
+merely happen to hold equal values). `wavelength` is in the key because
+`toeplitz_matrix` depends on it (shape Fourier transforms are wavelength-
+dependent whenever a shape's material is dispersive); the reciprocal-
+lattice truncation `g` is **not** in the key because it is fixed for a
+given `Simulation` instance's entire lifetime (`Simulation.__init__`
+computes `num_orders`/`truncation` once; `g` itself is recomputed from
+those inside `solve()` but is deterministic given them), so it can never
+vary between two cache lookups on the same instance.
+
+**Invalidation.** None needed by construction, not a design gap: the cache
+is a plain instance attribute (`Simulation._toeplitz_cache: dict`, created
+fresh in `__init__`, never module-level — per `rules.md`'s "no hidden
+global state, no singletons, no module-level mutable state" rule), so a
+new `Simulation` starts with an empty cache and no entry can outlive the
+instance it belongs to. Within one instance's lifetime, the key already
+captures every quantity `toeplitz_matrix`/`toeplitz_matrix_component`
+depend on, so no key can go stale while its `Simulation` exists. The one
+caller-facing contract this relies on, made explicit rather than solver-
+enforced (matching this project's existing construction-time-validation
+philosophy, Category 4 target 4.1, which similarly assumes shapes aren't
+mutated after being wired into a `Layer`): **a `Pattern` object, once
+passed into a `Layer` that is passed into a `Simulation`, must not have
+its `background`/`shapes` mutated in place.** Mutating it and re-solving
+the same `Simulation` instance would return a stale cached Toeplitz matrix
+for that `Pattern`'s `id()`. This is not a new restriction — Category 4's
+construction-time shape/lattice validation already assumes the same thing
+implicitly (validated once, at construction, not re-checked on every
+solve).
+
+**7.4 implementation note**: see `simulation.py`'s `Simulation._cached_toeplitz`/
+`_cached_toeplitz_component`, and `tests/test_layer_cache.py` for the
+equivalence-to-uncached test (per this section's own requirement, and
+`rules.md`'s "validate the optimized path against the unoptimized one
+before trusting it").
+
+## Layer-Wise Absorption Design (Category 7 targets 7.5/7.6)
+
+**Physical quantity.** Per-interior-layer absorbed power, normalized to
+incident power (same normalization convention `SimulationResult.reflectance()`/
+`transmittance()` already use): the net time-averaged z-directed Poynting
+flux entering a layer at its top interface minus the net flux leaving at
+its bottom interface. For a lossless layer this is exactly zero by energy
+conservation (a strong, free correctness check); for a lossy layer it is
+the physical absorbed-power fraction, `A_i`, satisfying
+`R + T + sum(A_i) = 1` for a stack with no diffracted orders escaping as
+loss elsewhere (`testing.md`'s Physical-Invariant Testing tier already
+names this identity as the target the project doesn't yet satisfy without
+this capability — see `tests/test_stress_regression.py`'s docstring, which
+explicitly flags Category 7 targets 7.5/7.6 as the missing piece).
+
+**Formula — reused, not invented, per `rules.md` AI Coding Rule 1's
+preference for building on already-validated blocks (the same treatment
+ADR-015 gave `interior_amplitudes`).** No new physics formula is written
+here at all; layer-wise absorption is a direct combination of three
+already-implemented, already-oracle/consistency-validated pieces (Category
+9 / Phase 7):
+
+```text
+For each interior layer i (all_modes index 1..len(all_modes)-2):
+    (a_top, b_top) = interior_amplitudes(stack.partial_smatrix_up_to(i), n2, a0, b_reflected)
+    (a_bot, b_bot) = propagate_amplitudes(modes_i.q, thickness_i, a_top, b_top)
+    net_top = sum(z_poynting_flux(omega, modes_i.q, modes_i.kp, modes_i.phi, a_top, b_top))
+    net_bot = sum(z_poynting_flux(omega, modes_i.q, modes_i.kp, modes_i.phi, a_bot, b_bot))
+    A_i = (net_top - net_bot).real / incident_power.real
+```
+
+`z_poynting_flux` already returns `(forward, backward)` with the
+forward/backward interference cross-term folded symmetrically into each
+half (`fields.py:51-56`, the `diff`/`np.conj(diff)` split) — so
+`forward + backward` is already the genuine net total z-flux at one
+reference plane with both a forward and a backward wave simultaneously
+present, exactly what's needed here (not an approximation or a new
+derivation of that split).
+
+**Why this reuses existing infrastructure instead of a volumetric `Im(eps)`
+integral.** The textbook alternative — integrating `omega * Im(eps) *
+|E|^2` over the layer's volume — would need a new spatial-integration
+formula (a new source of physics-formula risk, exactly what Rule 1 warns
+against) and would need reconciling against this project's already-found
+`z_poynting_flux` factor-of-2 convention (`CONVENTIONS.md`, Category 9
+target 9.6's finding). The flux-divergence formula above needs no new
+formula at all — every piece (`interior_amplitudes`, `propagate_amplitudes`,
+`z_poynting_flux`) is already independently validated
+(`tests/test_field_reconstruction.py`), and Poynting-flux divergence
+equaling absorbed power is a direct restatement of energy conservation,
+not a new physical claim.
+
+**Validation method (before exposing the API, per target 7.5's own
+wording).** The energy-balance identity itself is the validation: `R + T +
+sum(A_i) == 1` for a genuinely lossy stack (reusing
+`tests/test_stress_regression.py`'s already-vetted `eps = -396+80j` lossy-
+metal fixture, whose sign convention was already checked against
+`CONVENTIONS.md`'s `d/dt -> -i*omega` passivity requirement), and `A_i ==
+0` (to numerical precision) for every layer in a lossless stack — both
+independent of any external oracle, since no published per-layer
+absorption benchmark exists in any vendored `REFERENCE/` repo (confirmed
+by the same `phase-reference-picker`-style audit prior categories used;
+Category 7's own register entry lists no such benchmark as "already
+present").
+
+**API placement.** `SimulationResult.layer_absorption() -> list[float]`,
+one entry per interior (finite-thickness) layer in stack order — mirrors
+`diffraction_efficiencies()`/`order_classification()`'s existing pattern
+of a `SimulationResult` method built from already-stored `all_modes`/`a0`/
+`b_reflected`, rather than a free function requiring the caller to keep
+the original `Simulation` object around. This needs `SimulationResult` to
+also store `thicknesses` (a new field, populated by `Simulation.solve()`
+from data it already computes locally) — the one small, purely-additive
+API extension this target requires.

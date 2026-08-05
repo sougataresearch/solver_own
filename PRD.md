@@ -93,6 +93,20 @@ depending on them at runtime.
   `Ellipse`/`Polygon` shapes and a JSON pattern-import format; five
   analytic dispersion models validated against BK7's and Rakić et al.
   (1998)'s independently-published values.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 6 (boundary conditions and
+  excitation): targets 6.1-6.6 all **met** — polarization-state and
+  azimuthal-rotation symmetry invariants, a characterized grazing-incidence
+  boundary, an oblique-incidence Rayleigh-threshold case, and a Stokes-
+  reciprocity-verified finding that bottom illumination needs no new API
+  (`decisions.md` ADR-014).
+- Phase 7 (real-space field reconstruction), tracked at atomic-target grain
+  as `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 9: targets 9.1-9.8 all
+  **met**. Reconstructed E/H fields match the analytic plane wave (uniform
+  layer), exact tangential-field continuity across a genuine material
+  interface, 1D periodicity, and real-space Poynting flux matching solver
+  `R`/`T` to `~1e-6` for a 2D pillar (this category's own exit criterion).
+  See `tests/test_field_reconstruction.py` and Phase 7's status entry in
+  `phases.md`.
 - No phase is marked "done" without: (a) a passing automated test against
   an oracle, and (b) a runnable example script producing physically
   plausible output.
@@ -109,7 +123,7 @@ depending on them at runtime.
 | FR-6 | Represent and solve 1D-periodic lamellar (line/space) patterns (trench). *(done — Phase 3)* |
 | FR-7 | Represent a feature (via/trench) with linearly tapered sidewalls via staircase layer discretization, and demonstrate R/T convergence with slice count. *(done — Phase 5)* |
 | FR-8 | Support anisotropic (full 3×3 tensor) materials in both uniform and patterned layers. *(partially done — Phase 6 Category 1 targets 1.3/1.4/1.6-1.8: diagonal and in-plane-coupled tensors, uniform and patterned. Longitudinal coupling, target 1.5, explicitly deferred — see `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`)* |
-| FR-9 | Reconstruct real-space E/H field maps at an arbitrary depth in the stack (for cross-section visualization of trench/via structures). *(planned — Phase 7)* |
+| FR-9 | Reconstruct real-space E/H field maps at an arbitrary depth in the stack (for cross-section visualization of trench/via structures). *(done — Phase 7 / `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 9, `fields.py`, `structures/trench/trench_field_cross_section.py`, `structures/via/pillar_field_cross_section.py`)* |
 | FR-10 | Ingest dispersive material data from refractiveindex.info-style CSV `n,k` exports, or build a dispersive material from an analytic model (Sellmeier, Cauchy, Lorentz, Drude, Drude-Lorentz). *(done — `structures/thin_film/sio2_on_si_thin_film.py::material_from_csv`; analytic models added `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 5 targets 5.2-5.6)* |
 | FR-11 | Import a `Pattern` from a minimal, safe, non-CAD JSON format (units, isotropic-scalar materials, `Circle`/`Rectangle`/`Ellipse`/`Polygon`/`Slab`). *(done — `geometry_io.py`, Category 4 target 4.6; parser only, not yet wired into `Simulation`/`Layer` construction)* |
 

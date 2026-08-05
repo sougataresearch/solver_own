@@ -489,3 +489,168 @@ whether it was ever actually implemented.
   (`output_paths.write_run_metadata`'s encoding). Updated
   `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
   `references.md`, and this file.
+
+---
+
+## 2026-08-04 (continued)
+
+### Discussed
+- User asked to complete Category 6 (Boundary conditions and excitation)
+  targets 6.1-6.6 the same way. Read `excitation.py`, `CONVENTIONS.md`
+  (already covers most of target 6.1), `smatrix.py`, and existing
+  polarization/mode-classification tests before starting, per `CLAUDE.md`'s
+  workspace instructions.
+
+### Action items
+- [x] Target 6.1 (convention note) — done 2026-08-04. Confirmed
+  `CONVENTIONS.md` already satisfies this; added a worked-examples table.
+- [x] Targets 6.2/6.3 (normal/oblique polarization regression) — done
+  2026-08-04. Two symmetry invariants verified numerically then encoded:
+  polarization-state independence at normal incidence, azimuthal-rotation
+  invariance at oblique incidence. `tests/test_polarization_states.py`
+  (89 tests). See `memory.md`.
+- [x] Target 6.4 (grazing-incidence boundary) — done 2026-08-04.
+  Characterized directly: any `theta<90deg` supported; exactly `90deg`
+  raises `ValueError` (not `NaN`), traced to a real floating-point
+  coincidence. `tests/test_grazing_incidence.py` (9 tests). Also backfilled
+  several missing Category 4/5 rows into `design.md`'s Failure Contract
+  while there.
+- [x] Target 6.5 (Rayleigh-threshold test) — done 2026-08-04 (found already
+  satisfied by Category 1 target 1.8's `tests/test_mode_classification.py`
+  at normal incidence; added the oblique-incidence case that coverage
+  lacked). `tests/test_oblique_rayleigh_threshold.py` (8 tests).
+- [x] Target 6.6 (bottom-incidence decision) — done 2026-08-04, with a
+  better answer than "defer": already achievable via the existing
+  `Simulation` constructor, verified via Stokes transmittance reciprocity
+  (`~1e-15` agreement), not just asserted. `decisions.md` ADR-014,
+  `tests/test_bottom_incidence.py` (3 tests).
+- **Session summary**: all six Category 6 targets (6.1-6.6) complete. 502
+  tests pass project-wide (393 at the start of this sub-session: 384 fast
+  + 9 slow -- 493 fast + 9 slow now, 109 new fast tests). No existing test
+  weakened. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`,
+  `tasks.md`, `decisions.md` (new ADR-014), `CONVENTIONS.md`, `design.md`,
+  and this file.
+
+## 2026-08-05
+
+### Discussed
+- Completing Phase 7 (Real-Space Field Reconstruction & Visualization),
+  tracked at atomic-target grain as `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+  Category 9 (targets 9.1-9.8), then committing and pushing both this
+  category and the still-uncommitted Category 6 work from the prior
+  sub-session.
+- How to reconstruct real-space E/H fields from per-order modal Fourier
+  coefficients: transcribed S4's `GetInPlaneFieldVector`/`GetFieldAtPoint`
+  formulas (transverse + longitudinal components), citing exact line
+  ranges in `references.md`.
+- How to recover interior-layer mode amplitudes without porting S4's more
+  complex block-tridiagonal `SolveInterior` algorithm: derived a simpler
+  formula from this project's own already-implemented
+  `SMatrixStack.partial_smatrix_up_to`, using standard Redheffer
+  star-product algebra — recorded as `decisions.md` ADR-015 (independently
+  derived, not transcribed from S4).
+- A genuine factor-of-2 discrepancy found while validating flux-matches-R/T:
+  this project's established `fields.z_poynting_flux` modal quadratic form
+  is exactly 2x the textbook real-space `Sz = 0.5*Re(Ex*conj(Hy) -
+  Ey*conj(Hx))` — harmless for R/T (ratio, cancels) but must be accounted
+  for when computing absolute real-space flux from raw reconstructed
+  fields. Not a bug in `z_poynting_flux` itself; documented as an
+  established convention.
+- `structures/` vs `postprocessing/` boundary (ADR-009/010) applied to two
+  new example scripts (trench (x,z) cross-section, pillar (x,y) field map)
+  and one new plotting script — both example scripts run end-to-end and
+  their output PNGs visually inspected for physical sensibility.
+
+### Action items
+- [x] Target 9.1 (field-component formulas) — done 2026-08-05.
+  `fields.modal_field_components`, transcribed from S4's
+  `GetInPlaneFieldVector`/`GetFieldAtPoint`. See `memory.md`, `CONVENTIONS.md`.
+- [x] Targets 9.2/9.3 (depth propagation, interior amplitudes) — done
+  2026-08-05. `fields.propagate_amplitudes`, `smatrix.interior_amplitudes`
+  (independently derived, `decisions.md` ADR-015), validated by a
+  zero-free-parameter self-consistency check against the already-known
+  transmitted amplitude.
+- [x] Targets 9.4-9.6 (reconstruction + flux-match tests) — done 2026-08-05.
+  `tests/test_field_reconstruction.py` (10 tests): analytic plane-wave
+  match, transversality, interface continuity, 1D periodicity, and
+  flux-matches-R/T (found and documented the missing-0.5-factor
+  convention along the way).
+- [x] Targets 9.7/9.8 (example scripts + grid save) — done 2026-08-05.
+  `fields.save_field_grid_npz`, `structures/trench/trench_field_cross_section.py`,
+  `structures/via/pillar_field_cross_section.py`,
+  `postprocessing/plot_field_cross_section.py`. Both examples run
+  end-to-end with `R+T=1.0000`; output PNGs visually confirmed physically
+  sensible.
+- **Session summary**: all eight Category 9 / Phase 7 targets (9.1-9.8)
+  complete. 512 tests pass project-wide (502 at the start of this
+  sub-session: 493 fast + 9 slow -- 503 fast + 9 slow now, 10 new fast
+  tests). No existing test weakened. Updated
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
+  `decisions.md` (new ADR-015), `CONVENTIONS.md`, `phases.md`, `PRD.md`,
+  `references.md`, `architecture.md`, `troubleshooting.md`, and this file.
+  Category 6 (uncommitted from the prior sub-session) and this category's
+  work committed and pushed together.
+
+## 2026-08-05 (Category 7)
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7 (Layer
+  handling, targets 7.1-7.6): layer construction-time validation, a
+  repeated-layer-identity regression guard, a Toeplitz-matrix cache
+  (design then implementation), and layer-wise absorption (design then
+  implementation).
+- A real tension between the atomic-targets register (which lists a layer
+  cache as a target) and `rules.md`'s Performance Requirements (which
+  forbid caching before Phase 9 unless measurably too slow) -- resolved
+  the same way Category 3's FFF/NVM tension was: measure first, then
+  implement only what the measurement justifies, and record the gate
+  explicitly in `decisions.md`.
+- A measurement mistake made and caught mid-session: a first timing
+  experiment (repeated identical patterned layers in one `solve()` call)
+  wrongly attributed the "extra time per repeated layer" entirely to
+  Toeplitz-matrix reconstruction; isolating the two costs directly showed
+  the (out-of-scope) eigensolve actually dominates at high `num_orders`.
+  Corrected before it was written into `design.md`/`decisions.md` as a
+  justification -- the real, measured beneficiary is a fixed-wavelength
+  angle sweep, not repeated layers within one call.
+- Whether layer-wise absorption needs a new physics formula (a volumetric
+  `Im(eps)*|E|^2` integral) or can reuse already-validated Category 9/
+  Phase 7 pieces (`interior_amplitudes`, `propagate_amplitudes`,
+  `z_poynting_flux`) -- chose the latter, per `rules.md` AI Coding Rule
+  1's preference for composing validated blocks over deriving new formulas
+  (same treatment ADR-015 gave interior-amplitude recovery).
+- A genuine numerical-stability limitation found while validating the
+  absorption energy-balance identity: a thick, highly lossy, high-
+  `num_orders` layer numerically overflows the deepest evanescent modes'
+  backward-propagated amplitude (`propagate_amplitudes`'s
+  `exp(-i*q*z)` term), giving a nonsensical absorbed-power value. Not a
+  formula bug -- the same instability class transfer-matrix methods are
+  known for, now documented rather than silently avoided.
+
+### Action items
+- [x] Target 7.1 (layer validation audit) — done 2026-08-05.
+  `layer._require_valid_thickness`. `tests/test_layer_validation.py`
+  (15 tests). See `memory.md`.
+- [x] Target 7.2 (repeated-layer identity) — done 2026-08-05.
+  `tests/test_layer_repetition.py` (7 tests).
+- [x] Target 7.3 (layer cache design) — done 2026-08-05. `design.md`'s
+  "Layer/Toeplitz Caching Design" section, gated on a measured (and once
+  corrected) timing case.
+- [x] Target 7.4 (layer cache implementation) — done 2026-08-05.
+  `Simulation._cached_toeplitz`/`_cached_toeplitz_component`,
+  `decisions.md` ADR-016. `tests/test_layer_cache.py` (4 tests).
+- [x] Target 7.5 (layer-wise absorption design) — done 2026-08-05.
+  `design.md`'s "Layer-Wise Absorption Design" section, `decisions.md`
+  ADR-017.
+- [x] Target 7.6 (layer-wise absorption implementation) — done 2026-08-05.
+  `SimulationResult.layer_absorption()`. `tests/test_layer_absorption.py`
+  (4 tests), including a regression guard on the found numerical-overflow
+  limitation. `troubleshooting.md` updated.
+- **Session summary**: all six Category 7 targets (7.1-7.6) complete. 542
+  tests pass project-wide (512 at the start of this category: 503 fast +
+  9 slow -- 533 fast + 9 slow now, 30 new fast tests). No existing test
+  weakened; one stale docstring claim (`test_stress_regression.py`, "layer-
+  wise absorption isn't implemented yet") corrected without touching that
+  file's actual assertions. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`,
+  `memory.md`, `tasks.md`, `decisions.md` (new ADR-016, ADR-017),
+  `design.md`, `references.md`, `troubleshooting.md`, and this file.

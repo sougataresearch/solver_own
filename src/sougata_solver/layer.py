@@ -11,6 +11,28 @@ from sougata_solver.geometry import Pattern
 from sougata_solver.materials import Material
 
 
+def _require_valid_thickness(thickness: float) -> None:
+    """Category 7 target 7.1 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`): fail
+    loud, fail early, at construction, same "why" as `geometry._require_finite`/
+    `materials._require_finite` -- a NaN or non-positive thickness would
+    otherwise only surface later as a nonsensical `propagation_smatrix`
+    phase (`exp(1j*q*thickness)`) or a silently-wrong stack. `math.inf` is
+    deliberately **not** rejected: it is this class's own documented
+    sentinel for a semi-infinite half-space (see the class docstring and
+    `LayerStack.__init__`, which constructs the incidence/transmission
+    layers with exactly this value); `smatrix.SMatrixStack.__init__` never
+    calls `propagation_smatrix` for the first/last layer, so `+inf` is safe
+    there specifically and only there.
+    """
+    if math.isnan(thickness):
+        raise ValueError(f"Layer thickness must not be NaN, got {thickness!r}")
+    if thickness != math.inf and not (thickness > 0):
+        raise ValueError(
+            f"Layer thickness must be > 0 (or exactly math.inf for a semi-infinite "
+            f"half-space), got {thickness!r}"
+        )
+
+
 @dataclass
 class Layer:
     """One layer in the stack.
@@ -28,6 +50,7 @@ class Layer:
     def __post_init__(self):
         if (self.material is None) == (self.pattern is None):
             raise ValueError("Layer requires exactly one of `material` or `pattern`")
+        _require_valid_thickness(self.thickness)
 
     def is_uniform(self) -> bool:
         return self.pattern is None

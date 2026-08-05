@@ -388,7 +388,7 @@ plan-mode scratch file) as phases complete.
   at `q=0`, not introduced this session) — see `troubleshooting.md` and
   Category 6 target 6.4.
 
-## Phase 7 — Real-Space Field Reconstruction & Visualization
+## Phase 7 — Real-Space Field Reconstruction & Visualization — **DONE**
 
 - **Objectives**: reconstruct E/H(x,y,z) on a grid at an arbitrary depth in
   the stack, and produce cross-section field-intensity plots for trench/via
@@ -406,6 +406,34 @@ plan-mode scratch file) as phases complete.
   case worth visualizing) — although the *machinery* for field
   reconstruction is dimension-agnostic and could technically be built
   against Phase 1's uniform stacks first as a stepping stone.
+- **Status**: shipped, tracked at atomic-target grain as
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 9 (targets 9.1-9.8, all
+  done 2026-08-05). `fields.modal_field_components`/`propagate_amplitudes`/
+  `reconstruct_field_at_points` (transcribed from
+  `S4/S4/rcwa.cpp::GetInPlaneFieldVector`/`GetFieldAtPoint`) and
+  `smatrix.interior_amplitudes` (independently derived on top of
+  `partial_smatrix_up_to`, `decisions.md` ADR-015) reconstruct full
+  6-component `(Ex,Ey,Ez,Hx,Hy,Hz)` fields at any real-space point/line/grid
+  and any depth. Validated against the analytic plane wave (uniform layer),
+  exact tangential-field continuity across a genuine material interface,
+  1D periodicity, and — the category's own exit criterion — real-space
+  Poynting-flux integrals matching the solver's own `R`/`T` to `~1e-6` for
+  a 2D pillar. **Honest finding along the way**: `fields.z_poynting_flux`
+  turns out to be missing the textbook `0.5` time-average factor (harmless
+  everywhere it's used, since `reflectance()`/`transmittance()` are ratios
+  that cancel it) — never noticed before this phase because nothing
+  earlier computed an *absolute* flux from raw E/H fields; see
+  `CONVENTIONS.md`/`troubleshooting.md`. Two end-to-end example scripts
+  (`structures/trench/trench_field_cross_section.py`,
+  `structures/via/pillar_field_cross_section.py`) plus
+  `postprocessing/plot_field_cross_section.py` (per `decisions.md`
+  ADR-009/010's `structures/`-solves/`postprocessing/`-plots split) were
+  run and their output field maps visually inspected, not just checked for
+  "doesn't crash" — both show physically sensible near-field patterns
+  (standing-wave lobes around a scattering pillar; periodic interference
+  fringes through a grating). `tests/test_field_reconstruction.py`, 10
+  tests. `fields.save_field_grid_npz` covers this phase's field-export
+  need (NumPy `.npz`; CSV/HDF5 deliberately deferred, no schema designed).
 
 ## Phase 8 — Expanded Validation Suite & Example Gallery
 

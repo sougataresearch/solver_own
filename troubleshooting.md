@@ -93,10 +93,29 @@ one; don't rely on memory across sessions.
   attempted to fix. `tests/test_mode_classification.py`'s Rayleigh test
   deliberately checks a small relative step away from the threshold on
   each side (`0.999x`/`1.001x`) rather than the exact point. Defining a
-  supported near-grazing/near-threshold behavior (interpolation, a
-  documented exclusion zone, or similar) is `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
-  Category 6 target 6.4's ("Grazing-incidence boundary test") job, not
-  yet done.
+  supported near-grazing/near-threshold behavior was
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 6 target 6.4's
+  ("Grazing-incidence boundary test") job — see the next entry for what
+  that target found for the closely related exact-grazing-*incidence*
+  case (as opposed to this entry's exact-Rayleigh-*threshold* case; same
+  `q==0` mechanism, different trigger).
+- **Exact grazing incidence (`theta=90 deg`) raises a plain `ValueError`,
+  not a `NaN` (Category 6 target 6.4, `tests/test_grazing_incidence.py`).**
+  Same root mechanism as the Rayleigh-threshold entry above (`q==0` in
+  `interface_smatrix`'s `kp @ phi / q` division) but a different failure
+  mode: here the *entire* incidence-medium mode set shares `q=0` (not just
+  one order among many), so the resulting non-finite `b_l` matrix is
+  caught by `scipy.linalg.lu_factor`'s internal `asarray_chkfinite` check
+  and raised as `ValueError` before ever reaching a silent `NaN`. Confirmed
+  this happens at *exactly* `theta=90 deg` in float64, not merely "very
+  close to it," because `math.sin(math.radians(90.0)) == 1.0` exactly (a
+  genuine floating-point coincidence for the nearest representable double
+  to `pi/2`), which for an `n=1` (air) incidence medium makes
+  `kx0 = omega*sin(theta)` exactly equal to `omega`, giving `q_sq =
+  omega^2 - kx0^2 == 0.0` exactly. **Supported range**: any `theta < 90
+  deg` — confirmed finite and energy-conserving (`R+T=1` to `1e-8`+) up to
+  `theta=89.999 deg`; only the exact endpoint fails, and fails loud, not
+  silently.
 - **A "lossy metal" index copied from a source using the opposite time
   convention is actually a gain medium here — `R+T>1`, not a bug (found
   twice: Category 2 target 2.5, then guarded against in Category 5 target
@@ -122,6 +141,52 @@ one; don't rely on memory across sessions.
   explicitly; any new code that reads/writes text files in this project
   should do the same rather than relying on the platform default, per
   `PRD.md`'s Windows-primary-shell constraint.
+- **`fields.z_poynting_flux` is missing the textbook `0.5` time-average
+  factor relative to `Sz = 0.5*Re(Ex*conj(Hy) - Ey*conj(Hx))` -- confirmed
+  directly, not a bug (found while building Category 9's real-space field
+  reconstruction, target 9.6).** `z_poynting_flux`'s own modal quadratic
+  form gives exactly `2x` the textbook per-order flux for the same mode --
+  harmless everywhere it's actually used (`reflectance()`/`transmittance()`
+  are *ratios* of two `z_poynting_flux` outputs, so the factor of 2
+  cancels), but a real-space Poynting-flux integral built independently
+  from `modal_field_components`' `Ex/Ey/Hx/Hy` must use the **no-`0.5`**
+  form (`Sz = Re(Ex*conj(Hy) - Ey*conj(Hx))`) to match this project's
+  established convention, confirmed to reproduce `R`/`T` to full double
+  precision once accounted for. See `CONVENTIONS.md`'s "Real-space field
+  reconstruction" section and `tests/test_field_reconstruction.py`.
+- **Interior field/amplitude reconstruction (`smatrix.interior_amplitudes`
+  + `fields.propagate_amplitudes`) can numerically overflow for thick,
+  highly lossy, high-`num_orders` layers -- found while implementing
+  Category 7 target 7.6's layer-wise absorption, a real numerical-
+  conditioning limitation, not a formula bug.** `propagate_amplitudes`'s
+  backward-wave exponential, `b(z) = b_top * exp(-i*q*z)`, grows as
+  `exp(Im(q)*z)` for `Im(q) >= 0` (the correct, already-validated
+  convention for a *stationary reference point deep inside a decaying
+  medium* -- confirmed exactly by Category 9's field-continuity tests at
+  moderate `Im(q)*thickness`). For a high-loss material (`eps=-396+80j`,
+  the same fixture `tests/test_stress_regression.py` uses) at high
+  `num_orders`, the deepest evanescent Fourier orders can have `Im(q)`
+  large enough that `Im(q)*thickness` reaches the 30s-and-up range for a
+  layer that isn't even especially thick in absolute terms
+  (`thickness=0.3`, `num_orders=25`: `max(Im(q))*thickness ~= 38`,
+  `exp(38) ~= 3e16`) -- one such term then dominates the
+  `z_poynting_flux` sum and produces a nonsensical result (a measured
+  `layer_absorption()` of `~573`, versus the correct `R+T+A=1` identity
+  that same material/pattern satisfies exactly at `thickness=0.05`,
+  `max(Im(q))*thickness ~= 6.3`). This is the same general instability
+  class the transfer-matrix method is famous for (`decisions.md`'s
+  original choice of S-matrix cascading over transfer matrices was made
+  for exactly this reason) — it doesn't affect `R`/`T` themselves (the
+  S-matrix cascade used for those never reconstructs an interior
+  amplitude), only interior-point queries (Category 9's field
+  reconstruction, Category 7's per-layer absorption) for genuinely
+  extreme thickness/loss/order combinations. Not fixed (no formula
+  change) — `layer_absorption()`/field reconstruction should be used with
+  parameters where `max(Im(q))*thickness` stays a modest double-digit
+  exponent or less; `tests/test_layer_absorption.py::test_interior_amplitude_reconstruction_can_numerically_overflow_for_thick_lossy_layers`
+  is a regression guard on the failure symptom itself, not a fix, so a
+  future silent workaround (e.g. clipping/renormalizing) doesn't land
+  unnoticed. See `decisions.md` ADR-017.
 
 ## Anticipated Gotchas (not yet encountered — flagged ahead of Phase 2-6)
 

@@ -105,6 +105,113 @@ lines 83–110).
   EMpy polarization-phase convention, so phase-sensitive comparisons must
   include an explicit convention check.
 
+### Worked polarization examples (Category 6 target 6.1)
+
+`PlaneWaveExcitation(s_amplitude, p_amplitude)` constructs any fully-
+polarized input state via these amplitude pairs (`|s_amplitude|^2 +
+|p_amplitude|^2` sets total incident power, per `incident_mode_amplitude`'s
+docstring):
+
+| State | `s_amplitude` | `p_amplitude` |
+|---|---|---|
+| TE (s-pol) | `1.0` | `0.0` |
+| TM (p-pol) | `0.0` | `1.0` |
+| Linear at 45 deg | `1/sqrt(2)` | `1/sqrt(2)` |
+| Linear at an arbitrary angle `alpha` | `cos(alpha)` | `sin(alpha)` |
+| Right-hand circular (RCP) | `1/sqrt(2)` | `1j/sqrt(2)` |
+| Left-hand circular (LCP) | `1/sqrt(2)` | `-1j/sqrt(2)` |
+| Elliptical | `cos(alpha)` | `sin(alpha) * exp(1j*delta)`, `delta != 0, pi` |
+
+These are the states `tests/test_polarization_states.py` (Category 6
+targets 6.2/6.3) exercises: normal-incidence regression checks that, for
+an isotropic (non-birefringent) stack, `R`/`T` are identical across every
+row above at fixed total power (a direct consequence of the stack having
+no preferred in-plane direction at `theta=0` — see that file for the
+proof-by-symmetry argument); oblique-incidence regression additionally
+varies `phi` and checks energy conservation for mixed/elliptical states.
+
+## Real-space field reconstruction (Category 9 target 9.1, Phase 7)
+
+`fields.py`'s `modal_field_components`/`reconstruct_field_at_points` extend
+the already-established modal-vector conventions above (`u = [-Ey; Ex]`,
+`Ex = u[n:2n]`, `Ey = -u[0:n]`) to a full 6-component `(Ex,Ey,Ez,Hx,Hy,Hz)`
+per-order Fourier representation, then sum that Fourier series onto a
+real-space `(x, y)` point or grid. Transcribed from
+`S4/S4/rcwa.cpp::GetInPlaneFieldVector` (lines 1959-1995, the transverse
+components — this project's existing `tangential_e_field` already
+implements the `E` half of this) and `GetFieldAtPoint` (lines 1997-2074,
+the longitudinal components and the real-space phase sum).
+
+- **Transverse components** (per Fourier order `i`, forward amplitude `a`,
+  backward amplitude `b`, both referenced at the same `z`-plane):
+  ```text
+  Hx, Hy = split(phi @ (a + b))          # NOT E, despite the naive-looking
+                                          # resemblance -- see troubleshooting.md
+  Ex, Ey = tangential_e_field(...)        # already implemented, unchanged
+  ```
+- **Longitudinal components** (from the source-free Maxwell curl equations,
+  i.e. `del x H = -i*omega*eps*E` restricted to its z-component and
+  `del x E = i*omega*mu0*H` similarly, evaluated per Fourier order so
+  `del -> i*(kx, ky, d/dz)` in-plane):
+  ```text
+  Ez = epsilon_inv @ (ky*Hx - kx*Hy) / omega   # epsilon_inv: scalar (uniform
+                                                 # isotropic) or (n,n) matrix
+                                                 # (patterned/anisotropic),
+                                                 # same dispatch as
+                                                 # eigenmodes.build_kp_matrix
+  Hz = (kx*Ey - ky*Ex) / omega
+  ```
+- **Real-space phase sum** (the actual "reconstruction" step; `kx`, `ky` are
+  this project's already-angular per-order wavevectors, the same arrays
+  `eigenmodes.py`/`simulation.py` already use — **not** `geometry.py`'s
+  separate "cycles per unit length" convention for shape Fourier
+  transforms, a different, already-documented convention used only inside
+  `Shape.fourier_transform`/`fourier_factorization.py`):
+  ```text
+  F(x, y) = sum_i F_i * exp(i*(kx_i*x + ky_i*y))
+  ```
+  for each field component `F in {Ex,Ey,Ez,Hx,Hy,Hz}`.
+- **Depth dependence within a layer** (independently derived — see
+  `decisions.md` ADR-015 for why this wasn't transcribed and how it was
+  validated instead — algebraically consistent with `smatrix.propagation_smatrix`'s
+  already-established `exp(+i*q*thickness)` convention, confirmed directly,
+  not assumed): given forward/backward amplitudes `(a_top, b_top)` at a
+  layer's top reference plane (`z=0` local to that layer, exactly what
+  `smatrix.interior_amplitudes` recovers), the amplitudes at depth `z`
+  (`0 <= z <= thickness`) are
+  ```text
+  a(z) = a_top * exp(+i*q*z)
+  b(z) = b_top * exp(-i*q*z)
+  ```
+
+**Real-space Poynting flux, and the missing factor of `0.5` (Category 9
+target 9.6, found this session, confirmed directly not assumed)**: the
+textbook time-averaged Poynting flux is `Sz = 0.5*Re(Ex*conj(Hy) -
+Ey*conj(Hx))`. `fields.z_poynting_flux`'s own already-oracle-validated
+modal quadratic form does **not** include that `0.5` -- confirmed by
+direct comparison for a single-order uniform-layer case:
+`z_poynting_flux`'s output is exactly `2x` the textbook formula evaluated
+on `modal_field_components`' own output for the same mode. This never
+affected any existing result because `reflectance()`/`transmittance()`
+only ever use *ratios* of `z_poynting_flux` outputs (the factor of 2
+cancels), but it matters for `tests/test_field_reconstruction.py`'s target
+9.6 real-space flux integral, which must therefore use
+`Sz = Re(Ex*conj(Hy) - Ey*conj(Hx))` (no `0.5`) to match this project's
+established convention -- verified to reproduce the solver's own `R`/`T`
+to full double precision once the missing factor is accounted for, not
+merely "close."
+
+## Bottom (reverse-side) illumination (Category 6 target 6.6)
+
+There is no separate "illuminate from below" mode. Reverse the layer list
+and swap which material plays `incidence`/`transmission`:
+`Simulation(lattice, list(reversed(layers)), num_orders, incidence=<old
+transmission material>, transmission=<old incidence material>)` — a
+`Layer`'s `thickness`/`pattern` carry no inherent z-direction, so this is a
+complete, correct description of the mirrored problem. See `decisions.md`
+ADR-014 and `tests/test_bottom_incidence.py` for the reciprocity check that
+validates this recipe.
+
 ## Permittivity tensor ordering
 
 `Material.epsilon_tensor(wavelength)` returns a complex `(3, 3)` array in

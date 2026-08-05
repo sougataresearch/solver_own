@@ -26,13 +26,13 @@ from sougata_solver.eigenmodes import (
     solve_layer_eigenmodes_uniform_inplane,
 )
 from sougata_solver.excitation import PlaneWaveExcitation
-from sougata_solver.fields import z_poynting_flux
+from sougata_solver.fields import propagate_amplitudes, z_poynting_flux
 from sougata_solver.fourier_basis import truncate_fourier_orders, truncate_fourier_orders_1d
 from sougata_solver.fourier_factorization import toeplitz_matrix, toeplitz_matrix_component
 from sougata_solver.geometry import Lattice, Lattice1D, validate_pattern_fits_lattice
 from sougata_solver.layer import Layer, LayerEigenmodes, LayerStack
 from sougata_solver.materials import Material
-from sougata_solver.smatrix import SMatrixStack
+from sougata_solver.smatrix import SMatrixStack, interior_amplitudes
 
 
 @dataclass
@@ -45,6 +45,7 @@ class SimulationResult:
     a0: np.ndarray
     a_transmitted: np.ndarray
     b_reflected: np.ndarray
+    thicknesses: list[float]
 
     def reflectance(self) -> float:
         """`z_poynting_flux`'s `backward` output is a genuinely-signed z-Poynting
@@ -148,6 +149,45 @@ class SimulationResult:
             }
         return classification
 
+    def layer_absorption(self) -> list[float]:
+        """Category 7 targets 7.5/7.6 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`):
+        per-interior-layer absorbed power fraction (normalized to incident
+        power, same convention `reflectance()`/`transmittance()` use), one
+        entry per interior (finite-thickness) layer in stack order.
+
+        Composition of already-validated Phase 7 pieces only -- no new
+        physics formula (`design.md`'s "Layer-Wise Absorption Design",
+        `decisions.md` ADR-017): net z-Poynting flux entering a layer at
+        its top interface (`smatrix.interior_amplitudes` at
+        `partial_smatrix_up_to(i)`) minus net flux leaving at its bottom
+        interface (`fields.propagate_amplitudes` through the layer's own
+        thickness, then `fields.z_poynting_flux` again). `z_poynting_flux`
+        already folds the forward/backward interference cross-term
+        symmetrically into its `(forward, backward)` split
+        (`fields.py:51-56`), so `forward + backward` is the genuine net
+        total z-flux at one reference plane.
+        """
+        omega = self.excitation.omega()
+        n2 = 2 * self.num_orders
+        stack = SMatrixStack(self.thicknesses, self.all_modes)
+
+        modes_inc = self.all_modes[0]
+        zeros = np.zeros_like(self.a0)
+        incident_power, _ = z_poynting_flux(omega, modes_inc.q, modes_inc.kp, modes_inc.phi, self.a0, zeros)
+
+        absorptions: list[float] = []
+        for i in range(1, len(self.all_modes) - 1):
+            modes_i = self.all_modes[i]
+            a_top, b_top = interior_amplitudes(stack.partial_smatrix_up_to(i), n2, self.a0, self.b_reflected)
+            a_bot, b_bot = propagate_amplitudes(modes_i.q, self.thicknesses[i], a_top, b_top)
+
+            fwd_top, bwd_top = z_poynting_flux(omega, modes_i.q, modes_i.kp, modes_i.phi, a_top, b_top)
+            fwd_bot, bwd_bot = z_poynting_flux(omega, modes_i.q, modes_i.kp, modes_i.phi, a_bot, b_bot)
+            net_top = (fwd_top + bwd_top).real
+            net_bot = (fwd_bot + bwd_bot).real
+            absorptions.append(float((net_top - net_bot) / incident_power.real))
+        return absorptions
+
 
 class Simulation:
     """Owns a lattice, layer stack, and Fourier-order truncation; solves for
@@ -166,6 +206,14 @@ class Simulation:
         self.layer_stack = LayerStack(layers, incidence, transmission)
         self.num_orders = num_orders
         self.truncation = truncation
+        # Category 7 targets 7.3/7.4 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md):
+        # instance-scoped Toeplitz-matrix cache, gated on a measured timing
+        # case per `rules.md`'s Performance Requirements exception clause --
+        # see `design.md`'s "Layer/Toeplitz Caching Design" and
+        # `decisions.md` ADR-016. Never module-level (rules.md's "no hidden
+        # global state" rule): a fresh `Simulation` starts with an empty
+        # cache, so no entry can outlive the instance it belongs to.
+        self._toeplitz_cache: dict = {}
 
         # Category 4 target 4.2 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md): reject
         # a patterned layer whose shapes could overlap their own periodic
@@ -174,6 +222,23 @@ class Simulation:
         for layer in self.layer_stack:
             if layer.pattern is not None:
                 validate_pattern_fits_lattice(layer.pattern, lattice)
+
+    def _cached_toeplitz(self, pattern, g: np.ndarray, wavelength: float, inverse: bool) -> np.ndarray:
+        """Category 7 target 7.4: `id(pattern)`-keyed cache -- see
+        `design.md`'s "Layer/Toeplitz Caching Design" for the full key/
+        invalidation rationale (`decisions.md` ADR-016)."""
+        key = ("toeplitz", id(pattern), wavelength, inverse)
+        if key not in self._toeplitz_cache:
+            self._toeplitz_cache[key] = toeplitz_matrix(pattern, self.lattice, g, wavelength, inverse=inverse)
+        return self._toeplitz_cache[key]
+
+    def _cached_toeplitz_component(
+        self, pattern, g: np.ndarray, wavelength: float, row: int, col: int
+    ) -> np.ndarray:
+        key = ("toeplitz_component", id(pattern), wavelength, row, col)
+        if key not in self._toeplitz_cache:
+            self._toeplitz_cache[key] = toeplitz_matrix_component(pattern, self.lattice, g, wavelength, row, col)
+        return self._toeplitz_cache[key]
 
     def solve(self, excitation: PlaneWaveExcitation) -> SimulationResult:
         wavelength = excitation.wavelength
@@ -238,8 +303,8 @@ class Simulation:
                         )
                     )
             elif is_1d:
-                epsilon_hat = toeplitz_matrix(layer.pattern, self.lattice, g, wavelength, inverse=False)
-                epsilon_inv_hat = toeplitz_matrix(layer.pattern, self.lattice, g, wavelength, inverse=True)
+                epsilon_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=False)
+                epsilon_inv_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=True)
                 all_modes.append(solve_layer_eigenmodes_1d(omega, kx, ky, epsilon_hat, epsilon_inv_hat))
             else:
                 materials_in_pattern = [layer.pattern.background] + [s.material for s in layer.pattern.shapes]
@@ -249,7 +314,7 @@ class Simulation:
                     # true-2D, no-polarization-basis closed-form path (the
                     # one transcribed here) doesn't consume the inverse-rule
                     # Toeplitz at all, unlike the 1D case above.
-                    epsilon_hat = toeplitz_matrix(layer.pattern, self.lattice, g, wavelength, inverse=False)
+                    epsilon_hat = self._cached_toeplitz(layer.pattern, g, wavelength, inverse=False)
                     all_modes.append(solve_layer_eigenmodes_patterned(omega, kx, ky, epsilon_hat))
                 else:
                     # Anisotropic patterned layer (Category 1 target 1.6,
@@ -263,11 +328,11 @@ class Simulation:
                             "Longitudinally-coupled anisotropic patterned layers require "
                             "Category 1 target 1.5 (COMMERCIAL_RCWA_ATOMIC_TARGETS.md), not yet available"
                         )
-                    exx = toeplitz_matrix_component(layer.pattern, self.lattice, g, wavelength, 0, 0)
-                    exy = toeplitz_matrix_component(layer.pattern, self.lattice, g, wavelength, 0, 1)
-                    eyx = toeplitz_matrix_component(layer.pattern, self.lattice, g, wavelength, 1, 0)
-                    eyy = toeplitz_matrix_component(layer.pattern, self.lattice, g, wavelength, 1, 1)
-                    ezz = toeplitz_matrix_component(layer.pattern, self.lattice, g, wavelength, 2, 2)
+                    exx = self._cached_toeplitz_component(layer.pattern, g, wavelength, 0, 0)
+                    exy = self._cached_toeplitz_component(layer.pattern, g, wavelength, 0, 1)
+                    eyx = self._cached_toeplitz_component(layer.pattern, g, wavelength, 1, 0)
+                    eyy = self._cached_toeplitz_component(layer.pattern, g, wavelength, 1, 1)
+                    ezz = self._cached_toeplitz_component(layer.pattern, g, wavelength, 2, 2)
                     all_modes.append(
                         solve_layer_eigenmodes_patterned_inplane(omega, kx, ky, exx, exy, eyx, eyy, ezz)
                     )
@@ -292,4 +357,5 @@ class Simulation:
             a0=a0,
             a_transmitted=a_transmitted,
             b_reflected=b_reflected,
+            thicknesses=thicknesses,
         )

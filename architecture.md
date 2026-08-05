@@ -35,9 +35,9 @@ Layer(s)     ─┘            │                              │
 | `fourier_basis.py` | G-vector (Fourier order) truncation: `truncate_fourier_orders` (2D, circular selection matching S4's `gsel.c`), `truncate_fourier_orders_1d` (Phase 3) | done |
 | `layer.py` | `Layer` (uniform or patterned), `LayerStack` (with incidence/transmission half-spaces), `LayerEigenmodes` (result container) | done |
 | `eigenmodes.py` | Per-layer eigenmode solve: closed-form for uniform isotropic layers; `solve_layer_eigenmodes_1d` (Phase 3, block-diagonal specialization of S4's general operator); dense general non-uniform solve (2D patterns) is Phase 4a | uniform + 1D-patterned done |
-| `smatrix.py` | Interface S-matrices, propagation S-matrices, Redheffer star-product cascade (`SMatrixStack`) | done, dimension-agnostic — confirmed unchanged through Phase 3, expected unchanged through Phase 4/6 too |
+| `smatrix.py` | Interface S-matrices, propagation S-matrices, Redheffer star-product cascade (`SMatrixStack`), `interior_amplitudes` (Category 9 target 9.3, Phase 7 — recovers forward/backward amplitudes at an interior interface from `partial_smatrix_up_to`) | done, dimension-agnostic — confirmed unchanged through Phase 3-6, extended (not modified) for Phase 7 |
 | `excitation.py` | Plane-wave s/p decomposition, incident-mode-amplitude inversion | done |
-| `fields.py` | z-Poynting flux (R/T power), tangential E-field reconstruction at one interface | done for R/T (unchanged through Phase 3); full real-space reconstruction is Phase 7 |
+| `fields.py` | z-Poynting flux (R/T power), tangential E-field reconstruction at one interface, full real-space `(Ex,Ey,Ez,Hx,Hy,Hz)` reconstruction at any point/depth (`modal_field_components`/`propagate_amplitudes`/`reconstruct_field_at_points`), NumPy field-grid export (`save_field_grid_npz`) | done — R/T (Phase 1) and full real-space reconstruction (Phase 7, Category 9 targets 9.1-9.8) both shipped |
 | `polarimetry.py` | Jones/Mueller matrix construction from simulation results | done |
 | `simulation.py` | Orchestration: builds the Fourier-order set, solves every layer's eigenmodes, cascades the S-matrix stack, solves for transmitted/reflected amplitudes given an incident excitation; `SimulationResult.diffraction_efficiencies()` (Phase 3, per-order R/T) | done for uniform + 1D-patterned + 2D-patterned layers |
 | `staircase.py` | Phase 5: `slice_profile` (Category 4 target 4.7, general geometry-to-layer-slices interface, independent of the RCWA solve) plus `staircase_circle_layers`/`staircase_rectangle_layers`/`staircase_slab_layers` (now thin wrappers around it) — generate a `list[Layer]` approximating a linearly-tapered via/trench sidewall as `N` uniform-in-z slices; pure geometry/bookkeeping, no new physics formula (consumes Phase 3/4a's per-layer solvers unchanged) | done |
@@ -67,9 +67,13 @@ Layer(s)     ─┘            │                              │
       `[a_transmitted; b_reflected] = S_full @ [a0; 0]`.
    f. Return a `SimulationResult`, from which `reflectance()`/
       `transmittance()` are derived via `fields.z_poynting_flux`.
-3. **(Planned, Phase 7)** Field reconstruction at an arbitrary intermediate
-   depth uses `SMatrixStack.partial_smatrix_up_to` to get local mode
-   amplitudes, then inverse-Fourier-sums them onto a real-space grid.
+3. **(Phase 7, shipped)** Field reconstruction at an arbitrary intermediate
+   depth: `smatrix.interior_amplitudes` uses `SMatrixStack.partial_smatrix_up_to`
+   plus the already-known `a0`/`b_reflected` to get local mode amplitudes
+   at an interior interface, `fields.propagate_amplitudes` carries them to
+   any depth within a layer, `fields.modal_field_components` converts to
+   per-order `(Ex,Ey,Ez,Hx,Hy,Hz)`, and `fields.reconstruct_field_at_points`
+   inverse-Fourier-sums them onto a real-space point/line/grid.
 
 ## Component Responsibilities
 

@@ -5,11 +5,164 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-04 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 5, targets
-5.1-5.8), 2026-08-04 (Category 4, targets 4.1-4.7), 2026-08-04 (Category 3,
-targets 3.1-3.6), 2026-08-04 (Category 2, targets 2.1-2.5), 2026-08-03
-(Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23 (Phase 4b),
-2026-07-21 (Phase 4a) and earlier entries below:
+As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7, targets
+7.1-7.6), 2026-08-05 (Phase 7 / Category 9, targets 9.1-9.8), 2026-08-04
+(Category 6, targets 6.1-6.6), 2026-08-04
+(Category 5, targets 5.1-5.8), 2026-08-04 (Category 4, targets 4.1-4.7),
+2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
+2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
+(Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 7 (Layer handling), targets 7.1-7.6, are all complete.**
+  7.1: `layer._require_valid_thickness`, called from `Layer.__post_init__`
+  -- rejects NaN/non-positive thickness at construction, explicitly allows
+  `math.inf` (the documented semi-infinite half-space sentinel; a direct
+  test confirms `SMatrixStack` never actually reads that value, since
+  `propagation_smatrix` is only called for interior layers).
+  `tests/test_layer_validation.py` (15 tests). 7.2: equivalent repeated-
+  layer representations (a thick layer split into N thin ones; a pattern
+  reused by object identity vs. N separately-constructed structurally-
+  equal patterns) give identical R/T -- `tests/test_layer_repetition.py`
+  (7 tests), the invariant target 7.4's cache leans on. 7.3/7.4: an
+  instance-scoped Toeplitz-matrix cache on `Simulation`
+  (`_cached_toeplitz`/`_cached_toeplitz_component`), deliberately gated on
+  a measured timing case per `rules.md`'s Performance Requirements
+  exception clause rather than implemented speculatively (`design.md`'s
+  "Layer/Toeplitz Caching Design", `decisions.md` ADR-016). **Honest
+  correction made mid-session**: a first measurement (repeated identical
+  patterned layers within one `solve()` call) wrongly attributed the
+  entire "extra time per repeat" to Toeplitz reconstruction; isolating the
+  two costs directly showed the (out-of-scope, still-uncached) eigensolve
+  actually dominates at high `num_orders`, so that scenario only sees a
+  ~4% real speedup. The scenario that actually justifies the cache,
+  measured properly: a fixed-wavelength angle sweep (Category 8 target
+  8.3, planned) reuses the same Toeplitz matrix across every sweep point
+  (Toeplitz depends on pattern+wavelength, not angle) -- ~30% wall-clock
+  reduction over a 20-point sweep, confirmed directly.
+  `tests/test_layer_cache.py` (4 tests): equivalence to forced-uncached
+  recomputation, a call-counting cache-hit check, and a direct angle-sweep
+  cache-reuse regression. 7.5/7.6: `SimulationResult.layer_absorption()`
+  (plus a new `SimulationResult.thicknesses` field to support it) -- per-
+  layer absorbed power as a z-Poynting-flux-divergence combination of
+  already-validated Category 9/Phase 7 pieces (`interior_amplitudes`,
+  `propagate_amplitudes`, `z_poynting_flux`), deliberately not a new
+  volumetric `Im(eps)*|E|^2` formula (`design.md`'s "Layer-Wise Absorption
+  Design", `decisions.md` ADR-017). Validated by the `R+T+sum(A)=1`
+  energy-balance identity itself -- finally closing the gap
+  `tests/test_stress_regression.py`'s docstring had flagged since Category
+  2 ("layer-wise absorption isn't implemented yet"), reusing that same
+  file's already-vetted `eps=-396+80j` lossy fixture.
+  `tests/test_layer_absorption.py` (4 tests). **Second honest finding,
+  found while validating 7.6, documented rather than silently avoided**:
+  `layer_absorption()` inherits `interior_amplitudes`/`propagate_amplitudes`'s
+  existing numerical-stability envelope -- a thick, highly lossy, high-
+  `num_orders` case (`max(Im(q))*thickness ~= 38`) numerically overflows
+  the deepest evanescent modes' backward-propagated amplitude, giving a
+  nonsensical `layer_absorption() ~= 573`; the same fixture at a thinner
+  layer (`~6.3`) satisfies the energy identity to `~1e-6`. Not fixed (no
+  formula change, matching the same-class transfer-matrix-vs-S-matrix
+  numerical-stability tradeoff this project's own S-matrix choice was
+  originally made to avoid at the R/T level) -- documented in
+  `troubleshooting.md` and `decisions.md` ADR-017, with a dedicated
+  regression test on the failure symptom itself so a future silent
+  workaround doesn't land unnoticed. 542 tests pass project-wide (512 at
+  the start of this category: 503 fast + 9 slow -- 533 fast + 9 slow now,
+  30 new fast tests: 15+7+4+4 across the four new test files), full
+  fast+slow suite re-run and confirmed green.
+- **Phase 7 (Real-Space Field Reconstruction & Visualization), tracked at
+  atomic-target grain as Category 9 (targets 9.1-9.8), is complete.**
+  9.1: `fields.modal_field_components` (per-order `Ex,Ey,Ez,Hx,Hy,Hz` from
+  modal amplitudes) and `fields.reconstruct_field_at_points` (inverse-
+  Fourier phase sum onto real-space points/grids), citing S4's
+  `GetInPlaneFieldVector` (`S4.cpp:1959-1995`) and `GetFieldAtPoint`
+  (`S4.cpp:1997-2074`) for the transverse+longitudinal formulas
+  (`Ez = epsilon_inv @ (ky*Hx - kx*Hy) / omega`,
+  `Hz = (kx*Ey - ky*Ex) / omega`). 9.2/9.3: `fields.propagate_amplitudes`
+  (depth-dependence ansatz `a(z)=a_top*exp(+i*q*z)`,
+  `b(z)=b_top*exp(-i*q*z)`) and `smatrix.interior_amplitudes` (interior-
+  layer mode-amplitude recovery from `SMatrixStack.partial_smatrix_up_to`
+  plus the already-known `a0`/`b_reflected`) — **both independently
+  derived, not transcribed** (`decisions.md` ADR-015): S4 uses a
+  structurally different block-tridiagonal `SolveInterior` algorithm; this
+  project instead reuses its own already-implemented
+  `partial_smatrix_up_to` architecture via standard Redheffer star-product
+  algebra (`b_i = inv(S11) @ (b_reflected - S10 @ a0)`,
+  `a_i = S00 @ a0 + S01 @ b_i`), validated by a zero-free-parameter
+  self-consistency check (recovering amplitudes at the full-stack partial
+  matrix exactly reproduces the already-known transmitted amplitude).
+  **Real finding, not a bug**: this project's established
+  `fields.z_poynting_flux` modal quadratic form is exactly **2x** the
+  textbook real-space flux `Sz = 0.5*Re(Ex*conj(Hy) - Ey*conj(Hx))` —
+  confirmed directly (single-order uniform-layer case: `z_poynting_flux`
+  gives `1.0`, textbook formula on the same mode gives `0.5`) — harmless
+  for `R`/`T` (a ratio, so the factor cancels) but must be accounted for
+  (`Sz = Re(...)`, no `0.5`) when computing absolute real-space flux from
+  raw reconstructed fields; documented in `CONVENTIONS.md` and
+  `troubleshooting.md`, not silently absorbed into the new code. 9.4-9.6:
+  validated via analytic-plane-wave match, transversality (`k.E=0`,
+  `k.H=0`), field continuity across a real material interface, 1D
+  periodicity, and flux-matches-`R`/`T` (using the corrected no-`0.5`
+  formula, agreeing to the solver's own `T` at multiple grid resolutions)
+  — `tests/test_field_reconstruction.py` (10 new tests). 9.7/9.8:
+  `fields.save_field_grid_npz` (raw-data-only, per ADR-009/010) plus two
+  `structures/` example scripts (`structures/trench/trench_field_cross_section.py`,
+  a 1D lamellar-grating (x,z) cross-section, saved via direct `np.savez`
+  since `save_field_grid_npz`'s single-z-plane signature doesn't fit a
+  z-sweep; `structures/via/pillar_field_cross_section.py`, a 2D circular-
+  pillar (x,y) field map at one depth, the genuine single-plane case
+  `save_field_grid_npz` was designed for) and one `postprocessing/` script
+  (`postprocessing/plot_field_cross_section.py`, auto-detects either
+  `.npz` layout, plots `|E|^2` via `pcolormesh`) — both example scripts
+  run end-to-end (`R+T=1.0000`) and their output PNGs visually inspected,
+  showing physically sensible interference/near-field patterns. 512 tests
+  pass project-wide (502 at the start of this category: 493 fast + 9 slow
+  -- 503 fast + 9 slow now), full fast+slow suite re-run and confirmed
+  green.
+- **Category 6 (Boundary conditions and excitation), targets 6.1-6.6, are
+  all complete.** 6.1: confirmed `CONVENTIONS.md`'s existing "Phasor and
+  propagation convention"/"Polarization convention" sections already
+  satisfy this target, then added a "Worked polarization examples" table
+  (TE/TM/linear/RCP/LCP/elliptical amplitude pairs). 6.2/6.3: two strong,
+  oracle-independent symmetry invariants, both verified numerically before
+  being encoded as tests -- (a) at normal incidence, an isotropic stack's
+  `R`/`T` are *identical* across every polarization state at fixed total
+  power (full rotational symmetry, stronger than energy conservation
+  alone); (b) at fixed `theta`/polarization, `R`/`T` are independent of
+  azimuth `phi` for a laterally-uniform stack. Combined with an 84-case
+  oblique-incidence energy-conservation sweep (7 states x 4 azimuths x 3
+  angles), `tests/test_polarization_states.py` (89 tests). 6.4: 
+  characterized the grazing-incidence boundary directly rather than
+  assuming it -- any `theta<90 deg` is supported (finite, energy-
+  conserving to `1e-8`+ up to `89.999 deg`); exactly `theta=90 deg` raises
+  a plain `ValueError` (from `scipy.linalg.lu_factor`'s finiteness check),
+  traced to a genuine floating-point coincidence
+  (`math.sin(math.radians(90.0)) == 1.0` exactly in float64, making the
+  incidence half-space's `q` exactly `0.0` for `n=1`, not merely small).
+  Added to `design.md`'s Failure Contract, which also picked up several
+  Category 4/5 rows that had never been backfilled into it.
+  `tests/test_grazing_incidence.py` (9 tests). 6.5: found already satisfied
+  by `tests/test_mode_classification.py` (Category 1 target 1.8, normal
+  incidence) -- added the one thing that coverage didn't have and Category
+  6 is specifically about: an oblique-incidence Rayleigh-threshold case,
+  where the `+m`/`-m` order degeneracy breaks and the two orders cross
+  threshold at different wavelengths (confirmed by a coarse sweep, not a
+  closed form -- the oblique threshold condition has no simple analytic
+  form the way the normal-incidence one does).
+  `tests/test_oblique_rayleigh_threshold.py` (8 tests). 6.6: **found a
+  better answer than "defer, not needed"** -- bottom (reverse-side)
+  illumination is already achievable via the existing `Simulation`
+  constructor (reverse the layer list, swap `incidence`/`transmission`;
+  `Layer.thickness`/`pattern` carry no inherent z-direction), verified via
+  the Stokes transmittance-reciprocity relation for a lossless reciprocal
+  medium (`T` matches to `~1e-15` at normal incidence between the forward
+  and reversed simulations) rather than just asserted. No new `Simulation`
+  parameter added, per `rules.md`'s "don't add features not needed" --
+  `decisions.md` ADR-014 records the decision, `tests/test_bottom_incidence.py`
+  (3 tests) is the permanent regression guard, including an honest
+  counter-check that `R` genuinely differs between directions at oblique
+  incidence (not claimed direction-independent, unlike `T`). 502 tests
+  pass project-wide (393 at the start of this category: 384 fast + 9 slow
+  -- 493 fast + 9 slow now), full fast+slow suite re-run and confirmed
+  green.
 - **Category 5 (Material models), targets 5.1-5.8, are all complete.**
   5.1: `Material.__init__` and `Material.epsilon_tensor` both now validate
   (finite values, correct tensor shape) -- construction-time alone can't
