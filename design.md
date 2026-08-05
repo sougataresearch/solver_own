@@ -266,6 +266,40 @@ reciprocity relation (`tests/test_bottom_incidence.py`): at normal
 incidence, the reversed simulation's transmittance matches the original's
 to `~1e-15`.
 
+**Parameter sweeps** (Category 8 targets 8.1-8.8, `src/sougata_solver/sweep.py`):
+
+```python
+from sougata_solver.sweep import (
+    SweepResult, sweep_wavelength, sweep_theta, sweep_phi,
+    sweep_polarization, sweep_thickness, harmonic_study,
+    find_convergence_index, auto_select_num_orders,
+)
+
+sweep = sweep_wavelength(sim, wavelengths, theta, phi, s_amplitude, p_amplitude)
+sweep.reflectance(); sweep.transmittance()   # np.ndarray, one entry per point
+```
+
+Every `sweep_*` function is a thin wrapper calling `Simulation.solve()`
+once per parameter value — no new solver-formula risk, per the category's
+own exit criterion ("each sweep is equivalent to repeated scalar solves"),
+confirmed directly by `tests/test_sweep.py` for every function (build the
+same result via the sweep function and via a manual per-point loop,
+compare). `sweep_theta`/`sweep_phi` (fixed-wavelength angle sweeps) are
+the scenario ADR-016's Toeplitz-matrix cache was actually measured
+against — reusing one `Simulation` across such a sweep gets that ~30%
+reduction automatically, no extra code needed here.
+
+`harmonic_study` takes a `Simulation`-*builder* callable
+(`Callable[[int], Simulation]`), not a single instance, because
+`num_orders` is fixed for a `Simulation` instance's entire lifetime (the
+same invariant ADR-016's Toeplitz cache relies on) — there is no supported
+way to resweep `num_orders` on one live instance. `find_convergence_index`
+is a conservative data-selection rule (every *later* point must also stay
+within tolerance, not just the immediate next one — see `decisions.md`
+ADR-018 for why), validated against thin-film/trench/pillar fixtures
+before `auto_select_num_orders` (target 8.8) was implemented, per that
+target's own "implement only after 8.7 succeeds" wording.
+
 ## "Database Design"
 
 Not applicable — `sougata_solver` has no database and no persistent application

@@ -5,13 +5,63 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7, targets
-7.1-7.6), 2026-08-05 (Phase 7 / Category 9, targets 9.1-9.8), 2026-08-04
+As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 8, targets
+8.1-8.8), 2026-08-05 (Category 7, targets 7.1-7.6), 2026-08-05 (Phase 7 /
+Category 9, targets 9.1-9.8), 2026-08-04
 (Category 6, targets 6.1-6.6), 2026-08-04
 (Category 5, targets 5.1-5.8), 2026-08-04 (Category 4, targets 4.1-4.7),
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 8 (Solver sweeps and convergence), targets 8.1-8.8, are all
+  complete.** New module `src/sougata_solver/sweep.py`. 8.1: `SweepResult`
+  (typed one-parameter-sweep container: `parameter_name`/`parameter_unit`/
+  `parameter_values`/`results`/`metadata`/`extra`), with `.reflectance()`/
+  `.transmittance()` array accessors reusing already-validated
+  `SimulationResult` methods. 8.2-8.5: `sweep_wavelength`/`sweep_theta`/
+  `sweep_phi`/`sweep_polarization`/`sweep_thickness` -- each a thin
+  wrapper repeating `Simulation.solve()` once per parameter value, no new
+  solver-formula risk (confirmed equivalent to a manual per-point loop for
+  every function, `tests/test_sweep.py`). `sweep_thickness` mutates an
+  already-constructed `Layer`'s thickness in place between calls
+  (`Layer.__post_init__`'s construction-time validation, Category 7 target
+  7.1, doesn't refire on attribute mutation), so it explicitly re-validates
+  every candidate thickness itself and restores the original value
+  afterward (even on error). `sweep_theta`/`sweep_phi` are exactly the
+  fixed-wavelength-angle-sweep scenario Category 7 target 7.4's Toeplitz
+  cache (ADR-016) was measured against -- confirmed to populate exactly
+  one cache entry across a whole angle sweep, not one per angle. 8.6:
+  `harmonic_study`, taking a `Simulation`-*builder* callable rather than a
+  single instance -- `num_orders` is fixed for a `Simulation` instance's
+  entire lifetime (the same invariant the Toeplitz-cache design already
+  relies on), so there is no supported way to resweep it on one live
+  instance. Its conservation-residual output reuses Category 7 target
+  7.6's `layer_absorption()` (`|1-(R+T+sum(A))|`), confirmed near-zero at
+  every harmonic-order count for a lossless fixture. 8.7:
+  `find_convergence_index` (`decisions.md` ADR-018) -- a deliberately
+  conservative criterion (every *later* point in the data must also stay
+  within tolerance, not just the immediate next one), motivated directly
+  by Category 3's own recorded non-monotonic-convergence findings.
+  **Honest bug found and fixed before trusting the function, by the
+  project's own test-first discipline**: a first version let the very
+  last data point count as trivially "converged" (vacuously true, since
+  there are zero later points to disagree with it) -- a test built
+  specifically to exercise a monotonically-diverging (never-converging)
+  sequence caught this immediately; fixed by requiring confirmation from
+  at least one later point, so `None` became a real, reachable return
+  value again, not merely one the type signature claimed was possible.
+  Validated against three structurally different fixtures per target
+  8.8's own gating requirement -- thin-film (trivial, `num_orders` has no
+  physical effect, converges at index 0 exactly), a moderate-contrast 1D
+  TE grating (genuine non-trivial convergence), and Category 3's
+  high-contrast 2D pillar fixture's own recorded `num_orders=25` wobble
+  (confirmed the criterion correctly refuses to anchor on it). 8.8:
+  `auto_select_num_orders`, implemented only after 8.7's validation above
+  passed -- raises `ValueError` (never silently falls back to the largest
+  candidate) if nothing converges within the given candidates. 569 tests
+  pass project-wide (542 at the start of this category: 533 fast + 9 slow
+  -- 559 fast + 10 slow now, 26 new fast tests + 1 new slow test), full
+  fast+slow suite re-run and confirmed green.
 - **Category 7 (Layer handling), targets 7.1-7.6, are all complete.**
   7.1: `layer._require_valid_thickness`, called from `Layer.__post_init__`
   -- rejects NaN/non-positive thickness at construction, explicitly allows

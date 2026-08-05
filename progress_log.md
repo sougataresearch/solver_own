@@ -654,3 +654,58 @@ whether it was ever actually implemented.
   file's actual assertions. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`,
   `memory.md`, `tasks.md`, `decisions.md` (new ADR-016, ADR-017),
   `design.md`, `references.md`, `troubleshooting.md`, and this file.
+
+## 2026-08-05 (Category 8)
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 8 (Solver
+  sweeps and convergence, targets 8.1-8.8): a typed sweep-result
+  container, wavelength/angle/polarization/thickness sweep APIs, a
+  harmonic-order study, a conservative convergence criterion, and
+  automatic harmonic-order selection built on top of it.
+- Why `harmonic_study` needs a `Simulation`-*builder* callable rather than
+  a single instance: `num_orders` is a construction-time parameter, and
+  Category 7's Toeplitz-cache design (ADR-016) already established that
+  `g` (and therefore `num_orders`) must stay fixed for a `Simulation`
+  instance's whole lifetime -- resweeping `num_orders` on one live
+  instance isn't supported.
+- How to define a "conservative" convergence-stopping criterion (target
+  8.7) given this project's own already-recorded evidence
+  (`tests/test_fourier_convergence.py`) that high-contrast patterns can
+  show a sharply non-monotonic low-order wobble -- settled on "every
+  later point must also stay within tolerance," not just the immediate
+  next one.
+- A bug found and fixed by the project's own test-first discipline: the
+  first version of the convergence criterion let the very last data point
+  count as trivially converged (vacuously true against zero remaining
+  points) -- caught immediately by a test using a never-actually-
+  converging monotonic sequence, fixed before being trusted by
+  `auto_select_num_orders`.
+
+### Action items
+- [x] Target 8.1 (result-series container) — done 2026-08-05.
+  `sweep.SweepResult`.
+- [x] Target 8.2 (wavelength sweep API) — done 2026-08-05.
+  `sweep.sweep_wavelength`.
+- [x] Target 8.3 (angle sweep API) — done 2026-08-05.
+  `sweep.sweep_theta`/`sweep_phi`, confirmed to reuse the Category 7
+  Toeplitz cache across a whole angle sweep.
+- [x] Target 8.4 (polarization sweep API) — done 2026-08-05.
+  `sweep.sweep_polarization`.
+- [x] Target 8.5 (thickness sweep API) — done 2026-08-05.
+  `sweep.sweep_thickness`, with explicit validation and thickness
+  restoration.
+- [x] Target 8.6 (harmonic-study API) — done 2026-08-05.
+  `sweep.harmonic_study`.
+- [x] Target 8.7 (convergence criterion) — done 2026-08-05.
+  `sweep.find_convergence_index`, `decisions.md` ADR-018. Validated
+  against thin-film/trench/pillar fixtures.
+- [x] Target 8.8 (automatic harmonic selection) — done 2026-08-05, after
+  8.7's validation passed. `sweep.auto_select_num_orders`.
+- **Session summary**: all eight Category 8 targets (8.1-8.8) complete.
+  569 tests pass project-wide (542 at the start of this category: 533
+  fast + 9 slow -- 559 fast + 10 slow now, 26 new fast tests + 1 new slow
+  test). No existing test weakened. Updated
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
+  `decisions.md` (new ADR-018), `design.md`, `architecture.md`, and this
+  file.

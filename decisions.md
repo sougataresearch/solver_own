@@ -719,3 +719,51 @@
   Not in scope to fix here — the validation tests for this ADR instead use
   a parameter regime (`thickness=0.05`) confirmed to stay well clear of
   this envelope.
+
+## ADR-018: Conservative "every later point must also match" convergence criterion (Category 8 target 8.7)
+
+- **Decision**: `sweep.find_convergence_index(values, tolerance)` returns
+  the smallest index `i` such that **every later value** in the sequence
+  (not just the immediate next one) stays within `tolerance` of
+  `values[i]`, and requires confirmation from at least one later point (an
+  index with nothing after it is never itself eligible — see the "found
+  while testing" note below). Returns `None` if no such index exists.
+- **Reason**: this project's own already-recorded evidence
+  (`tests/test_fourier_convergence.py`, Category 3 targets 3.2/3.3) shows
+  a high-contrast pattern's reflectance-vs-`num_orders` curve can be
+  sharply non-monotonic at low harmonic-order counts (`num_orders=25`
+  gives `R~0.214`, an order-of-magnitude outlier against both its
+  immediate low-order neighbors and the eventual ~0.0236 converged value).
+  A criterion that only checks "is the next point close" would misreport
+  convergence at exactly this kind of transient. Requiring *every*
+  remaining point to also match is the conservative choice target 8.7
+  itself asks for.
+- **Validation**: per target 8.8's explicit gating ("implement only after
+  8.7 succeeds on thin-film, trench, and pillar fixtures"), validated
+  against three structurally different cases before `auto_select_num_orders`
+  (target 8.8) was implemented (`tests/test_harmonic_convergence.py`): a
+  thin-film case where `num_orders` has no physical effect at all
+  (converges at index 0, trivially and exactly); a moderate-contrast 1D
+  TE grating that converges genuinely, at a non-trivial, non-final index;
+  and the Category 3 high-contrast 2D pillar fixture's own known
+  `num_orders=25` wobble, confirmed directly not to fool the criterion
+  into anchoring on it.
+- **Found while testing, fixed before trusting the function (not silently
+  left in)**: a first version allowed the *last* index in the data to
+  count as converged, since "every later value" is vacuously true when
+  there are zero later values to check against. A test built to exercise
+  a monotonically-diverging (never-actually-converging) sequence caught
+  this immediately — the function returned the last index instead of
+  `None`. Fixed by requiring at least one later point to actually confirm
+  against (looping only up to `n-1`, not `n`), so returning an index is
+  always a genuine confirmation, and `None` is a real, reachable outcome
+  again — not merely a value the type signature claimed was possible.
+- **Alternatives considered**: a relative (percentage) tolerance instead
+  of an absolute one — left to the caller (pass a value computed from
+  their own reference magnitude) rather than baked into the function,
+  since `R`/`T` are already normalized quantities in `[0, 1]` where an
+  absolute tolerance is the natural unit, unlike some other physical
+  quantities this project's solvers produce.
+- **Impact**: `sweep.find_convergence_index` (new function),
+  `sweep.auto_select_num_orders` (new function, built directly on it, only
+  added after the validation above passed).

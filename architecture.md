@@ -41,6 +41,7 @@ Layer(s)     ─┘            │                              │
 | `polarimetry.py` | Jones/Mueller matrix construction from simulation results | done |
 | `simulation.py` | Orchestration: builds the Fourier-order set, solves every layer's eigenmodes, cascades the S-matrix stack, solves for transmitted/reflected amplitudes given an incident excitation; `SimulationResult.diffraction_efficiencies()` (Phase 3, per-order R/T) | done for uniform + 1D-patterned + 2D-patterned layers |
 | `staircase.py` | Phase 5: `slice_profile` (Category 4 target 4.7, general geometry-to-layer-slices interface, independent of the RCWA solve) plus `staircase_circle_layers`/`staircase_rectangle_layers`/`staircase_slab_layers` (now thin wrappers around it) — generate a `list[Layer]` approximating a linearly-tapered via/trench sidewall as `N` uniform-in-z slices; pure geometry/bookkeeping, no new physics formula (consumes Phase 3/4a's per-layer solvers unchanged) | done |
+| `sweep.py` | Category 8 targets 8.1-8.8: `SweepResult` (typed one-parameter-sweep container), `sweep_wavelength`/`sweep_theta`/`sweep_phi`/`sweep_polarization`/`sweep_thickness` (thin wrappers repeating `Simulation.solve()`, no new physics), `harmonic_study`/`find_convergence_index`/`auto_select_num_orders` (harmonic-order convergence study and a conservative, `decisions.md` ADR-018, stopping criterion) | done |
 
 ## Data Flow
 

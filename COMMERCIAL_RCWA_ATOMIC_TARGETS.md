@@ -729,39 +729,93 @@ loss reporting is available via `SimulationResult.layer_absorption()`.
 within numerical tolerance (`tests/test_layer_cache.py`'s equivalence
 test, exact to `1e-12`).
 
-## 8. Solver sweeps and convergence — PARTIAL
+## 8. Solver sweeps and convergence — DONE
 
 ### Already present
 
 - Runnable examples with wavelength and staircase-slice sweeps.
 - Manual harmonic-order selection through `num_orders`.
+- A library-level sweep module (`src/sougata_solver/sweep.py`) covering
+  wavelength/angle/polarization/thickness sweeps, a harmonic-order
+  convergence study, and a conservative automatic-convergence criterion.
 
 **Current scope**
 
-Sweeps live mostly in scripts; library-level sweep and automatic-convergence
-support are pending.
+Sweeps are available as library functions (`sweep.py`), not just scripts;
+automatic harmonic-order selection is available, gated on a validated
+convergence criterion.
 
 ### Small targets
 
-- [ ] **8.1 Result-series container:** define a typed result container for a
+- [x] **8.1 Result-series container:** define a typed result container for a
   one-parameter sweep, including units and run metadata.
-- [ ] **8.2 Wavelength sweep API:** promote the existing script loop into a
+  Done 2026-08-05: `sweep.SweepResult` (`parameter_name`, `parameter_unit`,
+  `parameter_values`, `results`, `metadata`, `extra`), with
+  `.reflectance()`/`.transmittance()` array accessors built from
+  already-validated `SimulationResult` methods.
+- [x] **8.2 Wavelength sweep API:** promote the existing script loop into a
   library-level wavelength sweep; compare to scalar calls.
-- [ ] **8.3 Angle sweep API:** add theta/phi sweeps using the same container.
-- [ ] **8.4 Polarization sweep API:** add a finite list of Jones states.
-- [ ] **8.5 Thickness/geometry sweep API:** add one named parameter sweep with
+  Done 2026-08-05: `sweep.sweep_wavelength`, promoting the loop every
+  `structures/*.py` wavelength-sweep script hand-wrote (e.g.
+  `structures/trench/trench_grating.py`). `tests/test_sweep.py` confirms
+  bit-for-bit equivalence to a manual per-point `solve()` loop.
+- [x] **8.3 Angle sweep API:** add theta/phi sweeps using the same container.
+  Done 2026-08-05: `sweep.sweep_theta`/`sweep_phi`. Directly reuses
+  Category 7 target 7.4's Toeplitz-matrix cache (ADR-016) automatically --
+  confirmed by a test asserting exactly one cache entry across a
+  fixed-wavelength angle sweep.
+- [x] **8.4 Polarization sweep API:** add a finite list of Jones states.
+  Done 2026-08-05: `sweep.sweep_polarization`, over an explicit,
+  non-empty, finite list of `(s_amplitude, p_amplitude)` tuples (rejects
+  an empty list).
+- [x] **8.5 Thickness/geometry sweep API:** add one named parameter sweep with
   explicit input validation.
-- [ ] **8.6 Harmonic-study API:** return R/T and conservation residual versus
+  Done 2026-08-05: `sweep.sweep_thickness` -- looks up a layer by name,
+  validates every candidate thickness explicitly (finite, `> 0`, since
+  mutating an already-constructed `Layer` in place bypasses
+  `Layer.__post_init__`'s Category 7 target 7.1 validation), restores the
+  original thickness afterward (even on error) so the sweep leaves no
+  surprising side effect on the `Simulation` instance.
+- [x] **8.6 Harmonic-study API:** return R/T and conservation residual versus
   harmonic order without automatic decisions.
-- [ ] **8.7 Convergence criterion:** define a conservative stopping criterion;
+  Done 2026-08-05: `sweep.harmonic_study`, taking a `Simulation`-builder
+  callable (not a single instance, since `num_orders` is fixed for an
+  instance's lifetime -- the same invariant ADR-016's cache design
+  relies on). Conservation residual reuses Category 7 target 7.6's
+  `layer_absorption()` (`|1 - (R+T+sum(A))|`), confirmed near-zero for a
+  lossless fixture at every harmonic-order count tested.
+- [x] **8.7 Convergence criterion:** define a conservative stopping criterion;
   validate it against manually extended studies.
-- [ ] **8.8 Automatic harmonic selection:** implement only after 8.7 succeeds
+  Done 2026-08-05: `sweep.find_convergence_index` (`decisions.md`
+  ADR-018) -- an index only counts as converged if *every* later point in
+  the given data also stays within tolerance, not just the immediate next
+  one. Validated against three structurally different fixtures
+  (`tests/test_harmonic_convergence.py`): a thin-film case (converges
+  trivially at index 0, `num_orders` has no physical effect), a
+  moderate-contrast 1D TE grating (genuine non-trivial convergence), and
+  Category 3's high-contrast 2D pillar fixture's own recorded
+  `num_orders=25` wobble (confirmed the criterion is not fooled by it).
+  **Found and fixed before trusting the function**: a first version let
+  the very last data point count as trivially "converged" (vacuously true
+  against zero remaining points) -- caught by a test using a
+  monotonically-diverging sequence; fixed by requiring confirmation from
+  at least one later point.
+- [x] **8.8 Automatic harmonic selection:** implement only after 8.7 succeeds
   on thin-film, trench, and pillar fixtures.
+  Done 2026-08-05, after 8.7's validation above passed:
+  `sweep.auto_select_num_orders` -- runs `harmonic_study` then
+  `find_convergence_index`, returns `(selected_num_orders, sweep_result)`;
+  raises `ValueError` (never silently falls back to the largest candidate)
+  if nothing converges within the given candidate list.
 
 ### Exit criteria
 
-**Category gate:** each sweep is equivalent to repeated scalar solves and
-stores enough data to reproduce its convergence decision.
+**Category gate: met, 2026-08-05.** Every `sweep_*` function is confirmed
+equivalent to repeated scalar `Simulation.solve()` calls
+(`tests/test_sweep.py`, `tests/test_harmonic_convergence.py`); each
+`SweepResult` stores its own `parameter_values`/`results`, sufficient for
+a caller to independently recompute `find_convergence_index`'s decision
+from the stored data alone.
 
 ## 9. Field calculations — NOT COMPLETED
 

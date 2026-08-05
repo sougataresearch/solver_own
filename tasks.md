@@ -203,6 +203,17 @@ Status snapshot (update the source-of-truth file first, then this line):
   `test_stress_regression.py` had flagged since Category 2; a found-and-
   documented numerical-overflow limitation for thick/highly-lossy/high-
   `num_orders` interior-amplitude reconstruction, `troubleshooting.md`).
+☑ Category 8 (Solver sweeps and convergence) — targets 8.1-8.8 all done,
+  2026-08-05 (new `sweep.py` module: a typed `SweepResult` container;
+  wavelength/theta/phi/polarization/thickness sweep functions, each
+  confirmed equivalent to a manual `Simulation.solve()` loop; a
+  harmonic-order study reusing Category 7's `layer_absorption()` for its
+  conservation residual; a conservative convergence criterion,
+  `decisions.md` ADR-018, validated against thin-film/trench/pillar
+  fixtures per target 8.8's own gating requirement before automatic
+  harmonic-order selection was implemented on top of it; one honest bug
+  found and fixed via the project's own test-first discipline before the
+  criterion was trusted).
 ☑ Category 9 (Field calculations) — targets 9.1-9.8 all done, 2026-08-05
   (real-space field reconstruction transcribed from S4's
   `GetInPlaneFieldVector`/`GetFieldAtPoint`; interior-layer amplitude
@@ -213,5 +224,5 @@ Status snapshot (update the source-of-truth file first, then this line):
   cross-section, pillar (x,y) field map) and one `postprocessing/` plotting
   script, both run end-to-end and visually verified). This is also Phase 7
   (`phases.md`), now marked DONE.
-□ Categories 8, 10-19 — not yet started at atomic-target grain (see that
+□ Categories 10-19 — not yet started at atomic-target grain (see that
   file for each category's own small-target checklist).
