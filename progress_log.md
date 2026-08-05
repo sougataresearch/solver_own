@@ -760,3 +760,50 @@ whether it was ever actually implemented.
   weakened. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`,
   `tasks.md`, `design.md`, `references.md`, `CONVENTIONS.md`, and this
   file.
+
+## 2026-08-05 (Category 11)
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 11 (Semiconductor
+  OCD features, targets 11.1-11.8): a validated CD-first OCD parameter
+  object, a trapezoid trench constructor, corner-rounding geometry,
+  TSV/grating example templates, and overlay/LER feasibility decisions.
+- How to add corner rounding without a new geometry primitive or Fourier
+  formula -- settled on arc-sampled `Polygon` vertices, reusing Category
+  4's already-validated analytic `Polygon` Fourier transform unchanged.
+- Whether overlay (layer-to-layer misregistration) needs new API --
+  investigated directly (not assumed) and found it's already fully
+  achievable via existing `Shape.center` offsets across layers sharing one
+  `Lattice`, verified via a shift-by-one-period periodicity self-
+  consistency check (same class of finding as Category 6 target 6.6's
+  bottom-illumination result).
+- Whether LER/LWR (stochastic edge roughness) can be approximated
+  deterministically within RCWA's periodic-Fourier formulation -- concluded
+  no reasonable deterministic proxy avoids overclaiming what it actually
+  models; explicitly deferred rather than implemented.
+
+### Action items
+- [x] Target 11.1 (OCD parameter object) — done 2026-08-05.
+  `ocd.OCDTrapezoidParams`.
+- [x] Target 11.2 (trapezoid constructor) — done 2026-08-05.
+  `ocd.trapezoid_trench_layers`.
+- [x] Target 11.3 (corner-rounding design) — done 2026-08-05. Arc-sampled
+  `Polygon`, `num_arc_points` as the convergence parameter.
+- [x] Target 11.4 (corner-rounding implementation) — done 2026-08-05.
+  `ocd.rounded_rectangle_polygon`.
+- [x] Target 11.5 (TSV template) — done 2026-08-05.
+  `structures/via/tsv_ocd_sweep.py`.
+- [x] Target 11.6 (grating template) — done 2026-08-05.
+  `structures/trench/trench_ocd_sweep.py`.
+- [x] Target 11.7 (overlay feasibility) — done 2026-08-05, better answer
+  than "define a model": already achievable, no new API. `decisions.md`
+  ADR-019.
+- [ ] Target 11.8 (LER/LWR feasibility) — evaluated and explicitly
+  deferred, 2026-08-05. `decisions.md` ADR-020.
+- **Session summary**: seven of eight Category 11 targets (11.1-11.7)
+  complete; target 11.8 explicitly deferred (a documented decision, not a
+  gap). 600 tests pass project-wide (570 at the start of this category,
+  30 new fast tests, no new `slow` tests). No existing test weakened.
+  Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
+  `decisions.md` (new ADR-019, ADR-020), `architecture.md`, `references.md`,
+  `structures/README.md`, and this file.

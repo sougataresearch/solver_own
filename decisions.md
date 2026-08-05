@@ -767,3 +767,77 @@
 - **Impact**: `sweep.find_convergence_index` (new function),
   `sweep.auto_select_num_orders` (new function, built directly on it, only
   added after the validation above passed).
+
+## ADR-019: Overlay (layer-to-layer misregistration) is already achievable, no new API needed (Category 11 target 11.7)
+
+- **Decision**: overlay between two patterned layers is already fully
+  representable by the existing `Pattern`/`Layer`/`Simulation` API — give
+  the lower layer's shape a `center` offset by the desired overlay error
+  vector `(dx, dy)` relative to the upper layer's shape, within the same
+  shared `Lattice`. No new parameter, field, or method is needed. Same
+  treatment as ADR-014 (bottom illumination): "define a periodic unit-cell
+  model" (this target's own wording) turns out to already be exactly what
+  every multi-patterned-layer stack already does — every layer in a
+  `LayerStack` shares one `Lattice`/reciprocal-vector set
+  (`Simulation.__init__`), so two independently-offset shapes in two
+  different layers are, by construction, already a periodic (period =
+  the shared lattice) two-layer overlay model.
+- **Reason**: `Simulation`/`Layer`/`Pattern` were never restricted to a
+  single shape position per stack, and nothing in the existing
+  construction-time validation (Category 4) assumes shapes across
+  different layers share a center — this was true well before Category 11
+  existed, just never previously framed as "overlay."
+- **Validation**: not merely asserted — checked directly with a two-layer
+  via-over-landing-pad fixture (`tests/test_overlay.py`). Three cases: (a)
+  zero overlay, (b) a genuine sub-period overlay shift (confirmed to
+  change R/T, as physically expected — an overlay error is a real
+  structural change), and (c) a shift by *exactly one full lattice
+  period*, which must reproduce case (a)'s result exactly (a periodicity
+  self-consistency check specific to the "periodic unit-cell model"
+  claim) — confirmed to `~1e-15`. Energy conservation (`R+T=1`) holds in
+  all three cases.
+- **Alternatives considered**: adding an explicit `overlay_dx`/`overlay_dy`
+  parameter to `Simulation`/`LayerStack` — rejected as unnecessary
+  indirection for something a caller can already do directly and
+  transparently via `Shape.center`, per `rules.md`'s "don't add features
+  not needed" guidance.
+- **Impact**: no code change to `src/sougata_solver/` — documentation
+  (this ADR, `references.md`, `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`) plus
+  `tests/test_overlay.py` as the permanent regression guard for the claim.
+
+## ADR-020: LER/LWR (stochastic edge roughness) explicitly deferred, not approximated (Category 11 target 11.8)
+
+- **Decision**: line-edge/line-width roughness is **not** implemented,
+  even as a "deterministic periodic approximation" — evaluated and
+  explicitly deferred, per this target's own escape-hatch wording.
+- **Reason**: genuine LER/LWR is inherently *stochastic* and, in real
+  structures, has no periodicity at the base lattice's period at all — it
+  is defined as a random perturbation of an edge along the (nominally
+  infinite, non-periodic) line direction. RCWA is fundamentally a
+  periodic-Fourier method: representing roughness at all requires either
+  (a) a genuinely random, non-periodic edge (outside what any Fourier-
+  modal method can represent without further approximation) or (b) a
+  supercell large enough to hold many independent roughness "periods,"
+  averaged over multiple random realizations — a substantial new
+  capability (supercell lattice construction, per-realization random
+  shape perturbation, and a statistical-averaging outer loop), not a
+  "small target" scoped addition, and a materially different validation
+  problem (there is no single deterministic answer to check against, only
+  a statistical distribution). A *deterministic periodic* edge modulation
+  (e.g. a sinusoidal wiggle at some sub-multiple of the lattice period)
+  was considered as a cheaper proxy, but rejected: it approximates a
+  qualitatively different physical effect (periodic edge modulation, a
+  real but distinct scatterometry phenomenon in its own right) rather than
+  genuine stochastic roughness, and presenting it as an "LER/LWR
+  approximation" would overstate what it actually models — exactly the
+  kind of overclaiming `rules.md` AI Coding Rule 1 warns against.
+- **Alternatives considered**: implementing the supercell + multi-
+  realization-averaging approach anyway — rejected as out of scope for a
+  category of "small targets," and because averaging over how many
+  realizations is "enough" for a statistically meaningful result is itself
+  an unresolved design question this session did not have grounds to
+  answer without further requirements from the project owner.
+- **Impact**: no code change. `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`'s 11.8
+  entry records this as an explicit, reasoned deferral, not a silently
+  skipped target — revisit if genuine supercell/stochastic-averaging
+  support is explicitly requested as its own scoped effort.

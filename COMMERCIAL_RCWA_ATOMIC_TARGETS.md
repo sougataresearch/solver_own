@@ -1031,33 +1031,97 @@ conservation check where physics permits (`energy_balance()`'s residual,
 ### Already present
 
 - Trenches, vias, pillars, and linear sidewall taper via staircase layers.
+- A validated, CD-first OCD parameter object; a trapezoid trench
+  constructor; a rounded-rectangle corner geometry; reproducible TSV/
+  grating OCD example sweeps; overlay confirmed already achievable with
+  the existing API.
 
 **Current scope**
 
-Basic geometry exists, but dedicated CD/rounding/overlay/roughness workflows
-are not implemented.
+CD/rounding/overlay workflows are implemented, built entirely on
+already-validated Phase 4/5 geometry and staircase machinery (no new
+physics). Stochastic line-edge/line-width roughness (target 11.8) remains
+explicitly deferred -- see that target's own entry.
 
 ### Small targets
 
-- [ ] **11.1 OCD parameter object:** define validated CD, period, height,
+- [x] **11.1 OCD parameter object:** define validated CD, period, height,
   material, and sidewall-angle parameters.
-- [ ] **11.2 Trapezoid constructor:** generate a staircase trench from top CD,
+  Done 2026-08-05: `ocd.OCDTrapezoidParams` -- validates `top_cd`/
+  `bottom_cd`/`period`/`height` (finite, positive, CD `<= period`);
+  `sidewall_angle_deg` is a computed property (derived from the other
+  three, deliberately not a separately stored field that could drift out
+  of sync). `tests/test_ocd.py`.
+- [x] **11.2 Trapezoid constructor:** generate a staircase trench from top CD,
   bottom CD, height, and slice count; test zero taper.
-- [ ] **11.3 Corner-rounding design:** choose a periodic geometry approximation
+  Done 2026-08-05: `ocd.trapezoid_trench_layers` -- a thin CD-to-halfwidth
+  (`halfwidth = CD/2`) wrapper around Phase 5's already-validated
+  `staircase.staircase_slab_layers`. Zero taper confirmed to reduce
+  exactly to a direct `staircase_slab_layers` call.
+- [x] **11.3 Corner-rounding design:** choose a periodic geometry approximation
   and define its convergence parameter.
-- [ ] **11.4 Corner-rounding implementation:** add one geometry with area and
+  Done 2026-08-05: chose "`Polygon` with arc-sampled corners" (reuses
+  Category 4's already-validated analytic `Polygon` Fourier transform
+  unchanged, no new geometry primitive or formula) over a superellipse or
+  smoothed-indicator approach. Convergence parameter: `num_arc_points`
+  per corner (`>=2`). See `ocd.rounded_rectangle_polygon`'s docstring.
+- [x] **11.4 Corner-rounding implementation:** add one geometry with area and
   convergence tests.
-- [ ] **11.5 TSV template:** create a reproducible via/OCD example sweep.
-- [ ] **11.6 Grating template:** create a reproducible trench/OCD example sweep.
-- [ ] **11.7 Overlay feasibility decision:** define a periodic unit-cell model or
+  Done 2026-08-05: `ocd.rounded_rectangle_polygon`. `corner_radius=0`
+  reduces exactly to a plain rectangle's area; as `num_arc_points`
+  increases, area converges monotonically to the closed-form rounded-
+  rectangle area `4*hx*hy - (4-pi)*r^2` (confirmed to `<1e-6` at
+  `num_arc_points=64`). `tests/test_ocd.py`.
+- [x] **11.5 TSV template:** create a reproducible via/OCD example sweep.
+  Done 2026-08-05: `structures/via/tsv_ocd_sweep.py` -- sweeps
+  `OCDTrapezoidParams.bottom_cd` (and its derived `sidewall_angle_deg`)
+  for a circular via, `run_metadata.txt` recording every swept parameter.
+  Run end-to-end: `R+T=1.0000` at every point.
+- [x] **11.6 Grating template:** create a reproducible trench/OCD example sweep.
+  Done 2026-08-05: `structures/trench/trench_ocd_sweep.py` -- sweeps
+  wavelength (via Category 8's `sweep.sweep_wavelength`) at several
+  trapezoid sidewall angles, built via `ocd.trapezoid_trench_layers`. Run
+  end-to-end: `R+T=1.0000` at every point.
+- [x] **11.7 Overlay feasibility decision:** define a periodic unit-cell model or
   explicitly defer overlay.
+  Done 2026-08-05, with a better answer than "defer" -- like Category 6
+  target 6.6's bottom-illumination finding, overlay (layer-to-layer
+  misregistration) is **already achievable** via the existing `Pattern`/
+  `Layer`/`Simulation` API (an offset `Shape.center` between two layers'
+  patterns, sharing one `Lattice`, is already exactly the periodic
+  unit-cell overlay model this target asks for) -- no new parameter
+  needed. `decisions.md` ADR-019. Verified, not just asserted: a
+  shift-by-exactly-one-lattice-period periodicity self-consistency check
+  reproduces the zero-overlay result to `~1e-15`
+  (`tests/test_overlay.py`).
 - [ ] **11.8 LER/LWR feasibility decision:** define deterministic periodic
   approximations or explicitly defer stochastic roughness.
+  Evaluated and explicitly deferred, 2026-08-05 -- genuine LER/LWR is
+  inherently stochastic and non-periodic at the base lattice period,
+  fundamentally in tension with RCWA's periodic-Fourier formulation; a
+  correct treatment would need supercell construction, per-realization
+  random shape perturbation, and statistical averaging (a substantial new
+  capability, not a small-target addition). A cheaper deterministic
+  periodic edge-modulation proxy was considered and rejected as
+  overclaiming -- it would model a different, real-but-distinct
+  phenomenon (periodic edge modulation), not stochastic roughness. See
+  `decisions.md` ADR-020.
 
 ### Exit criteria
 
 **Category gate:** parameter changes are traceable in metadata and covered by
 at least one convergence study.
+
+**Status as of 2026-08-05**: targets 11.1-11.7 are done; target 11.8 is
+evaluated and explicitly deferred (see its own entry and ADR-020). Every
+OCD example script (11.5/11.6) records its full swept-parameter set in
+`run_metadata.txt` (the category gate's "traceable in metadata"
+requirement), and 11.4's corner-rounding geometry has its own dedicated
+convergence study (the category gate's "at least one convergence study"
+requirement) in addition to Phase 5's pre-existing staircase convergence
+studies. 600 tests pass project-wide (570 at the start of this category:
+no new `slow` tests, 30 new fast tests across `tests/test_ocd.py` and
+`tests/test_overlay.py`), no existing test weakened.
 
 ## 12. Linear algebra — PARTIAL
 

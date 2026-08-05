@@ -234,5 +234,16 @@ Status snapshot (update the source-of-truth file first, then this line):
   validate the polarization convention against S4's actual source found a
   plausible but numerically-unconfirmed match (S4 not buildable in this
   environment); see `references.md`.
-□ Categories 11-19 — not yet started at atomic-target grain (see that
+☐ Category 11 (Semiconductor OCD features) — targets 11.1-11.7 done,
+  2026-08-05 (new `ocd.py` module: a validated CD-first parameter object,
+  a trapezoid trench constructor thin-wrapping Phase 5's staircase
+  machinery, an arc-sampled-`Polygon` corner-rounding geometry validated
+  against a closed-form area, and reproducible TSV/grating OCD example
+  sweeps recording every swept parameter in `run_metadata.txt`; overlay
+  confirmed already achievable with no new API, `decisions.md` ADR-019,
+  verified via a shift-by-one-period periodicity check). Target 11.8
+  (LER/LWR) explicitly deferred -- genuine stochastic roughness
+  fundamentally conflicts with RCWA's periodic-Fourier formulation;
+  `decisions.md` ADR-020.
+□ Categories 12-19 — not yet started at atomic-target grain (see that
   file for each category's own small-target checklist).

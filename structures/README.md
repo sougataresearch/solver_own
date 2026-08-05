@@ -47,6 +47,7 @@ and output path. No other part of the script should normally need touching.
 | [`trench_grating_ellipsometry_run.py`](trench/trench_grating_ellipsometry_run.py) | Saves raw field data for ellipsometry postprocessing |
 | [`tapered_trench.py`](trench/tapered_trench.py) | Linearly-tapered ridge (staircase-discretized), `num_slices` convergence sweep; FDTD-style `TCD`/`BCD`/`SPACING`/`PERIOD` naming for the ridge geometry |
 | [`trench_field_cross_section.py`](trench/trench_field_cross_section.py) | Reconstructs `(Ex,Ey,Ez,Hx,Hy,Hz)` over an (x,z) cross-section grid through the grating (Category 9 targets 9.1-9.8) — saves raw field data for `postprocessing/plot_field_cross_section.py` |
+| [`trench_ocd_sweep.py`](trench/trench_ocd_sweep.py) | Category 11 target 11.6: wavelength sweep at several `ocd.OCDTrapezoidParams` sidewall angles, `run_metadata.txt` recording every swept parameter |
 
 ## `via/` (Phase 4a/4b 2D patterned layers, Phase 5 tapered sidewall, Phase 7 field cross-section — done)
 
@@ -61,6 +62,7 @@ and output path. No other part of the script should normally need touching.
 | [`elliptical_pillar.py`](via/elliptical_pillar.py) | Uniform (untapered) elliptical Si pillar, wavelength sweep — Category 4 target 4.3's end-to-end `Ellipse` example |
 | [`triangular_pillar.py`](via/triangular_pillar.py) | Uniform (untapered) triangular Si pillar (`Polygon`), wavelength sweep — Category 4 targets 4.4/4.5's end-to-end `Polygon` example |
 | [`pillar_field_cross_section.py`](via/pillar_field_cross_section.py) | Reconstructs the full 6-component field over an (x,y) plane at one depth through the pillar (Category 9 targets 9.1-9.8) — saves raw field data for `postprocessing/plot_field_cross_section.py` |
+| [`tsv_ocd_sweep.py`](via/tsv_ocd_sweep.py) | Category 11 target 11.5: sweeps `ocd.OCDTrapezoidParams.bottom_cd` (and its derived sidewall angle) for a circular via, `run_metadata.txt` recording every swept parameter |
 
 All three tapered scripts (`tapered_trench.py`, `tapered_via.py`,
 `tapered_pillar.py`) build on `src/sougata_solver/staircase.py`'s

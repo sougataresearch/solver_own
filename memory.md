@@ -5,8 +5,9 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 10, targets
-10.1-10.4/10.6, 10.5 deferred), 2026-08-05 (Category 8, targets 8.1-8.8),
+As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 11, targets
+11.1-11.7, 11.8 deferred), 2026-08-05 (Category 10, targets 10.1-10.4/10.6,
+10.5 deferred), 2026-08-05 (Category 8, targets 8.1-8.8),
 2026-08-05 (Category 7, targets 7.1-7.6), 2026-08-05 (Phase 7 /
 Category 9, targets 9.1-9.8), 2026-08-04
 (Category 6, targets 6.1-6.6), 2026-08-04
@@ -14,6 +15,52 @@ Category 9, targets 9.1-9.8), 2026-08-04
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 11 (Semiconductor OCD features), targets 11.1-11.7 are
+  complete; target 11.8 is evaluated and explicitly deferred.** New
+  module `src/sougata_solver/ocd.py` -- no new physics anywhere in it,
+  entirely built from already-validated geometry/staircase machinery.
+  11.1: `OCDTrapezoidParams` (validated CD-first parameters;
+  `sidewall_angle_deg` deliberately a computed property, not a separately
+  stored field, since a linear taper's angle is fully determined by
+  `top_cd`/`bottom_cd`/`height` and a fourth independent field would let
+  it drift out of sync). 11.2: `trapezoid_trench_layers`, a thin
+  CD-to-halfwidth wrapper around Phase 5's `staircase_slab_layers`,
+  confirmed to reduce exactly to a direct call at zero taper. 11.3/11.4:
+  `rounded_rectangle_polygon` -- chose "`Polygon` with arc-sampled
+  corners" over a superellipse/smoothed-indicator approach specifically
+  because it reuses Category 4's already-validated analytic `Polygon`
+  Fourier transform unchanged; `num_arc_points` is the convergence
+  parameter, confirmed to converge monotonically to the closed-form
+  rounded-rectangle area `4*hx*hy-(4-pi)*r^2` (to `<1e-6` at
+  `num_arc_points=64`), and `corner_radius=0` reduces exactly to a plain
+  rectangle's area regardless of `num_arc_points`. 11.5/11.6:
+  `structures/via/tsv_ocd_sweep.py`/`structures/trench/trench_ocd_sweep.py`,
+  both run end-to-end with `R+T=1.0000`, both recording every swept OCD
+  parameter (including the derived `sidewall_angle_deg`) in
+  `run_metadata.txt`, satisfying the category's own "traceable in
+  metadata" exit criterion. 11.7: **found a better answer than "define a
+  model," same class of finding as Category 6 target 6.6's bottom-
+  illumination result** -- overlay (layer-to-layer misregistration) is
+  already fully achievable via the existing `Pattern`/`Layer`/`Simulation`
+  API (an offset `Shape.center` between two patterned layers sharing one
+  `Lattice` already *is* the periodic unit-cell overlay model this target
+  asks for), no new parameter needed. Verified, not just asserted: a
+  two-layer via-over-landing-pad fixture confirmed a genuine overlay
+  shift changes R/T (as physically expected) while a shift by exactly one
+  full lattice period reproduces the zero-overlay result to `~1e-15` (the
+  periodicity self-consistency check specific to this claim),
+  `decisions.md` ADR-019, `tests/test_overlay.py`. 11.8 (LER/LWR):
+  evaluated and explicitly deferred -- genuine stochastic roughness is
+  fundamentally in tension with RCWA's periodic-Fourier formulation
+  (would need supercell construction, per-realization random
+  perturbation, and statistical averaging, a substantial new capability,
+  not a small-target addition); a cheaper deterministic periodic edge-
+  modulation proxy was considered and rejected as overclaiming (it models
+  a different, real phenomenon, not stochastic roughness),
+  `decisions.md` ADR-020. 600 tests pass project-wide (570 at the start
+  of this category: no new `slow` tests, 30 new fast tests across
+  `tests/test_ocd.py` and `tests/test_overlay.py`), full fast suite
+  re-run and confirmed green.
 - **Category 10 (Optical outputs), targets 10.1-10.4 and 10.6 are
   complete; target 10.5 is evaluated and explicitly deferred.** New
   `SimulationResult` methods: `complex_amplitudes()` (10.1, raw Cartesian

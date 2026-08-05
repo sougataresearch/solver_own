@@ -16,6 +16,25 @@ validates against. Update when a new phase cites a new source.
 
 ## Phases With No Vendored-Repo Source
 
+### Category 11 (Semiconductor OCD features) targets 11.1/11.2/11.4/11.7 (2026-08-05)
+
+None of Category 11's implementation targets needed a new external
+citation:
+
+- **11.1/11.2 (OCD parameter object, trapezoid constructor)** are a
+  validated CD-first input parametrization built entirely as a thin
+  wrapper around Phase 5's already-validated `staircase.staircase_slab_layers`
+  (`decisions.md` ADR-004) — no new discretization or physics.
+- **11.4 (corner rounding)** builds an ordinary `geometry.Polygon` from
+  arc-sampled vertices — `Polygon`'s analytic Fourier transform (Category
+  4 targets 4.4/4.5, transcribed from `S4/S4/pattern/pattern.c`) handles
+  the result unchanged; the vertex-sampling itself is elementary circle
+  geometry, not risky enough to need transcription (per `rules.md`
+  Documentation Standards option 2, the same treatment `Polygon.signed_distance_normal`
+  already got).
+- **11.7 (overlay)** required no new code at all — see `decisions.md`
+  ADR-019.
+
 ### Target 10.5 bounded external-validation attempt (2026-08-05, before deciding implement/defer)
 
 Category 10 target 10.5 explicitly gates on "the polarization convention
