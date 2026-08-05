@@ -1123,34 +1123,91 @@ studies. 600 tests pass project-wide (570 at the start of this category:
 no new `slow` tests, 30 new fast tests across `tests/test_ocd.py` and
 `tests/test_overlay.py`), no existing test weakened.
 
-## 12. Linear algebra — PARTIAL
+## 12. Linear algebra — DONE
 
 ### Already present
 
 - NumPy/SciPy dense complex eigensolves, linear solves, and condition estimates.
+- A measured baseline profiler, a direct-inverse consistency audit, a
+  factorization-reuse design note, an opt-in SVD diagnostic, and a
+  measured sparse/iterative-methods feasibility decision.
 
 **Current scope**
 
-The solver uses dense CPU linear algebra; profiling and alternative
-factorizations have not been systematically evaluated.
+The solver uses dense CPU linear algebra, now with a measured performance
+baseline (`profiling/baseline_profile.py`) and a structural finding
+(Toeplitz coupling matrices are 100% dense) that closes the sparse/
+iterative-methods question rather than leaving it open.
 
 ### Small targets
 
-- [ ] **12.1 Baseline profiler:** measure eigensolve, matrix-solve, and
+- [x] **12.1 Baseline profiler:** measure eigensolve, matrix-solve, and
   S-matrix time/memory on fixed fixtures.
-- [ ] **12.2 Direct-inverse audit:** replace only demonstrably unnecessary
+  Done 2026-08-05: `profiling/baseline_profile.py` (new top-level
+  directory, diagnostic-only, never asserted against a hard time/memory
+  limit in any test since wall-clock timing is machine-dependent, per
+  `rules.md`'s Performance Requirements). Measured eigensolve, isolated
+  matrix-solve, and end-to-end `Simulation.solve()` time/peak-memory on
+  thin-film/1D/2D fixtures at several `num_orders`. See `design.md`'s
+  "Linear-Algebra Baseline & Factorization-Reuse Design" for the results
+  table and the finding it feeds into 12.3/12.5.
+- [x] **12.2 Direct-inverse audit:** replace only demonstrably unnecessary
   explicit inverses with linear solves; add equivalence tests.
-- [ ] **12.3 Factorization reuse design:** identify safe intra-solve reuse
+  Done 2026-08-05: audited every `linalg.inv`/`.inv(`/`linalg.solve`
+  call site in `src/sougata_solver/`. Found none "demonstrably
+  unnecessary" (each full-matrix inverse is genuinely consumed downstream
+  as a matrix, not a single linear-system answer; `geometry.py`'s 2x2
+  lattice-vector inverse is too small to matter) -- but found a real
+  house-convention inconsistency: three `eigenmodes.py` call sites used
+  `np.linalg.solve(A, np.eye(n))` instead of the project's own documented
+  `scipy.linalg.lu_factor`/`lu_solve` convention (`smatrix.py::_solve`).
+  Fixed by extracting `eigenmodes._dense_inverse`, replacing all three.
+  Bit-for-bit equivalence to the pre-refactor numeric results confirmed
+  directly (`tests/test_linear_algebra_audit.py`), not merely assumed.
+- [x] **12.3 Factorization reuse design:** identify safe intra-solve reuse
   opportunities without adding global cache state.
-- [ ] **12.4 SVD diagnostic:** add an opt-in singular-value diagnostic for
+  Done 2026-08-05: audited every explicit linear-solve call site in the
+  S-matrix cascade (`interface_smatrix`/`star_product`/`interior_amplitudes`)
+  -- found no further reuse opportunity beyond the already-shipped
+  `_is_trivial_interface` fast path (identical-mode-pair interfaces skip
+  the linear solve entirely, since Phase 1). 12.1's measurements instead
+  point to a different, one-layer-up opportunity (an instance-scoped
+  `LayerEigenmodes` cache, analogous to but narrower-scoped than
+  Category 7's Toeplitz cache) -- documented as a design note, not
+  implemented (no corresponding "implementation" target exists in this
+  category, matching how target 7.3 stayed design-only until 7.4). See
+  `design.md`.
+- [x] **12.4 SVD diagnostic:** add an opt-in singular-value diagnostic for
   troublesome eigenvector matrices.
-- [ ] **12.5 Sparse feasibility decision:** use benchmark dimensions to decide
+  Done 2026-08-05: `eigenmodes.svd_diagnostics` (full singular-value
+  spectrum, condition number, and a count of "small" singular values --
+  more detail than the always-on `EigenmodeDiagnostics.cond_phi`'s
+  min/max ratio alone). Never called automatically during a solve
+  (opt-in, per `rules.md`'s Performance Requirements). Validated against
+  synthetic near-rank-deficient matrices and Phase 4b's already-
+  characterized most-ill-conditioned pillar fixture
+  (`tests/test_svd_diagnostics.py`).
+- [x] **12.5 Sparse feasibility decision:** use benchmark dimensions to decide
   whether sparse/iterative methods are worthwhile.
+  Done 2026-08-05: evaluated and **rejected** (a structural finding, not
+  a "not attempted" deferral) -- measured directly (not assumed) that the
+  direct-rule Toeplitz permittivity matrix for an ordinary 2D patterned
+  layer is **100% dense** (no exploitable sparsity), and RCWA needs the
+  entire mode spectrum, not a few extremal eigenvalues, so neither of
+  sparse linear algebra's two usual advantages applies here.
+  `decisions.md` ADR-021; the density measurement is pinned as a
+  permanent regression check (`tests/test_linear_algebra_audit.py`).
 
 ### Exit criteria
 
-**Category gate:** any algebra change preserves existing oracle tests and has
-a measured conditioning or runtime justification.
+**Category gate: met, 2026-08-05.** No algebra formula changed (only a
+house-convention consistency fix, target 12.2, confirmed bit-for-bit
+equivalent) -- every existing oracle-comparison test still passes
+unchanged, and every target above has a measured conditioning or runtime
+justification (the 12.1 profiler numbers, the 12.2 equivalence tests, the
+12.5 density measurement) rather than an unverified claim. 612 tests pass
+project-wide (600 at the start of this category: no new `slow` tests, 12
+new fast tests), no existing test weakened.
 
 ## 13. Performance optimization — NOT COMPLETED
 

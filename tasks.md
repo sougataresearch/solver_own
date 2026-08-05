@@ -245,5 +245,15 @@ Status snapshot (update the source-of-truth file first, then this line):
   (LER/LWR) explicitly deferred -- genuine stochastic roughness
   fundamentally conflicts with RCWA's periodic-Fourier formulation;
   `decisions.md` ADR-020.
-□ Categories 12-19 — not yet started at atomic-target grain (see that
+☑ Category 12 (Linear algebra) — targets 12.1-12.5 all done, 2026-08-05
+  (new `profiling/baseline_profile.py` measuring eigensolve/matrix-solve/
+  end-to-end timing on fixed fixtures, showing the eigensolve dominates
+  at larger `num_orders`; a direct-inverse audit that found and fixed a
+  house-convention inconsistency in `eigenmodes.py`, confirmed bit-for-
+  bit equivalent; a factorization-reuse design note finding no further
+  S-matrix-level reuse beyond the already-shipped trivial-interface fast
+  path; an opt-in `svd_diagnostics` function; and a sparse/iterative-
+  methods feasibility decision **rejected** on a measured 100%-dense-
+  matrix structural finding, `decisions.md` ADR-021).
+□ Categories 13-19 — not yet started at atomic-target grain (see that
   file for each category's own small-target checklist).

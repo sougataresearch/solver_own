@@ -11,12 +11,37 @@ its 1D specialization).
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 import numpy as np
+import scipy.linalg as sla
 
 from sougata_solver.layer import EigenmodeDiagnostics, LayerEigenmodes
 
 logger = logging.getLogger(__name__)
+
+
+def _dense_inverse(a: np.ndarray) -> np.ndarray:
+    """Category 12 target 12.2 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`): the
+    project's house convention for a linear-algebra inverse
+    (`scipy.linalg.lu_factor`/`lu_solve`, `rules.md`'s Performance
+    Requirements, already used by `smatrix.py::_solve`) applied here too,
+    replacing three previously-inconsistent `np.linalg.solve(a, eye(n))`
+    call sites. **Not** a "demonstrably unnecessary explicit inverse" --
+    `build_kp_matrix` genuinely consumes the full dense matrix downstream
+    (`kappa[:n,:n] = ky_diag @ einv @ ky_diag`, etc.), not just the
+    solution of one linear system against a single right-hand side, so a
+    full inverse (via one LU factorization solved against the identity,
+    not a separate `getri` inversion routine) is the correct operation
+    here, not an unnecessary one -- this is a house-convention consistency
+    fix, not a new algorithm. Bit-for-bit equivalence to the pre-refactor
+    `np.linalg.solve(a, np.eye(n))` confirmed directly before trusting it
+    (`tests/test_linear_algebra_audit.py`), not merely assumed because
+    both ultimately call LAPACK `gesv`-family routines.
+    """
+    n = a.shape[0]
+    lu, piv = sla.lu_factor(a)
+    return sla.lu_solve((lu, piv), np.eye(n, dtype=complex))
 
 # Condition-number threshold above which solve_layer_eigenmodes_patterned
 # logs a WARNING (design.md's Logging Strategy). Chosen from the Phase 4b
@@ -82,6 +107,50 @@ def _eigenmode_diagnostics(q: np.ndarray, phi: np.ndarray, cond_epsilon: float) 
         min_eigenvalue_gap=_min_pairwise_gap(q),
         num_propagating=int(np.count_nonzero(propagating)),
         num_evanescent=int(np.count_nonzero(~propagating)),
+    )
+
+
+@dataclass
+class SVDDiagnostics:
+    """Category 12 target 12.4: opt-in, more detailed singular-value
+    diagnostic for a troublesome eigenvector matrix -- a caller invokes
+    `svd_diagnostics(phi)` explicitly, typically after already seeing an
+    `ILL_CONDITIONED_THRESHOLD` `WARNING` (`EigenmodeDiagnostics.cond_phi`)
+    and wanting to know more than the min/max ratio that number
+    summarizes: how many modes are actually responsible for the
+    ill-conditioning, not just that *some* mode is.
+
+    Deliberately **not** computed automatically inside any solver function
+    (unlike `EigenmodeDiagnostics`, which every dense anisotropic/
+    patterned solver already attaches to its result) -- per `rules.md`'s
+    Performance Requirements, this is strictly additional, opt-in cost a
+    caller pays only when actually investigating a warning, not overhead
+    every ordinary solve incurs.
+    """
+
+    singular_values: np.ndarray   # descending order (numpy/LAPACK's own SVD convention)
+    condition_number: float        # singular_values[0] / singular_values[-1], same 2-norm definition np.linalg.cond uses
+    num_small_singular_values: int  # count of singular values < relative_threshold * singular_values[0]
+    relative_threshold: float
+
+
+def svd_diagnostics(phi: np.ndarray, relative_threshold: float = 1e-6) -> SVDDiagnostics:
+    """Category 12 target 12.4: full singular-value spectrum of `phi`
+    (or any matrix -- not specific to eigenvector matrices), plus a count
+    of "small" singular values (below `relative_threshold` times the
+    largest) as a quick proxy for how many modes are near-rank-deficient,
+    not just whether the matrix as a whole is ill-conditioned.
+    """
+    singular_values = np.linalg.svd(phi, compute_uv=False)
+    largest = float(singular_values[0]) if singular_values.size else 0.0
+    smallest = float(singular_values[-1]) if singular_values.size else 0.0
+    condition_number = (largest / smallest) if smallest > 0 else float("inf")
+    num_small = int(np.count_nonzero(singular_values < relative_threshold * largest))
+    return SVDDiagnostics(
+        singular_values=singular_values,
+        condition_number=condition_number,
+        num_small_singular_values=num_small,
+        relative_threshold=relative_threshold,
     )
 
 
@@ -535,7 +604,7 @@ def solve_layer_eigenmodes_1d(
 
     kx_sq = np.diag(kx * kx)
     op_te = epsilon_hat @ kp[:n, :n] - kx_sq
-    einv_block = np.linalg.solve(epsilon_inv_hat, np.eye(n, dtype=complex))
+    einv_block = _dense_inverse(epsilon_inv_hat)
     op_tm = einv_block @ kp[n:, n:]
 
     q_sq_te, phi_te = np.linalg.eig(op_te)
@@ -693,7 +762,7 @@ def solve_layer_eigenmodes_patterned(
             ILL_CONDITIONED_THRESHOLD,
         )
 
-    einv = np.linalg.solve(epsilon_hat, np.eye(n, dtype=complex))
+    einv = _dense_inverse(epsilon_hat)
     kp = build_kp_matrix(omega, kx, ky, einv)
 
     epsilon2 = np.zeros((2 * n, 2 * n), dtype=complex)
@@ -817,7 +886,7 @@ def solve_layer_eigenmodes_patterned_inplane(
             ILL_CONDITIONED_THRESHOLD,
         )
 
-    einv_zz = np.linalg.solve(epsilon_hat_zz, np.eye(n, dtype=complex))
+    einv_zz = _dense_inverse(epsilon_hat_zz)
     kp = build_kp_matrix(omega, kx, ky, einv_zz)
 
     epsilon2 = np.zeros((2 * n, 2 * n), dtype=complex)

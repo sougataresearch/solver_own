@@ -128,6 +128,36 @@ depending on them at runtime.
   against thin-film/trench/pillar fixtures per the category's own gating
   requirement before automatic harmonic-order selection was built on top
   of it. See `tests/test_sweep.py`, `tests/test_harmonic_convergence.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 10 (optical outputs):
+  targets 10.1-10.4/10.6 all **met** — complex per-order Cartesian field
+  coefficients validated against both s- and p-polarization Fresnel-
+  oracle comparisons, diffraction angles with a clear `None` non-
+  propagating representation, a one-call conservation report, and a
+  frozen output schema. Target 10.5 (per-order s/p conversion) is
+  evaluated and explicitly deferred — a bounded attempt to externally
+  validate the polarization convention against S4's actual source found
+  a plausible but numerically-unconfirmed match. See
+  `tests/test_optical_outputs.py`, `references.md`'s "Target 10.5 bounded
+  external-validation attempt."
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 11 (semiconductor OCD
+  features): targets 11.1-11.7 all **met** — a validated CD-first OCD
+  parameter object, a trapezoid trench constructor, an arc-sampled-
+  `Polygon` corner-rounding geometry converging to the closed-form
+  rounded-rectangle area, reproducible TSV/grating OCD example sweeps,
+  and overlay confirmed already achievable with no new API
+  (`decisions.md` ADR-019). Target 11.8 (stochastic LER/LWR) is evaluated
+  and explicitly deferred — fundamentally in tension with RCWA's
+  periodic-Fourier formulation (`decisions.md` ADR-020). See
+  `tests/test_ocd.py`, `tests/test_overlay.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 12 (linear algebra):
+  targets 12.1-12.5 all **met** — a measured baseline performance profile
+  (`profiling/baseline_profile.py`), a direct-inverse audit that found
+  and fixed a house-convention inconsistency (confirmed bit-for-bit
+  equivalent), a factorization-reuse design note, an opt-in SVD
+  diagnostic, and sparse/iterative methods evaluated and **rejected** on
+  a measured 100%-dense-matrix structural finding (`decisions.md`
+  ADR-021). See `tests/test_linear_algebra_audit.py`,
+  `tests/test_svd_diagnostics.py`.
 - No phase is marked "done" without: (a) a passing automated test against
   an oracle, and (b) a runnable example script producing physically
   plausible output.

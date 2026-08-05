@@ -807,3 +807,47 @@ whether it was ever actually implemented.
   Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
   `decisions.md` (new ADR-019, ADR-020), `architecture.md`, `references.md`,
   `structures/README.md`, and this file.
+
+## 2026-08-05 (Category 12)
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 12 (Linear
+  algebra, targets 12.1-12.5): a baseline timing profiler, a direct-
+  inverse audit, a factorization-reuse design note, an opt-in SVD
+  diagnostic, and a sparse/iterative-methods feasibility decision.
+- Where diagnostic/profiling scripts belong given they're neither
+  `structures/` physics runs nor deterministic `pytest` assertions
+  (wall-clock timing is machine-dependent) -- created a new top-level
+  `profiling/` directory, explicitly documented as never asserted against
+  a hard time/memory limit in any test.
+- Whether any explicit matrix inverse in the codebase is "demonstrably
+  unnecessary" (target 12.2's own gating language) -- audited every call
+  site and found none were, but found a real, fixable house-convention
+  inconsistency (three `eigenmodes.py` sites using `np.linalg.solve(A,
+  eye(n))` instead of the project's documented `scipy.linalg.lu_factor`/
+  `lu_solve` convention).
+- Whether sparse/iterative linear algebra would help this project's
+  eigenvalue problems -- measured the actual Toeplitz coupling matrix
+  density directly rather than assuming, finding it 100% dense, closing
+  the question structurally rather than leaving it open for later.
+
+### Action items
+- [x] Target 12.1 (baseline profiler) — done 2026-08-05.
+  `profiling/baseline_profile.py`.
+- [x] Target 12.2 (direct-inverse audit) — done 2026-08-05.
+  `eigenmodes._dense_inverse`, three call sites migrated.
+- [x] Target 12.3 (factorization reuse design) — done 2026-08-05.
+  Documented in `design.md`; no further S-matrix-level reuse found beyond
+  the already-shipped trivial-interface fast path.
+- [x] Target 12.4 (SVD diagnostic) — done 2026-08-05.
+  `eigenmodes.svd_diagnostics`.
+- [x] Target 12.5 (sparse feasibility decision) — done 2026-08-05,
+  evaluated and rejected (not deferred) on measured structural grounds.
+  `decisions.md` ADR-021.
+- **Session summary**: all five Category 12 targets complete. 612 tests
+  pass project-wide (600 at the start of this category, 12 new fast
+  tests, no new `slow` tests). No existing test weakened; one house-
+  convention fix confirmed bit-for-bit equivalent before trusting it.
+  Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
+  `design.md`, `decisions.md` (new ADR-021), `architecture.md`,
+  `references.md`, and this file.

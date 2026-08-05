@@ -841,3 +841,56 @@
   entry records this as an explicit, reasoned deferral, not a silently
   skipped target — revisit if genuine supercell/stochastic-averaging
   support is explicitly requested as its own scoped effort.
+
+## ADR-021: Sparse/iterative linear algebra evaluated and rejected, not merely deferred (Category 12 target 12.5)
+
+- **Decision**: sparse or iterative linear-algebra methods (sparse
+  eigensolvers, Krylov-subspace iterative solvers, etc.) are **not**
+  adopted for this project's dense eigenvalue/linear-solve operations —
+  evaluated using `profiling/baseline_profile.py`'s measured benchmark
+  dimensions (target 12.1) and rejected on structural grounds, not merely
+  deferred for lack of time (unlike ADR-020's LER/LWR deferral, this is a
+  "the technique doesn't apply here" finding, not a "not attempted yet"
+  one).
+- **Reason**: two independent, measured findings rule it out:
+  1. **The coupling matrices are fully dense, not sparse.** Measured
+     directly (not assumed): the direct-rule Toeplitz permittivity matrix
+     `epsilon_hat` for an ordinary 2D patterned layer (`num_orders=49`,
+     circular pillar) has **100% nonzero entries** (every pairwise
+     Fourier-order coupling is nonzero, the expected structural
+     consequence of a shape's continuous Fourier transform sampled at
+     every reciprocal-lattice difference `G_i - G_j` — there is no
+     banded/block-sparse pattern to exploit). Sparse linear algebra's
+     benefit is proportional to how sparse the matrix actually is; here
+     it is exactly zero.
+  2. **Every mode is physically needed, not just a few.** Sparse
+     *eigensolvers* (e.g. ARPACK/Lanczos-family) are advantageous when
+     only a handful of extremal eigenvalues/eigenvectors are wanted out of
+     a huge matrix — RCWA needs the *entire* mode spectrum (every Fourier
+     order's forward/backward amplitude contributes to the S-matrix
+     cascade and the final R/T), so there is no "few eigenvalues out of
+     many" structure to exploit either, independent of sparsity.
+  3. 12.1's own measurements (`design.md`'s "Linear-Algebra Baseline &
+     Factorization-Reuse Design") show the eigensolve dominates runtime
+     at the sizes this project actually uses (`num_orders` up to a few
+     hundred at most, per Phase 4b's stress sweep) — the matrices never
+     reach a size regime (tens of thousands+) where even a hypothetically
+     sparse iterative method would clearly outperform a dense direct
+     LAPACK solve's better constant factors and numerical robustness.
+- **Validation**: the density measurement above, plus the general (well-
+  established in the RCWA/Fourier-modal-method literature, not unique to
+  this project) fact that Fourier-factorized permittivity matrices are
+  inherently dense — cited as domain knowledge, not fabricated as if
+  benchmarked against a specific paper (per `rules.md` AI Coding Rule 1,
+  distinguishing a well-known structural property from a specific
+  numerical claim needing citation).
+- **Alternatives considered**: none pursued further, given both structural
+  disqualifying factors above; a future session should re-evaluate only
+  if a materially different problem regime appears (e.g. a supercell
+  large enough to genuinely produce sparse coupling, which would only
+  arise from work like ADR-020's deferred LER/LWR supercell approach, not
+  from anything currently planned).
+- **Impact**: no code change. Recorded so a future session doesn't
+  re-investigate the same question without new evidence — the density
+  measurement above is the reason to trust "no" rather than re-deriving it
+  from first principles again.

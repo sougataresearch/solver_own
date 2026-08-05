@@ -1,7 +1,7 @@
 # `tests/` — Test Suite
 
-`pytest`-based, 569 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
-Category 8 (559 fast + 10 `slow`-marked convergence/benchmark studies). Run
+`pytest`-based, 622 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+Category 12 (612 fast + 10 `slow`-marked convergence/benchmark studies). Run
 the fast suite with:
 
 ```bash
@@ -60,6 +60,11 @@ oracle — never a self-consistency check against the same code path.
 | [`test_layer_absorption.py`](test_layer_absorption.py) | Category 7 targets 7.5/7.6: `SimulationResult.layer_absorption()` against the `R+T+sum(A)=1` energy-balance identity, plus a regression guard on a found numerical-overflow limitation for thick/highly-lossy/high-`num_orders` layers |
 | [`test_sweep.py`](test_sweep.py) | Category 8 targets 8.1-8.5: `sweep.SweepResult` and the wavelength/angle/polarization/thickness sweep functions, each confirmed equivalent to a manual per-point `solve()` loop |
 | [`test_harmonic_convergence.py`](test_harmonic_convergence.py) | Category 8 targets 8.6-8.8: `harmonic_study`, `find_convergence_index` (validated against thin-film/trench/pillar fixtures, including Category 3's non-monotonic pillar wobble), and `auto_select_num_orders` |
+| [`test_optical_outputs.py`](test_optical_outputs.py) | Category 10 targets 10.1-10.3/10.6: `complex_amplitudes()`/`diffraction_angles()`/`energy_balance()` against `oracles/fresnel.py::multilayer_complex_rt` and the classical grating equation, plus a frozen output-schema check across uniform/1D/2D fixtures |
+| [`test_ocd.py`](test_ocd.py) | Category 11 targets 11.1-11.4: `OCDTrapezoidParams` validation, `trapezoid_trench_layers`' zero-taper reduction, `rounded_rectangle_polygon`'s convergence to the closed-form rounded-rectangle area |
+| [`test_overlay.py`](test_overlay.py) | Category 11 target 11.7: overlay (layer-to-layer misregistration) via existing `Shape.center` offsets, including a shift-by-one-lattice-period periodicity self-consistency check |
+| [`test_linear_algebra_audit.py`](test_linear_algebra_audit.py) | Category 12 targets 12.2/12.5: `eigenmodes._dense_inverse` equivalence to the pre-refactor `np.linalg.solve`-based results, and the Toeplitz-matrix density measurement `decisions.md` ADR-021 relies on |
+| [`test_svd_diagnostics.py`](test_svd_diagnostics.py) | Category 12 target 12.4: `eigenmodes.svd_diagnostics` against synthetic near-rank-deficient matrices and Phase 4b's most-ill-conditioned pillar fixture |
 
 ## `oracles/`
 

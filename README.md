@@ -244,10 +244,51 @@ Current (Category 8, Solver sweeps and convergence, targets 8.1-8.8, shipped):
   fixtures before automatic harmonic-order selection
   (`sweep.auto_select_num_orders`) was implemented on top of it.
 
+Current (Category 10, Optical outputs, targets 10.1-10.4/10.6 shipped, target 10.5 deferred):
+- Per-order complex reflected/transmitted field coefficients
+  (`SimulationResult.complex_amplitudes()`), diffraction angles with a
+  clear `None` non-propagating representation
+  (`.diffraction_angles()`), and a one-call conservation report
+  (`.energy_balance()`) — validated against a new
+  `tests/oracles/fresnel.py::multilayer_complex_rt` function for both
+  polarizations.
+- **Not implemented**: per-order s/p amplitude conversion (target 10.5) —
+  a bounded attempt to externally validate the polarization convention
+  against S4's actual source found a plausible but numerically-
+  unconfirmed match (S4 not buildable in this environment); see
+  `references.md`.
+
+Current (Category 11, Semiconductor OCD features, targets 11.1-11.7 shipped, target 11.8 deferred):
+- A validated, CD-first OCD parameter object and trapezoid trench
+  constructor ([`src/sougata_solver/ocd.py`](src/sougata_solver/ocd.py)),
+  built entirely on already-validated Phase 5 staircase machinery.
+- Corner rounding via an arc-sampled `Polygon` (`ocd.rounded_rectangle_polygon`),
+  converging to the closed-form rounded-rectangle area.
+- Reproducible TSV/grating OCD example sweeps
+  (`structures/via/tsv_ocd_sweep.py`, `structures/trench/trench_ocd_sweep.py`).
+- Overlay (layer-to-layer misregistration) confirmed already achievable
+  with the existing API, no new parameter needed (`decisions.md` ADR-019).
+- **Not implemented**: stochastic line-edge/line-width roughness (target
+  11.8) — evaluated and explicitly deferred; fundamentally in tension
+  with RCWA's periodic-Fourier formulation (`decisions.md` ADR-020).
+
+Current (Category 12, Linear algebra, targets 12.1-12.5, shipped):
+- A measured baseline performance profile
+  ([`profiling/baseline_profile.py`](profiling/baseline_profile.py)),
+  showing the eigensolve — not the matrix-solve step — dominates runtime
+  at larger `num_orders`.
+- A direct-inverse audit that found and fixed a house-convention
+  inconsistency (`eigenmodes._dense_inverse`), confirmed bit-for-bit
+  equivalent to the pre-fix numerical results.
+- An opt-in singular-value diagnostic (`eigenmodes.svd_diagnostics`).
+- Sparse/iterative linear algebra evaluated and **rejected** (not merely
+  deferred) on a measured structural finding — the Toeplitz coupling
+  matrices are 100% dense (`decisions.md` ADR-021).
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
 - Expanded systematic validation sweep across all geometry types and an
   example gallery (Phase 8, `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories
-  10-19)
+  13-19)
 - Optional vectorized/GPU/autodiff backend (later; see `decisions.md`)
 
 ## Target Users
@@ -313,15 +354,21 @@ sougata_solver/
 │   ├── sweep.py                    typed parameter-sweep container + wavelength/angle/
 │   │                                 polarization/thickness/harmonic-order sweeps (Category 8)
 │   ├── simulation.py               top-level orchestration; SimulationResult.layer_absorption()
-│   │                                 (Category 7)
+│   │                                 (Category 7), .complex_amplitudes()/.diffraction_angles()/
+│   │                                 .energy_balance() (Category 10)
+│   ├── ocd.py                       CD-first OCD parameters, trapezoid trench, rounded-rectangle
+│   │                                 corner geometry (Category 11)
 │   └── output_paths.py             outputs/YYYY_MM_DD/HH_MM_SS_<run>/ helper
-├── tests/                    pytest suite (569 tests) + `tests/oracles/` -- see tests/README.md
+├── tests/                    pytest suite (612 tests) + `tests/oracles/` -- see tests/README.md
+├── profiling/                  diagnostic timing scripts (Category 12 target 12.1),
+│                                 never asserted against a hard limit -- see profiling/README.md
 ├── structures/                YOU RUN THESE -- see structures/README.md
 │   ├── thin_film/                uniform multilayer stacks (Phase 1, done)
 │   ├── trench/                    1D lamellar gratings, tapered ridges, field
-│   │                                cross-sections (Phase 3/5/7, done)
+│   │                                cross-sections, OCD sweeps (Phase 3/5/7, Category 11, done)
 │   └── via/                        2D via/pillar arrays, tapered/elliptical/polygon
-│                                    pillars, field cross-sections (Phase 4/5/7, Category 4, done)
+│                                    pillars, field cross-sections, TSV/OCD sweeps
+│                                    (Phase 4/5/7, Category 4/11, done)
 └── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
                                   output and derive Jones/Mueller matrices, ellipsometric
                                   angles, field-intensity plots, and (planned) RI/thickness
@@ -331,7 +378,8 @@ sougata_solver/
 Folder-level READMEs with more detail:
 [`src/sougata_solver/README.md`](src/sougata_solver/README.md) ·
 [`structures/README.md`](structures/README.md) ·
-[`tests/README.md`](tests/README.md)
+[`tests/README.md`](tests/README.md) ·
+[`profiling/README.md`](profiling/README.md)
 
 ## Installation
 
@@ -426,13 +474,20 @@ pytest -m slow        # convergence/benchmark studies (several minutes)
 See [`phases.md`](phases.md) for the complete, ordered roadmap and
 [`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`](COMMERCIAL_RCWA_ATOMIC_TARGETS.md) for
 the fine-grained target checklist. Phases 1-7 are shipped, and
-`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-9 (mathematical foundation/
-anisotropy, numerical methods, Fourier factorization, geometry engine,
-material models, boundary conditions/excitation, layer handling, solver
-sweeps/convergence, field calculations) are all shipped except Category 1
-target 1.5 (longitudinal tensor coupling, explicitly deferred pending a
-citable formulation). Remaining: Categories 10-19 (future extensions) at
-the atomic-target level, plus an expanded validation suite and example
-gallery (Phase 8's remaining scripted convergence studies/DBR/TSV
-examples) and an optional vectorized/GPU/autodiff backend (Phase 9,
-later).
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-12 (mathematical
+foundation/anisotropy, numerical methods, Fourier factorization, geometry
+engine, material models, boundary conditions/excitation, layer handling,
+solver sweeps/convergence, field calculations, optical outputs,
+semiconductor OCD features, linear algebra) are all shipped except three
+explicitly-evaluated-and-deferred targets, each with its own documented
+reason (not silently skipped): Category 1 target 1.5 (longitudinal tensor
+coupling — no citable + independently-benchmarkable formulation found),
+Category 10 target 10.5 (per-order s/p conversion — a bounded external-
+validation attempt against S4's actual source found a plausible but
+numerically-unconfirmed match), and Category 11 target 11.8 (stochastic
+line-edge/line-width roughness — fundamentally in tension with RCWA's
+periodic-Fourier formulation). Remaining: Categories 13-19 (future
+extensions) at the atomic-target level, plus an expanded validation suite
+and example gallery (Phase 8's remaining scripted convergence studies/
+DBR/TSV examples) and an optional vectorized/GPU/autodiff backend
+(Phase 9, later).

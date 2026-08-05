@@ -16,6 +16,17 @@ validates against. Update when a new phase cites a new source.
 
 ## Phases With No Vendored-Repo Source
 
+### Category 12 (Linear algebra) targets 12.1-12.5 (2026-08-05)
+
+No new external citation was needed for any Category 12 target — every
+deliverable is either a measurement (12.1's profiler, 12.5's density
+check) or a consistency fix against this project's own already-documented
+house convention (`rules.md`'s Performance Requirements section,
+`smatrix.py::_solve`), not a new physics or numerical-methods formula.
+`eigenmodes.svd_diagnostics` (12.4) calls `numpy.linalg.svd` directly —
+standard LAPACK singular value decomposition, not something requiring a
+citation beyond NumPy's own documentation.
+
 ### Category 11 (Semiconductor OCD features) targets 11.1/11.2/11.4/11.7 (2026-08-05)
 
 None of Category 11's implementation targets needed a new external

@@ -5,9 +5,10 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 11, targets
-11.1-11.7, 11.8 deferred), 2026-08-05 (Category 10, targets 10.1-10.4/10.6,
-10.5 deferred), 2026-08-05 (Category 8, targets 8.1-8.8),
+As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 12, targets
+12.1-12.5 all done), 2026-08-05 (Category 11, targets 11.1-11.7, 11.8
+deferred), 2026-08-05 (Category 10, targets 10.1-10.4/10.6, 10.5
+deferred), 2026-08-05 (Category 8, targets 8.1-8.8),
 2026-08-05 (Category 7, targets 7.1-7.6), 2026-08-05 (Phase 7 /
 Category 9, targets 9.1-9.8), 2026-08-04
 (Category 6, targets 6.1-6.6), 2026-08-04
@@ -15,6 +16,47 @@ Category 9, targets 9.1-9.8), 2026-08-04
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 12 (Linear algebra), targets 12.1-12.5, are all complete.**
+  New top-level `profiling/` directory (12.1): `baseline_profile.py`
+  measures eigensolve/matrix-solve/end-to-end `Simulation.solve()` time
+  and peak memory on fixed thin-film/1D/2D fixtures -- diagnostic-only,
+  never asserted against a hard limit in any test (wall-clock timing is
+  machine-dependent, per `rules.md`'s Performance Requirements). Measured
+  finding: the eigensolve dominates at moderate-to-large `num_orders`
+  (~9x order increase -> ~160x eigensolve-time increase), not the
+  isolated matrix-solve step -- consistent with, and now quantifying,
+  Category 7 ADR-016's earlier observation. 12.2: audited every
+  `linalg.inv`/`.inv(`/`linalg.solve` call site in `src/sougata_solver/`
+  -- found no "demonstrably unnecessary" explicit inverse (every one is
+  genuinely consumed as a full matrix downstream, or too small (2x2
+  lattice vectors) to matter), but found a real house-convention
+  inconsistency: three `eigenmodes.py` call sites used
+  `np.linalg.solve(A, eye(n))` instead of the project's own documented
+  `scipy.linalg.lu_factor`/`lu_solve` convention -- fixed via a new
+  `eigenmodes._dense_inverse` helper, with bit-for-bit equivalence to the
+  pre-refactor numeric results confirmed directly (not assumed),
+  `tests/test_linear_algebra_audit.py`. 12.3: audited every S-matrix-
+  cascade linear-solve call site for reuse opportunities -- found none
+  beyond the already-shipped `_is_trivial_interface` fast path (Phase 1);
+  documented, per 12.1's own eigensolve-dominance finding, a narrower
+  future extension (an instance-scoped `LayerEigenmodes` cache, analogous
+  to but distinct from Category 7's Toeplitz cache) as a design note only
+  -- not implemented, since no corresponding "12.6 implementation" target
+  exists (`design.md`). 12.4: `eigenmodes.svd_diagnostics`, an opt-in
+  (never automatically called during a solve) full singular-value
+  spectrum plus a "how many modes are near-rank-deficient" count, more
+  detail than the always-on `cond_phi`'s min/max ratio alone --
+  validated against Phase 4b's already-characterized most-ill-conditioned
+  pillar fixture. 12.5: evaluated and **rejected** (a structural finding,
+  not a "not attempted" deferral) whether sparse/iterative linear algebra
+  is worthwhile -- measured directly that the direct-rule Toeplitz
+  permittivity matrix for an ordinary 2D patterned layer is **100%
+  dense** (no exploitable sparsity), and RCWA needs the full mode
+  spectrum, not a few extremal eigenvalues, so neither of sparse linear
+  algebra's usual advantages applies -- `decisions.md` ADR-021, the
+  density measurement pinned as a permanent regression check. 612 tests
+  pass project-wide (600 at the start of this category: no new `slow`
+  tests, 12 new fast tests), full fast suite re-run and confirmed green.
 - **Category 11 (Semiconductor OCD features), targets 11.1-11.7 are
   complete; target 11.8 is evaluated and explicitly deferred.** New
   module `src/sougata_solver/ocd.py` -- no new physics anywhere in it,

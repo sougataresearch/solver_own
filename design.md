@@ -698,3 +698,75 @@ the original `Simulation` object around. This needs `SimulationResult` to
 also store `thicknesses` (a new field, populated by `Simulation.solve()`
 from data it already computes locally) — the one small, purely-additive
 API extension this target requires.
+
+## Linear-Algebra Baseline & Factorization-Reuse Design (Category 12 targets 12.1/12.3)
+
+**12.1 baseline measurements** (`profiling/baseline_profile.py`, run on
+this development machine — absolute numbers are machine-dependent and not
+asserted in any test, per `rules.md`'s Performance Requirements; the
+*qualitative* scaling behavior is the load-bearing result):
+
+| Stage | `num_orders` | measured (min of 5) |
+|---|---|---|
+| Isolated 2D-pillar eigensolve | 9 / 25 / 49 / 81 | 0.83 / 2.52 / 11.9 / 132 ms |
+| Isolated matrix-solve (`_solve`, random `(2n,2n)`) | 9 / 25 / 49 / 81 | 0.30 / 0.25 / 0.81 / 161 ms |
+| `Simulation.solve()`, thin-film | 1 | 5.0 ms |
+| `Simulation.solve()`, 1D grating | 9 | 11.8 ms |
+| `Simulation.solve()`, 2D pillar | 9 / 49 | 9.7 / 115 ms |
+
+**Finding, consistent with and now quantifying ADR-016's earlier
+observation**: the eigensolve is the dominant cost at moderate-to-large
+`num_orders` (steep, worse-than-linear growth: 9→81 orders is a ~9x
+Fourier-order increase but a ~160x eigensolve-time increase), not the
+isolated matrix-solve step (which stays comparatively small until the
+same large sizes, where LU-factorization cost catches up for the same
+underlying reason — both operations are dense `O(n^3)`-class LAPACK calls
+on the same growing matrix dimension). This directly informs 12.3 and
+12.5 below.
+
+**12.3 factorization-reuse design.** Audited every explicit linear-solve
+call site in the S-matrix cascade (`smatrix.py::interface_smatrix`,
+`star_product`, `interior_amplitudes`) for repeated-coefficient-matrix
+reuse opportunities:
+
+- `interface_smatrix`'s `_solve(ta, identity)`: `ta` is a fresh
+  `0.5*(P+Q)` combination for every distinct layer-pair, never repeated
+  within one cascade — no reuse opportunity, **except** the case already
+  handled since Phase 1: `_is_trivial_interface` short-circuits an
+  interface between two layers sharing identical `(q, phi, kp)` to a
+  literal identity S-matrix, skipping the linear solve entirely. This is
+  itself the safe, already-shipped instance of "intra-solve factorization
+  reuse" this target asks about — not a new opportunity, but worth
+  recording as the answer, not overlooking it because it predates
+  Category 12.
+- `star_product`'s two solves (`_solve(t1, ...)`, `_solve(t2, ...)`):
+  `t1 = I - a01@b10` and `t2 = I - b10@a01` are different matrices in
+  general (equal only if `a01`/`b10` commute, not assumed) — no reuse.
+- `interior_amplitudes`'s `_solve(s11, ...)`: `s11` is a different partial
+  S-matrix block per interior interface queried (`layer_absorption()`
+  calls it once per interior layer) — no reuse across layers.
+
+**Conclusion**: no further *S-matrix-level* factorization-reuse
+opportunity exists without changing the cascade's fundamental per-
+interface/per-layer structure (a materially larger, riskier change,
+out of this target's small-target scope). The 12.1 measurements point
+instead to a *different* opportunity, one layer up: since the eigensolve
+(not the matrix-solve) dominates, and Category 7's Toeplitz-matrix cache
+(ADR-016) already caches the Toeplitz matrix *feeding into* each
+eigensolve but not the eigensolve's own result, a natural future
+extension — **explicitly not implemented here**, since 12.3 asks only for
+the design, matching how target 7.3 was design-only before 7.4
+implemented it, and no corresponding "12.6 implementation" target exists
+in this category — would be an instance-scoped `LayerEigenmodes` cache on
+`Simulation`, keyed the same way ADR-016's Toeplitz cache is
+(`(kind, id(pattern)-or-material-identity, wavelength)`, since `kx`/`ky`
+are already fixed for a `Simulation` instance's lifetime, the same
+invariant ADR-016 relies on) — directly useful for the same fixed-
+wavelength angle-sweep scenario ADR-016 was measured against, since
+`kx`/`ky` genuinely do change with angle and *do* affect the eigensolve
+(unlike the Toeplitz matrix), so this specific extension would need
+angle-independent-only reuse within one `Simulation.solve()` call for
+repeated identical patterned layers, not across an angle sweep — a
+narrower, different benefit than ADR-016's, worth stating precisely
+rather than overclaiming. Revisit if a future session profiles a
+concrete workload where this narrower reuse would actually matter.
