@@ -141,17 +141,20 @@ open and revisitable.
 
 ---
 
-## 2. Numerical methods — PARTIAL
+## 2. Numerical methods — DONE
 
 ### Already present
 
 - Redheffer star-product S-matrix cascading.
 - Dense complex eigensolves, outgoing branch selection, and condition warnings.
+- A documented failure contract, per-solve eigenvalue diagnostics,
+  deterministic sweep-mode ordering, and a configurable degeneracy warning.
 
 **Current scope**
 
-The stable isotropic solve is implemented; deterministic sweep tracking and
-explicit numerical-failure policy remain.
+The stable isotropic solve, a documented failure contract, deterministic
+sweep tracking, and eigenvalue/conditioning diagnostics are all
+implemented and tested.
 
 ### Small targets
 
@@ -246,17 +249,22 @@ log lines) and the full pre-existing fast+slow suite (`pytest` /
 `pytest -m slow`) was re-run and confirmed passing after every change, not
 just at the end.
 
-## 3. Fourier factorization — PARTIAL
+## 3. Fourier factorization — DONE
 
 ### Already present
 
 - Direct and inverse-rule Toeplitz permittivity matrices for current patterns.
 - Analytic Fourier coefficients for slabs, circles, and rectangles.
+- A documented rule inventory and measured high-contrast 1D/2D convergence
+  fixtures; FFF/normal-vector-method feasibility evaluated and explicitly
+  deferred.
 
 **Current scope**
 
-Current scalar factorization is validated; high-contrast 2D improvements are
-not yet selected.
+Current scalar factorization is validated, with its convergence behavior
+(including known non-monotonic low-order cases) measured and recorded;
+high-contrast 2D improvements (FFF/NVM) were evaluated and explicitly
+deferred, not selected for implementation (`decisions.md` ADR-012).
 
 ### Small targets
 
@@ -357,17 +365,22 @@ domain-of-use documentation and convergence results exist, which they do.
 232 tests pass project-wide (227 at the start of this session: 220 fast + 7
 slow -- 226 fast + 9 slow now).
 
-## 4. Geometry engine — PARTIAL
+## 4. Geometry engine — DONE
 
 ### Already present
 
 - 1D slabs and 2D circles/rectangles.
 - Nested-shape handling and staircase taper geometry.
+- Construction-time validation, a unit-cell self-overlap policy,
+  `Ellipse`/`Polygon` primitives, a JSON pattern-import format, and a
+  general geometry-to-layer-slices interface.
 
 **Current scope**
 
-The geometry engine covers current grating/via examples; general primitives
-and imported profiles remain pending.
+The geometry engine covers current grating/via examples plus general
+analytic `Ellipse`/`Polygon` primitives and a minimal safe JSON
+pattern-import format (parser only, not yet wired into `Simulation`/`Layer`
+construction).
 
 ### Small targets
 
@@ -451,17 +464,21 @@ test weakened (`rules.md` AI Coding Rule 3) — the `staircase.py` refactor
 full pre-existing test suite before being considered done, not merely
 assumed safe because it "should" be equivalent.
 
-## 5. Material models — PARTIAL
+## 5. Material models — DONE
 
 ### Already present
 
 - Constant complex permittivity/index and tabulated isotropic n,k data.
 - A `Material` interface that stores scalar or 3x3 tensor values.
+- Construction-/call-time validation, five analytic dispersion models
+  (Sellmeier, Cauchy, Lorentz, Drude, Drude-Lorentz), and optional
+  provenance metadata.
 
 **Current scope**
 
-Tensor values can be represented but cannot yet be solved; analytic dispersion
-models are not yet implemented.
+Tensor values are validated and solvable end to end (Category 1's uniform/
+patterned anisotropic eigensolvers); five analytic dispersion models are
+implemented and validated against published references.
 
 ### Small targets
 
@@ -558,17 +575,22 @@ fast tests), no existing test weakened (`rules.md` AI Coding Rule 3); one
 genuine pre-existing bug (`write_run_metadata`'s missing UTF-8 encoding)
 was found and fixed, not just documented.
 
-## 6. Boundary conditions and excitation — PARTIAL
+## 6. Boundary conditions and excitation — DONE
 
 ### Already present
 
 - Floquet boundaries, arbitrary incidence angle/azimuth, and Jones-vector input.
 - TE/TM, linear, circular, and elliptical polarization amplitudes.
+- A documented worked-examples table, a polarization-state/azimuth/angle
+  regression suite, a characterized grazing-incidence boundary, and
+  verified bottom (reverse-side) illumination.
 
 **Current scope**
 
-The existing convention is internally consistent; external polarization-phase
-validation remains required.
+The existing convention is documented with worked examples and validated
+via symmetry-invariant and energy-conservation regression tests across
+polarization state, azimuth, and incidence angle, including the
+grazing-incidence boundary.
 
 ### Small targets
 
@@ -817,16 +839,22 @@ equivalent to repeated scalar `Simulation.solve()` calls
 a caller to independently recompute `find_convergence_index`'s decision
 from the stored data alone.
 
-## 9. Field calculations — NOT COMPLETED
+## 9. Field calculations — DONE
 
 ### Already present
 
 - Modal amplitudes and z-directed Poynting-flux evaluation for R/T.
 - Partial S-matrix support that can supply internal interface amplitudes.
+- Full real-space `(Ex,Ey,Ez,Hx,Hy,Hz)` reconstruction at any point/depth
+  (`fields.py`), interior-layer amplitude recovery
+  (`smatrix.interior_amplitudes`), and NumPy field-grid export
+  (`fields.save_field_grid_npz`).
 
 **Current scope**
 
-Real-space E/H reconstruction and field exports are not implemented.
+Real-space E/H reconstruction and NumPy field export are implemented and
+validated; CSV/HDF5 export remains explicitly out of scope (target 9.8's
+own wording — no schema design has been done for either).
 
 ### Small targets
 
