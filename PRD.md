@@ -107,6 +107,27 @@ depending on them at runtime.
   `R`/`T` to `~1e-6` for a 2D pillar (this category's own exit criterion).
   See `tests/test_field_reconstruction.py` and Phase 7's status entry in
   `phases.md`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7 (layer handling): targets
+  7.1-7.6 all **met** — construction-time layer-thickness validation, a
+  repeated-layer-identity regression guard, an instance-scoped Toeplitz-
+  matrix cache gated on a measured timing case (`decisions.md` ADR-016),
+  and `SimulationResult.layer_absorption()` (a flux-divergence combination
+  of already-validated field-reconstruction pieces, `decisions.md`
+  ADR-017) satisfying the `R+T+sum(A)=1` energy-balance identity for a
+  lossy fixture, with a found-and-documented numerical-overflow limitation
+  for extreme thick/highly-lossy/high-`num_orders` cases
+  (`troubleshooting.md`). See `tests/test_layer_validation.py`,
+  `tests/test_layer_repetition.py`, `tests/test_layer_cache.py`,
+  `tests/test_layer_absorption.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 8 (solver sweeps and
+  convergence): targets 8.1-8.8 all **met** — a typed `SweepResult`
+  container and library-level wavelength/angle/polarization/thickness
+  sweep functions, each confirmed equivalent to a manual per-point
+  `Simulation.solve()` loop; a harmonic-order convergence study; a
+  conservative convergence criterion (`decisions.md` ADR-018) validated
+  against thin-film/trench/pillar fixtures per the category's own gating
+  requirement before automatic harmonic-order selection was built on top
+  of it. See `tests/test_sweep.py`, `tests/test_harmonic_convergence.py`.
 - No phase is marked "done" without: (a) a passing automated test against
   an oracle, and (b) a runnable example script producing physically
   plausible output.

@@ -17,14 +17,15 @@ Roughly in the order data flows through them for a single `Simulation.solve()` c
 | [`geometry_io.py`](geometry_io.py) | Minimal, safe JSON `Pattern`-import format (`pattern_from_dict`/`pattern_from_json_file`) — `json` module only, never `eval`/`exec` (Category 4 target 4.6, parser-only, not wired into `Simulation`/`Layer`) |
 | [`fourier_basis.py`](fourier_basis.py) | Circular G-vector truncation (`truncate_fourier_orders`) — which Fourier orders are kept |
 | [`fourier_factorization.py`](fourier_factorization.py) | `pattern_epsilon_hat`/`toeplitz_matrix` (scalar isotropic) and `pattern_epsilon_hat_component`/`toeplitz_matrix_component` (per-tensor-component) — builds the Toeplitz permittivity matrix for a patterned layer |
-| [`layer.py`](layer.py) | `Layer`, `LayerStack`, `LayerEigenmodes`, `EigenmodeDiagnostics` — the data model for a stack, including the semi-infinite incidence/transmission half-spaces and per-solve eigenvalue/conditioning diagnostics (Category 2 target 2.2) |
+| [`layer.py`](layer.py) | `Layer`, `LayerStack`, `LayerEigenmodes`, `EigenmodeDiagnostics` — the data model for a stack, including the semi-infinite incidence/transmission half-spaces, construction-time thickness validation (Category 7 target 7.1), and per-solve eigenvalue/conditioning diagnostics (Category 2 target 2.2) |
 | [`staircase.py`](staircase.py) | `slice_profile`, a general geometry-to-layer-slices interface (Category 4 target 4.7), plus the tapered-sidewall generators built on it (`staircase_circle_layers`, `staircase_rectangle_layers`, `staircase_slab_layers`) |
 | [`eigenmodes.py`](eigenmodes.py) | Per-layer eigenmode solve: `q` (propagation constants), `phi` (eigenvectors), `kp` (k-parallel operator). Covers uniform isotropic, uniform diagonal/in-plane-anisotropic, 1D-patterned, and 2D-patterned (isotropic and diagonal/in-plane-anisotropic) layers, plus `classify_propagating` (mode classification), `_canonical_mode_order` (deterministic degeneracy ordering), `ILL_CONDITIONED_THRESHOLD`/`DEGENERATE_GAP_THRESHOLD` (conditioning/near-degeneracy `WARNING`s, Category 2 targets 2.2/2.4) |
 | [`excitation.py`](excitation.py) | `PlaneWaveExcitation`: angle/polarization decomposition into s/p, and inversion to the incident mode-amplitude vector |
-| [`smatrix.py`](smatrix.py) | Interface + propagation S-matrices, Redheffer star-product cascading (`SMatrixStack`) — dimension-agnostic, needs no changes for Phase 3/4 |
-| [`fields.py`](fields.py) | `z_poynting_flux` — reflected/transmitted power from mode amplitudes |
+| [`smatrix.py`](smatrix.py) | Interface + propagation S-matrices, Redheffer star-product cascading (`SMatrixStack`) — dimension-agnostic, needs no changes for Phase 3/4; `interior_amplitudes` (Category 9 target 9.3) recovers forward/backward mode amplitudes at an interior interface, independently derived (`decisions.md` ADR-015) |
+| [`fields.py`](fields.py) | `z_poynting_flux`/`tangential_e_field` — reflected/transmitted power and tangential E-field from mode amplitudes; full real-space `(Ex,Ey,Ez,Hx,Hy,Hz)` reconstruction at any point/depth (`modal_field_components`/`propagate_amplitudes`/`reconstruct_field_at_points`) and NumPy field-grid export (`save_field_grid_npz`), Category 9 targets 9.1-9.8 |
 | [`polarimetry.py`](polarimetry.py) | Jones/Mueller matrix construction from s/p amplitudes (`decompose_sp` is reused by `postprocessing/`) |
-| [`simulation.py`](simulation.py) | Top-level orchestration: `Simulation.solve()` wires the above into a `SimulationResult` (`.reflectance()`, `.transmittance()`, `.diffraction_efficiencies()`, `.order_classification()`); validates every patterned layer against `geometry.validate_pattern_fits_lattice` at construction |
+| [`sweep.py`](sweep.py) | Category 8 targets 8.1-8.8: `SweepResult` (typed one-parameter-sweep container), `sweep_wavelength`/`sweep_theta`/`sweep_phi`/`sweep_polarization`/`sweep_thickness` (thin wrappers repeating `Simulation.solve()`), `harmonic_study`/`find_convergence_index`/`auto_select_num_orders` (harmonic-order convergence study and a conservative, `decisions.md` ADR-018, stopping criterion) |
+| [`simulation.py`](simulation.py) | Top-level orchestration: `Simulation.solve()` wires the above into a `SimulationResult` (`.reflectance()`, `.transmittance()`, `.diffraction_efficiencies()`, `.order_classification()`, `.layer_absorption()` — Category 7 targets 7.5/7.6); validates every patterned layer against `geometry.validate_pattern_fits_lattice` at construction; caches per-pattern Toeplitz matrices (Category 7 targets 7.3/7.4, `decisions.md` ADR-016) |
 | [`output_paths.py`](output_paths.py) | `outputs/YYYY_MM_DD/HH_MM_SS_<run>/` folder + `run_metadata.txt` helper (explicit UTF-8, Category 5 target 5.8), used by `structures/` scripts |
 
 ## Design rules specific to this folder
@@ -61,9 +62,11 @@ Roughly in the order data flows through them for a single `Simulation.solve()` c
   narrow, explicit revisit of `decisions.md` ADR-005 (`decisions.md`
   ADR-013) — GDS/arbitrary-mask import remains out of scope; do not treat
   `Polygon`'s existence as license to add raster-based geometry elsewhere.
-- No `absorbance()`/layer-wise-absorption computation exists yet
-  (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 7, targets 7.5/7.6, open)
-  — a lossy material's `R+T` will correctly be `< 1`, but nothing in this
-  package independently derives the missing `A` from the layers'
-  imaginary permittivity; `1 - R - T` is a caller-computed residual, not a
-  validated solver output.
+- `SimulationResult.layer_absorption()` (Category 7 targets 7.5/7.6) gives
+  per-layer absorbed power, validated against the `R+T+sum(A)=1`
+  energy-balance identity. It inherits `interior_amplitudes`/
+  `propagate_amplitudes`'s numerical-stability envelope: a thick, highly
+  lossy, high-`num_orders` layer can numerically overflow the deepest
+  evanescent modes' backward-propagated amplitude — see
+  `troubleshooting.md` and `decisions.md` ADR-017 before trusting a result
+  from a parameter regime that extreme.

@@ -24,8 +24,9 @@ dominant failure mode in this domain, not crashes.
 
 `sougata_solver` solves Maxwell's equations for plane-wave illumination of a stack
 of periodic (or uniform) layers, returning reflected/transmitted diffraction
-efficiencies, polarimetric response (Jones/Mueller), and — in a later phase
-— reconstructed real-space field maps. It targets the same class of problems
+efficiencies, polarimetric response (Jones/Mueller), reconstructed
+real-space field maps, and per-layer absorbed power. It targets the same
+class of problems
 as commercial tools like JCMsuite (see the vendored tutorials in
 [`../EMTutorial`](../EMTutorial)) but restricted to structures that are
 periodic in the lateral direction(s): thin-film stacks, distributed Bragg
@@ -190,9 +191,63 @@ Current (Category 5, Material models, targets 5.1-5.8, shipped):
 - Optional `Material.source` citation metadata, threaded through every
   `from_*` classmethod and into serialized `run_metadata.txt` output.
 
+Current (Category 6, Boundary conditions and excitation, targets 6.1-6.6, shipped):
+- A "Worked polarization examples" table (`CONVENTIONS.md`) and a full
+  polarization-state x azimuth x angle regression suite using symmetry
+  invariants, not just energy conservation (`tests/test_polarization_states.py`).
+- A characterized-and-tested grazing-incidence boundary (`ValueError`, not
+  `NaN`, exactly at `theta=90 deg`) and an oblique-incidence extension of
+  the Rayleigh-threshold test (`tests/test_grazing_incidence.py`,
+  `tests/test_oblique_rayleigh_threshold.py`).
+- Bottom (reverse-side) illumination — already achievable with the
+  existing `Simulation` constructor, no new API, verified via Stokes
+  transmittance reciprocity (`decisions.md` ADR-014,
+  `tests/test_bottom_incidence.py`).
+
+Current (Phase 7 / Category 9, Field calculations, targets 9.1-9.8, shipped):
+- Full real-space `(Ex, Ey, Ez, Hx, Hy, Hz)` field reconstruction at any
+  point/depth — `fields.modal_field_components`/`propagate_amplitudes`/
+  `reconstruct_field_at_points`, transcribed from S4's
+  `GetInPlaneFieldVector`/`GetFieldAtPoint`
+  ([`src/sougata_solver/fields.py`](src/sougata_solver/fields.py)).
+- Interior-layer mode-amplitude recovery at any interface —
+  `smatrix.interior_amplitudes`, independently derived from
+  `SMatrixStack.partial_smatrix_up_to` (`decisions.md` ADR-015).
+- NumPy field-grid export (`fields.save_field_grid_npz`) and two runnable
+  cross-section examples with a matching plotting script
+  (`structures/trench/trench_field_cross_section.py`,
+  `structures/via/pillar_field_cross_section.py`,
+  `postprocessing/plot_field_cross_section.py`).
+
+Current (Category 7, Layer handling, targets 7.1-7.6, shipped):
+- Construction-time layer-thickness validation (`layer.py`) and a
+  repeated-layer-identity regression guard
+  (`tests/test_layer_repetition.py`).
+- An instance-scoped Toeplitz-matrix cache on `Simulation`, gated on a
+  measured timing case (fixed-wavelength angle sweeps, ~30% wall-clock
+  reduction) per `rules.md`'s Performance Requirements (`decisions.md`
+  ADR-016).
+- `SimulationResult.layer_absorption()` — per-layer absorbed power from a
+  z-Poynting-flux-divergence combination of already-validated field-
+  reconstruction pieces, finally closing the `R+T+sum(A)=1` energy-balance
+  identity for lossy structures (`decisions.md` ADR-017,
+  `tests/test_layer_absorption.py`).
+
+Current (Category 8, Solver sweeps and convergence, targets 8.1-8.8, shipped):
+- A typed one-parameter-sweep container (`sweep.SweepResult`) and library-
+  level wavelength/angle/polarization/thickness sweep functions
+  ([`src/sougata_solver/sweep.py`](src/sougata_solver/sweep.py)), each
+  confirmed equivalent to a manual per-point `Simulation.solve()` loop.
+- A harmonic-order convergence study (`sweep.harmonic_study`) and a
+  conservative convergence criterion (`sweep.find_convergence_index`,
+  `decisions.md` ADR-018), validated against thin-film/trench/pillar
+  fixtures before automatic harmonic-order selection
+  (`sweep.auto_select_num_orders`) was implemented on top of it.
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
-- Real-space field reconstruction and cross-section plotting (Phase 7)
-- Expanded systematic validation sweep across all geometry types (Phase 8)
+- Expanded systematic validation sweep across all geometry types and an
+  example gallery (Phase 8, `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories
+  10-19)
 - Optional vectorized/GPU/autodiff backend (later; see `decisions.md`)
 
 ## Target Users
@@ -249,21 +304,28 @@ sougata_solver/
 │   ├── eigenmodes.py           per-layer eigenmode solve: uniform, 1D-patterned (Phase 3),
 │   │                            2D-patterned (Phase 4a/4b), and anisotropic (Phase 6);
 │   │                            conditioning/degeneracy WARNING diagnostics
-│   ├── smatrix.py               interface + propagation S-matrices, star product
+│   ├── smatrix.py               interface + propagation S-matrices, star product,
+│   │                             interior_amplitudes (Category 9 target 9.3)
 │   ├── excitation.py            plane-wave decomposition, incident amplitude
-│   ├── fields.py                  Poynting flux, tangential field reconstruction
+│   ├── fields.py                  Poynting flux, full real-space field reconstruction
+│   │                                and NumPy field-grid export (Category 9)
 │   ├── polarimetry.py             Jones/Mueller (reused by postprocessing/)
-│   ├── simulation.py               top-level orchestration
+│   ├── sweep.py                    typed parameter-sweep container + wavelength/angle/
+│   │                                 polarization/thickness/harmonic-order sweeps (Category 8)
+│   ├── simulation.py               top-level orchestration; SimulationResult.layer_absorption()
+│   │                                 (Category 7)
 │   └── output_paths.py             outputs/YYYY_MM_DD/HH_MM_SS_<run>/ helper
-├── tests/                    pytest suite (393 tests) + `tests/oracles/` -- see tests/README.md
+├── tests/                    pytest suite (569 tests) + `tests/oracles/` -- see tests/README.md
 ├── structures/                YOU RUN THESE -- see structures/README.md
 │   ├── thin_film/                uniform multilayer stacks (Phase 1, done)
-│   ├── trench/                    1D lamellar gratings, tapered ridges (Phase 3/5, done)
+│   ├── trench/                    1D lamellar gratings, tapered ridges, field
+│   │                                cross-sections (Phase 3/5/7, done)
 │   └── via/                        2D via/pillar arrays, tapered/elliptical/polygon
-│                                    pillars (Phase 4/5, Category 4, done)
+│                                    pillars, field cross-sections (Phase 4/5/7, Category 4, done)
 └── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
                                   output and derive Jones/Mueller matrices, ellipsometric
-                                  angles, and (planned) RI/thickness extraction
+                                  angles, field-intensity plots, and (planned) RI/thickness
+                                  extraction
 ```
 
 Folder-level READMEs with more detail:
@@ -363,16 +425,14 @@ pytest -m slow        # convergence/benchmark studies (several minutes)
 
 See [`phases.md`](phases.md) for the complete, ordered roadmap and
 [`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`](COMMERCIAL_RCWA_ATOMIC_TARGETS.md) for
-the fine-grained target checklist. Phases 1-5 are shipped, and
-`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-5 (mathematical foundation/
+the fine-grained target checklist. Phases 1-7 are shipped, and
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-9 (mathematical foundation/
 anisotropy, numerical methods, Fourier factorization, geometry engine,
-material models) are all shipped except Category 1 target 1.5 (longitudinal
-tensor coupling, explicitly deferred pending a citable formulation).
-Remaining: Category 6 (boundary conditions/excitation) through Category 19
-(future extensions) at the atomic-target level — notably Category 7's
-layer-wise absorption (no `absorbance()`/`A` computation exists yet: a
-lossy material's `R+T` is correctly `<1`, but nothing independently derives
-the missing `A`) — plus real-space field reconstruction and cross-section
-plotting (Phase 7), an expanded validation suite and example gallery
-(Phase 8), and an optional vectorized/GPU/autodiff backend (Phase 9,
+material models, boundary conditions/excitation, layer handling, solver
+sweeps/convergence, field calculations) are all shipped except Category 1
+target 1.5 (longitudinal tensor coupling, explicitly deferred pending a
+citable formulation). Remaining: Categories 10-19 (future extensions) at
+the atomic-target level, plus an expanded validation suite and example
+gallery (Phase 8's remaining scripted convergence studies/DBR/TSV
+examples) and an optional vectorized/GPU/autodiff backend (Phase 9,
 later).

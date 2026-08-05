@@ -37,7 +37,7 @@ incident angle/azimuth/polarization (`s_amplitude`/`p_amplitude`, complex —
 their ratio sets linear/circular/elliptical polarization), wavelength sweep,
 and output path. No other part of the script should normally need touching.
 
-## `trench/` (Phase 3 lamellar grating, Phase 5 tapered sidewall — done)
+## `trench/` (Phase 3 lamellar grating, Phase 5 tapered sidewall, Phase 7 field cross-section — done)
 
 1D-periodic patterned layers (`Lattice1D`/`Slab`).
 
@@ -46,8 +46,9 @@ and output path. No other part of the script should normally need touching.
 | [`trench_grating.py`](trench/trench_grating.py) | Uniform (untapered) lamellar grating, wavelength sweep |
 | [`trench_grating_ellipsometry_run.py`](trench/trench_grating_ellipsometry_run.py) | Saves raw field data for ellipsometry postprocessing |
 | [`tapered_trench.py`](trench/tapered_trench.py) | Linearly-tapered ridge (staircase-discretized), `num_slices` convergence sweep; FDTD-style `TCD`/`BCD`/`SPACING`/`PERIOD` naming for the ridge geometry |
+| [`trench_field_cross_section.py`](trench/trench_field_cross_section.py) | Reconstructs `(Ex,Ey,Ez,Hx,Hy,Hz)` over an (x,z) cross-section grid through the grating (Category 9 targets 9.1-9.8) — saves raw field data for `postprocessing/plot_field_cross_section.py` |
 
-## `via/` (Phase 4a/4b 2D patterned layers, Phase 5 tapered sidewall — done)
+## `via/` (Phase 4a/4b 2D patterned layers, Phase 5 tapered sidewall, Phase 7 field cross-section — done)
 
 2D-periodic patterned layers (`Lattice`/`Circle`/`Rectangle`).
 
@@ -59,6 +60,7 @@ and output path. No other part of the script should normally need touching.
 | [`tapered_pillar.py`](via/tapered_pillar.py) | Linearly-tapered square pillar (staircase-discretized, `Rectangle` with equal x/y halfwidths), same FDTD-style naming (pillar side length) |
 | [`elliptical_pillar.py`](via/elliptical_pillar.py) | Uniform (untapered) elliptical Si pillar, wavelength sweep — Category 4 target 4.3's end-to-end `Ellipse` example |
 | [`triangular_pillar.py`](via/triangular_pillar.py) | Uniform (untapered) triangular Si pillar (`Polygon`), wavelength sweep — Category 4 targets 4.4/4.5's end-to-end `Polygon` example |
+| [`pillar_field_cross_section.py`](via/pillar_field_cross_section.py) | Reconstructs the full 6-component field over an (x,y) plane at one depth through the pillar (Category 9 targets 9.1-9.8) — saves raw field data for `postprocessing/plot_field_cross_section.py` |
 
 All three tapered scripts (`tapered_trench.py`, `tapered_via.py`,
 `tapered_pillar.py`) build on `src/sougata_solver/staircase.py`'s

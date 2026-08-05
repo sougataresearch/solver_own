@@ -1,7 +1,7 @@
 # `tests/` — Test Suite
 
-`pytest`-based, 393 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
-Category 5 (384 fast + 9 `slow`-marked convergence/benchmark studies). Run
+`pytest`-based, 569 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+Category 8 (559 fast + 10 `slow`-marked convergence/benchmark studies). Run
 the fast suite with:
 
 ```bash
@@ -49,6 +49,17 @@ oracle — never a self-consistency check against the same code path.
 | [`test_dispersion_models.py`](test_dispersion_models.py) | Category 5 targets 5.2-5.6: Sellmeier/Cauchy/Lorentz/Drude/Drude-Lorentz dispersion models, including a causality/sign-convention check and Rakić et al. (1998)'s published Au/Ag/Al/Ti coefficients |
 | [`test_tensor_material_wiring.py`](test_tensor_material_wiring.py) | Category 5 target 5.7: a dispersive tensor material solving end to end through Category 1's uniform-diagonal and patterned-anisotropic eigensolvers |
 | [`test_material_provenance.py`](test_material_provenance.py) | Category 5 target 5.8: optional `Material.source` citation metadata, forwarded by every `from_*` classmethod and threaded into serialized `run_metadata.txt` output |
+| [`test_polarization_states.py`](test_polarization_states.py) | Category 6 targets 6.2/6.3: polarization-state x azimuth x angle regression suite using symmetry invariants (rotational symmetry at normal incidence, azimuthal invariance at oblique incidence) plus an energy-conservation sweep |
+| [`test_grazing_incidence.py`](test_grazing_incidence.py) | Category 6 target 6.4: characterized grazing-incidence boundary — finite/energy-conserving up to `89.999deg`, `ValueError` (not `NaN`) exactly at `90deg` |
+| [`test_oblique_rayleigh_threshold.py`](test_oblique_rayleigh_threshold.py) | Category 6 target 6.5: oblique-incidence Rayleigh-threshold order-classification crossing |
+| [`test_bottom_incidence.py`](test_bottom_incidence.py) | Category 6 target 6.6: bottom (reverse-side) illumination via the existing `Simulation` constructor, verified by Stokes transmittance reciprocity |
+| [`test_field_reconstruction.py`](test_field_reconstruction.py) | Category 9 targets 9.1-9.8 (Phase 7): real-space field reconstruction against the analytic plane wave, transversality, interior-amplitude self-consistency, interface field continuity, 1D periodicity, and flux-matches-R/T |
+| [`test_layer_validation.py`](test_layer_validation.py) | Category 7 target 7.1: `Layer`/`LayerStack` construction-time invariants (finite-layer thickness, the semi-infinite half-space sentinel, patterned-layer background material) |
+| [`test_layer_repetition.py`](test_layer_repetition.py) | Category 7 target 7.2: equivalent repeated-layer representations (split thickness, reused vs. re-constructed identical `Pattern`) give identical R/T |
+| [`test_layer_cache.py`](test_layer_cache.py) | Category 7 target 7.4: the Toeplitz-matrix cache's equivalence to forced-uncached recomputation, cache-hit call counting, and angle-sweep cache reuse |
+| [`test_layer_absorption.py`](test_layer_absorption.py) | Category 7 targets 7.5/7.6: `SimulationResult.layer_absorption()` against the `R+T+sum(A)=1` energy-balance identity, plus a regression guard on a found numerical-overflow limitation for thick/highly-lossy/high-`num_orders` layers |
+| [`test_sweep.py`](test_sweep.py) | Category 8 targets 8.1-8.5: `sweep.SweepResult` and the wavelength/angle/polarization/thickness sweep functions, each confirmed equivalent to a manual per-point `solve()` loop |
+| [`test_harmonic_convergence.py`](test_harmonic_convergence.py) | Category 8 targets 8.6-8.8: `harmonic_study`, `find_convergence_index` (validated against thin-film/trench/pillar fixtures, including Category 3's non-monotonic pillar wobble), and `auto_select_num_orders` |
 
 ## `oracles/`
 
