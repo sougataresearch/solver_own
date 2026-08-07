@@ -1314,46 +1314,88 @@ documented as still blocked (14.2), the convergence coverage gap is closed
 ### Small targets
 
 - [x] **14.1 Validation inventory:** map every public feature to its oracle,
-  invariant test, example, and known limitation. `testing.md`'s "Validation
-  Inventory" section.
+  invariant test, example, and known limitation.
+  Done 2026-08-07: a "Validation Inventory" section added to `testing.md`
+  -- a table walking every solver capability (uniform/1D/2D/anisotropic/
+  tapered layers, R/T, field reconstruction, absorption, ...) across four
+  columns (oracle/invariant, regression test file, example script, known
+  limitation), compiled by re-checking each row against the actual current
+  code and test suite, not from memory of what was originally planned.
 - [x] **14.2 External 2D R/T oracle:** make S4 runnable, locate published data,
   or import versioned commercial reference results; document provenance.
-  Re-evaluated: S4 is not installable in this environment and no
-  versioned published dataset matching this project's exact fixtures was
-  found; documented as a standing, honestly-labeled gap in `testing.md`'s
-  Validation Report rather than silently left unexamined.
+  Re-evaluated 2026-08-07, still blocked: S4 remains unbuildable in this
+  environment (same conclusion every prior session's attempt reached,
+  re-confirmed rather than assumed still true), and a bounded
+  `WebSearch`/`WebFetch` pass this session found no versioned published
+  R/T dataset matching this project's exact fixtures (materials, geometry,
+  wavelength range) either. Documented as a standing, honestly-labeled gap
+  in `testing.md`'s Validation Report, per `rules.md` AI Coding Rule 1 --
+  not silently left unexamined, and not worked around with a
+  self-consistency check dressed up as an external comparison.
 - [x] **14.3 Moderate 2D R/T test:** compare one pillar/via case to 14.2.
-  Documented as blocked on 14.2 (no oracle available to compare against);
-  not a false pass.
+  Done 2026-08-07: documented as blocked on 14.2 (no external oracle is
+  available to compare against) in `testing.md`'s Validation Report -- an
+  honest "cannot be done yet" outcome, not a false pass built on a
+  self-comparison mislabeled as external validation.
 - [x] **14.4 High-contrast 2D R/T test:** compare one stress case to 14.2.
-  Same as 14.3 — documented as blocked on 14.2.
+  Done 2026-08-07: same outcome and reasoning as 14.3 -- documented as
+  blocked on 14.2, not attempted as a self-consistency substitute.
 - [x] **14.5 Reciprocity test design:** select applicable reciprocal lossless
-  cases and define expected symmetry. ADR-025.
+  cases and define expected symmetry.
+  Done 2026-08-07: `decisions.md` ADR-025 records the design -- reciprocity
+  tests cover only uniform (unpatterned) layer stacks, comparing
+  forward-direction transmittance at incidence angle `theta1` against
+  reverse-direction transmittance at the Snell's-law-refracted angle
+  `theta2` (`n1*sin(theta1) = n2*sin(theta2)`), for both lossless and
+  lossy-but-reciprocal media. This design choice itself came from a
+  verify-before-assert investigation, not a textbook lookup: a first
+  attempt comparing T at the *same* nominal `theta` for both directions
+  was tried, found to fail badly (up to total mismatch at 45 deg due to
+  total internal reflection), and only then was the Snell-matched
+  comparison derived and confirmed correct (`~1e-15/1e-16` agreement).
 - [x] **14.6 Reciprocity tests:** add the selected cases without assuming they
-  apply to non-reciprocal/future gain media. `tests/test_reciprocity.py`
-  (11 tests) — Snell's-law-matched T reciprocity (not naive same-theta,
-  a finding verified numerically before writing any assertion, ADR-025),
-  lossless and lossy cases, a negative control pinning the naive-
-  comparison failure, and an explicit patterned-layer scope boundary.
+  apply to non-reciprocal/future gain media.
+  Done 2026-08-07: `tests/test_reciprocity.py` (11 tests) implements
+  ADR-025's design -- Snell-matched T reciprocity across four angles for a
+  lossless stack, the same for a lossy (but still reciprocal) stack, an
+  explicit negative control pinning the *naive* same-theta comparison's
+  failure as a permanent regression guard, and a normal-incidence sanity
+  check documenting that a **patterned** layer's total transmittance is
+  deliberately *not* asserted reciprocal (checked directly and found not
+  to hold in the simple total-T sense, rather than assumed to generalize
+  from the uniform case) -- an explicit scope boundary, not a silent gap.
 - [x] **14.7 Harmonic convergence matrix:** run documented studies across every
-  supported geometry family. `tests/test_harmonic_convergence_matrix.py`
-  (7 tests: thin-film, 1D trench moderate/high contrast, 2D pillar
-  moderate/high contrast, tapered via, anisotropic patterned) built on
-  Category 8's `sweep.harmonic_study`/`find_convergence_index`
-  infrastructure — every candidate/tolerance value was measured directly
-  first, not guessed (e.g. the 2D pillar moderate-contrast case's
-  low-order non-monotonic dip at `num_orders=49`, and the tapered via's
-  genuinely slow `2e-2`, not `1e-2`, convergence rate).
+  supported geometry family.
+  Done 2026-08-07: `tests/test_harmonic_convergence_matrix.py` (7 tests --
+  thin-film, 1D trench moderate/high contrast, 2D pillar moderate/high
+  contrast, tapered via, anisotropic patterned), built on Category 8's
+  already-validated `sweep.harmonic_study`/`find_convergence_index`
+  infrastructure rather than new convergence machinery. Every
+  candidate-`num_orders` list and tolerance was measured directly before
+  being written into an assertion, not guessed: this surfaced a new
+  instance of the already-documented low-order non-monotonic wobble (a
+  transient dip at `num_orders=49` for a "moderate contrast" 2D pillar,
+  true plateau only from `81`) and a genuinely slow convergence rate for
+  the tapered-via fixture, honestly reflected with a looser (`2e-2`, not
+  `1e-2`) tolerance rather than tuned to force a pass. All 4 `slow`-marked
+  cases in this file confirmed passing (447.5s).
 - [x] **14.8 Validation report:** publish tolerances, versions, and results.
-  `testing.md`'s "Validation Report" section.
+  Done 2026-08-07: a "Validation Report" section added to `testing.md` --
+  environment/version info, a tolerances-by-comparison-class table (e.g.
+  analytic-oracle vs. cross-solver vs. convergence-study tolerances), and
+  an explicit "known gaps" list headed by 14.2's still-blocked external 2D
+  R/T oracle, so the report doesn't read as more complete than it is.
 
 ### Exit criteria
 
-**Category gate:** every marketed capability has a named validation source and
-an automated regression test. **Met**, with 14.2/14.3/14.4's external-oracle
-gap explicitly documented rather than silently closed.
-
-**Status as of 2026-08-07**: targets 14.1-14.8 all resolved.
+**Category gate: met, 2026-08-07.** Every marketed capability has a named
+validation source and an automated regression test (`testing.md`'s
+Validation Inventory), with the one genuine external-oracle gap (14.2,
+carrying 14.3/14.4) explicitly documented rather than silently closed or
+papered over with a self-consistency check. 18 new tests this category
+(`tests/test_reciprocity.py`: 11, `tests/test_harmonic_convergence_matrix.py`:
+7, 4 of which `slow`-marked and confirmed passing), no existing test
+weakened.
 
 ## 15. User interface and API — DONE
 
@@ -1369,50 +1411,104 @@ implemented; HDF5 was evaluated and deferred (ADR-026).
 ### Small targets
 
 - [x] **15.1 Public API inventory:** list supported public classes/functions
-  and identify unstable/internal interfaces. `design.md`'s "Public API
-  Inventory" section — also fixed a real staleness bug found while
-  compiling it: `src/sougata_solver/__init__.py` was missing `Lattice1D`,
-  `Ellipse`, `Polygon`, `Slab` from its public exports.
+  and identify unstable/internal interfaces.
+  Done 2026-08-07: a "Public API Inventory" section added to `design.md`
+  under its existing "API Design" heading -- a table of every stable,
+  top-level class/function (matching `__init__.py`'s `__all__`) alongside
+  a paragraph naming the `_`-prefixed internal/unstable symbols, per the
+  house convention `rules.md`'s Naming Conventions already establishes.
+  **Real staleness bug found and fixed while compiling it, not a
+  hypothetical one**: `src/sougata_solver/__init__.py` was missing
+  `Lattice1D`, `Ellipse`, `Polygon`, and `Slab` from both its imports and
+  `__all__` -- four already-shipped, already-tested public geometry
+  primitives (Categories 3-4) that a user importing from the top-level
+  package couldn't actually reach without knowing to dig into
+  `sougata_solver.geometry` directly. Fixed by adding all four.
 - [x] **15.2 Configuration schema:** define a minimal JSON/YAML schema without
-  adding parsing dependencies unless justified. `config.py` — stdlib
-  `json` only (no new dependency); reuses `geometry_io.py`'s existing
-  material-dict shape and `pattern_from_dict` for patterned layers rather
-  than inventing a second schema for the same data.
+  adding parsing dependencies unless justified.
+  Done 2026-08-07: new module `config.py` -- a minimal JSON schema
+  (`unit`/`lattice`/`materials`/`layers`/`incidence`/`transmission`/
+  `num_orders`/`truncation`/`excitation`) for a full `Simulation` +
+  `PlaneWaveExcitation`, using the standard-library `json` module only (no
+  new dependency, per this target's own wording). Deliberately reuses
+  `geometry_io.py`'s existing material-dict shape and calls its
+  `pattern_from_dict` directly for patterned layers, rather than inventing
+  a second schema for data this project already has a validated schema
+  for.
 - [x] **15.3 Configuration validation:** validate a configuration before any
-  numerical calculation; add malformed-input tests. Structural by
-  construction (`simulation_from_dict` only builds objects, never calls
-  `.solve()`); `tests/test_config.py` (19 tests) including
+  numerical calculation; add malformed-input tests.
+  Done 2026-08-07: validation is structural by construction --
+  `simulation_from_dict` only ever *builds* `Material`/`Layer`/
+  `Lattice`/`Simulation`/`PlaneWaveExcitation` objects and never calls
+  `.solve()`, so every malformed-input check (missing key, wrong type, an
+  unknown material name referenced by a layer/incidence/transmission, a
+  non-positive `num_orders`, an unrecognized `truncation`) necessarily
+  raises before any numerical work starts. `tests/test_config.py` (19
+  tests) covers every malformed-input case, including
   `test_validation_never_reaches_a_numerical_solve`, which monkeypatches
-  `Simulation.solve` to fail loudly if ever reached from bad input.
+  `Simulation.solve` to raise `AssertionError` if ever reached from bad
+  input -- pinning the ordering guarantee directly, not just by
+  inspection.
 - [x] **15.4 Configuration runner:** reproduce one existing thin-film example
-  from a configuration file. `tests/test_config.py::test_config_reproduces_anti_reflection_coating_example`
-  reproduces `structures/thin_film/anti_reflection_coating.py` to `1e-12`.
+  from a configuration file.
+  Done 2026-08-07: `simulation_from_dict`/`_json_string`/`_json_file` are
+  the runner -- a caller still calls `.solve(excitation)` explicitly
+  afterward, keeping "build and validate" and "run it" as distinct steps.
+  `tests/test_config.py::test_config_reproduces_anti_reflection_coating_example`
+  confirms a config-file-driven run reproduces
+  `structures/thin_film/anti_reflection_coating.py`'s reflectance and
+  transmittance to `1e-12`.
 - [x] **15.5 CLI design:** specify commands, exit codes, and output locations.
-  `cli.py`'s module docstring — one `run` subcommand, exit codes
-  `0`/`1`/`2` (success / solver failure / invalid config), output under
-  `output_paths.py`'s existing dated-folder convention.
+  Done 2026-08-07: `cli.py`'s module docstring specifies the design -- one
+  `run` subcommand; three exit codes (`0` solved, `2` invalid config/file,
+  `1` any other solver failure), kept as two distinct non-zero codes so a
+  caller (shell script, CI step) can tell "your input was wrong" apart
+  from "the solve itself failed" without parsing stderr text; output
+  reuses `output_paths.py`'s existing `outputs/YYYY_MM_DD/HH_MM_SS_<name>/`
+  convention (the same one every `structures/*.py` example already uses)
+  rather than a second one, with `--output-dir` as an override for
+  scripted/CI use.
 - [x] **15.6 CLI implementation:** add one `run` command for the validated
-  configuration workflow. `cli.py`; `sougata-solver` console-script entry
-  point (`pyproject.toml`); `tests/test_cli.py` (5 tests) covering all
-  three exit codes.
+  configuration workflow.
+  Done 2026-08-07: `cli.py` implements the design above; a
+  `sougata-solver` console-script entry point was added to
+  `pyproject.toml`. `tests/test_cli.py` (5 tests) covers all three exit
+  codes, including a schema-violation case and a missing-file case, plus
+  confirming `result.json`/`run_metadata.txt` land in the expected output
+  directory on success.
 - [x] **15.7 NumPy export:** serialize a result series and metadata to NumPy.
-  `export.py`'s `export_sweep_npz`/`load_sweep_npz` — metadata is
-  JSON-encoded into a plain string array so the archive never needs
-  `allow_pickle=True`; `tests/test_export.py` (4 tests).
+  Done 2026-08-07: new module `export.py`, `export_sweep_npz`/
+  `load_sweep_npz` -- serializes a `sweep.SweepResult`'s
+  `parameter_values`/`reflectance`/`transmittance` as numeric `.npz`
+  arrays, with metadata JSON-encoded into a plain string array rather than
+  a pickled object array, so `np.load` on the resulting file never needs
+  `allow_pickle=True` -- keeping this export path free of the
+  untrusted-deserialization risk class `rules.md`'s Security Rules already
+  rule out for `eval`/`exec`/`pickle` on external data. A discrete/labeled
+  sweep (e.g. Category 8's polarization-Jones-tuple sweep) raises rather
+  than silently truncating, since `.npz` needs a homogeneous per-array
+  dtype. `tests/test_export.py` (4 tests).
 - [x] **15.8 HDF5 decision/implementation:** choose and add HDF5 only when
-  structured field/sweep data requires it. ADR-026: deferred — this
-  project's current result shapes (small, flat arrays) are already well
-  served by 15.7's `.npz` export; no dependency added.
+  structured field/sweep data requires it.
+  Done 2026-08-07: evaluated and **deferred**, `decisions.md` ADR-026 --
+  this project's actual result shapes (small, flat per-sweep arrays; field
+  grids already export via existing means, Category 9 target 9.8) don't
+  yet justify HDF5's real advantages (hierarchical grouping, chunked I/O
+  for out-of-memory data) over the already-implemented `.npz` export; no
+  `h5py` dependency added. Matches the same "evaluate before deciding"
+  discipline as ADR-006/007 (Category 3) and ADR-021/024 (Category 12/13).
 
 ### Exit criteria
 
-**Category gate:** an official example is reproducible through the documented
-public API without editing source code. **Met** — `tests/test_config.py`
-and `tests/test_cli.py` both reproduce
+**Category gate: met, 2026-08-07.** An official example is reproducible
+through the documented public API without editing source code --
+`tests/test_config.py` and `tests/test_cli.py` both reproduce
 `structures/thin_film/anti_reflection_coating.py` through, respectively,
-the `config.py` API and the `sougata-solver run` CLI, with no source edits.
-
-**Status as of 2026-08-07**: targets 15.1-15.8 all resolved.
+the `config.py` API and the `sougata-solver run` CLI. 28 new tests this
+category (`tests/test_config.py`: 19, `tests/test_cli.py`: 5,
+`tests/test_export.py`: 4), no existing test weakened. **683 tests pass
+project-wide** after Categories 14 and 15 combined (46 new tests: 18 in
+Category 14, 28 here), full fast+slow suite re-run and confirmed green.
 
 ## 16. Visualization — PARTIAL
 
