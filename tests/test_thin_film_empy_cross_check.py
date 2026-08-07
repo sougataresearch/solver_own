@@ -18,6 +18,9 @@ from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
 from sougata_solver.simulation import Simulation
 
+
+pytestmark = pytest.mark.oracle  # Category 17 target 17.1: system-tier test, cross-checked against a named external oracle
+
 # Same placeholder indices structures/thin_film/sio2_on_si_thin_film.py falls
 # back to when no NK_FILE CSVs are found.
 SI_INDEX = 3.9 + 0.02j

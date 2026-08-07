@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "matplotlib>=3.7"]
+dev = ["pytest>=7.0", "matplotlib>=3.7", "ruff>=0.16"]
 
 [project.scripts]
 sougata-solver = "sougata_solver.cli:main"
@@ -25,4 +25,30 @@ where = ["src"]
 testpaths = ["tests"]
 markers = [
     "slow: convergence/benchmark studies excluded from the default run",
+    "oracle: system-tier tests cross-checked against a named external oracle (see testing.md's Test Taxonomy)",
 ]
+
+[tool.ruff]
+# `Code2_grating generate_5CD_hui.py` is a local scratch file, not part of
+# this package (never imported by sougata_solver, not staged/committed) --
+# excluded so `ruff check .` reflects the tracked codebase's lint state,
+# not incidental local scratch work.
+extend-exclude = ["Code2_grating generate_5CD_hui.py"]
+# Category 17 target 17.5: line-length matched to this project's actual
+# style (long, citation-heavy docstrings and inline comments are the
+# established convention -- see rules.md's Documentation Standards), not
+# ruff's 88-char default, which would flag the majority of existing
+# docstrings as violations having nothing to do with a real code-quality
+# issue.
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# Deliberately narrow selection for this pass: pyflakes (F, real bugs --
+# unused imports/variables, undefined names) and a small pycodestyle
+# subset (E7: statement-on-one-line style issues). NOT the full E/W
+# pycodestyle set (whitespace/formatting nitpicks) or import-sorting
+# (I) -- expanding the selection is a separate future decision, not
+# bundled into "install the tool and fix what it finds today" per this
+# target's own "fix the baseline before making them required" wording.
+select = ["F", "E7"]

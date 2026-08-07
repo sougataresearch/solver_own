@@ -340,8 +340,36 @@ resolved):
 - HDF5 evaluated and **deferred** (`decisions.md` ADR-026) — current
   result shapes are already well served by the `.npz` exporter.
 
+Current (Category 16, Visualization, targets 16.1-16.7, all resolved):
+- A plotting library
+  ([`src/sougata_solver/plotting.py`](src/sougata_solver/plotting.py))
+  covering unit-cell/layer-stack, R/T-spectrum, harmonic-convergence,
+  diffraction-order, field-intensity, field-phase, and Poynting-vector
+  plots — every function takes plain arrays/already-computed result
+  objects (never a `Simulation`) and never calls `.solve()`.
+- `plot_unit_cell` rasterizes a preview using each shape's own
+  `.contains()` method, so it covers every geometry primitive uniformly
+  and respects `Pattern`'s "later shapes take precedence" rule.
+
+Current (Category 17, Testing and quality, targets 17.1-17.6, all
+resolved):
+- Windows CI (`.github/workflows/ci.yml`) — `ruff` lint plus the fast
+  test suite on every push/PR, across a Python 3.10-3.12 matrix.
+- A separate weekly/on-demand slow-test workflow
+  (`.github/workflows/slow-tests.yml`).
+- A documented test taxonomy (`testing.md`) and a new `pytest -m oracle`
+  marker for the 8 files that cross-check against a named external
+  oracle.
+- A frozen regression-fixture spectrum
+  (`tests/regression_fixtures/thin_film_ar_coating_reference.npz`) with
+  documented provenance and tolerance rationale.
+- `ruff` static analysis configured, with its 24-issue baseline fixed
+  (including two genuine dead-code findings in already-shipped code).
+- A performance regression guard using a same-run relative-scaling
+  ratio, never an absolute wall-clock threshold (`decisions.md` ADR-028).
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
-- Categories 16-19 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`)
+- Categories 18-19 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`)
 - Optional vectorized/GPU/autodiff backend (later, not currently
   approved; see `decisions.md` ADR-024)
 

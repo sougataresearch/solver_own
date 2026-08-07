@@ -16,20 +16,16 @@ Tiers enforced here, per `rules.md` Testing Requirements:
 
 from __future__ import annotations
 
-import math
 
 import numpy as np
 import pytest
 
 from sougata_solver.eigenmodes import (
     _canonical_mode_order,
-    solve_layer_eigenmodes_patterned_inplane,
     solve_layer_eigenmodes_uniform_diagonal,
     solve_layer_eigenmodes_uniform_inplane,
 )
 from sougata_solver.excitation import PlaneWaveExcitation
-from sougata_solver.fourier_basis import truncate_fourier_orders
-from sougata_solver.fourier_factorization import toeplitz_matrix_component
 from sougata_solver.geometry import Circle, Lattice, Pattern
 from sougata_solver.layer import Layer
 from sougata_solver.materials import Material

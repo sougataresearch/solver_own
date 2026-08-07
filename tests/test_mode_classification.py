@@ -15,7 +15,6 @@ Tiers enforced here, per `rules.md` Testing Requirements:
 
 from __future__ import annotations
 
-import math
 
 import numpy as np
 import pytest

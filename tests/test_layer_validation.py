@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from sougata_solver.eigenmodes import solve_layer_eigenmodes_uniform
-from sougata_solver.geometry import Circle, Lattice, Pattern
+from sougata_solver.geometry import Circle, Pattern
 from sougata_solver.layer import Layer, LayerStack
 from sougata_solver.materials import Material
 from sougata_solver.smatrix import SMatrixStack

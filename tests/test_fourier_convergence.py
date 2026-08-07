@@ -19,7 +19,6 @@ than hidden by cherry-picking a starting point that looks clean.
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 from sougata_solver.excitation import PlaneWaveExcitation

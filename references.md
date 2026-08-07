@@ -16,6 +16,33 @@ validates against. Update when a new phase cites a new source.
 
 ## Phases With No Vendored-Repo Source
 
+### Category 17 (Testing and quality) targets 17.1-17.6 (2026-08-07)
+
+No new external citation was needed. This category is process/tooling,
+not physics: test-taxonomy documentation, CI workflow YAML, a static-
+analysis tool (`ruff`, a standard open-source Python linter, not a
+project-specific formula source), a regression-fixture snapshot of
+already-computed (and already independently oracle-validated) solver
+output, and a performance guard built entirely from already-cited
+formulas exercised via already-cited functions
+(`eigenmodes.solve_layer_eigenmodes_patterned`,
+`fourier_factorization.toeplitz_matrix`). See `decisions.md` ADR-027
+(test taxonomy) and ADR-028 (performance regression guard design) for
+this category's two genuine technical decisions.
+
+### Category 16 (Visualization) targets 16.1-16.7 (2026-08-07)
+
+No new external citation was needed. `plotting.py` adds no new physics
+formula anywhere — every function either renders already-computed,
+already-validated data (a `SimulationResult`'s diffraction efficiencies,
+a `sweep.SweepResult`'s convergence values, reconstructed field-grid
+arrays from Category 9's already-cited `fields.py`) or rasterizes a
+`Pattern`'s geometry for preview purposes using each shape's own
+already-implemented, already-tested `.contains(x, y)` method (Category
+4). Matplotlib itself (colormaps, `pcolormesh`, `quiver`) is a
+general-purpose plotting library, not a domain-specific formula source
+requiring the same citation discipline as an electromagnetics reference.
+
 ### Category 15 (User interface and API) targets 15.1-15.8 (2026-08-07)
 
 No new external citation was needed. This category is packaging/tooling,

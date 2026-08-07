@@ -880,3 +880,83 @@ label without guessing a convention no caller asked for.
 **15.8 HDF5 — evaluated and deferred**, see ADR-026: no dependency
 justifies itself against this project's actual (small, flat) result
 shapes yet.
+
+## Plotting Design (Category 16 targets 16.1-16.7)
+
+**16.1 plot data contract**: every function in the new `plotting.py`
+takes plain arrays, dataclasses, or already-computed result objects
+(`geometry.Pattern`/`Lattice`, raw field-grid arrays, a
+`SimulationResult.diffraction_efficiencies()` dict) — never a bare
+`Simulation` — and no function calls `.solve()`. Every function returns
+`(fig, ax)` rather than saving/showing, keeping the module a pure
+"data in, figure out" library with no filesystem or display side
+effects; saving/showing remains the caller's job, matching
+`postprocessing/*.py`'s existing pattern (`plot_thin_film_rt.py`'s
+`fig.savefig(...)`/`plt.show()`). `matplotlib` is imported lazily inside
+each function (not at module level), so importing
+`sougata_solver.plotting` doesn't force the `matplotlib` dependency onto
+every library user — the same lazy-import pattern
+`postprocessing/plot_field_cross_section.py` already used.
+
+**16.2 unit-cell/layer-stack plots**: `plot_unit_cell` rasterizes a
+preview grid using each `Shape.contains(x, y)` (already implemented by
+every shape class) rather than special-casing matplotlib patches per
+shape type — one implementation covers `Circle`/`Rectangle`/`Ellipse`/
+`Polygon`/`Slab` uniformly, and it respects `Pattern`'s own documented
+"later shapes take precedence" rule by iterating shapes in reverse
+order and taking the first (i.e. topmost/latest) match. This is
+explicitly a **preview raster for visualization only** — the solve
+itself still uses `pattern`'s analytic Fourier transforms unmodified.
+`plot_layer_stack` draws semi-infinite (`math.inf`-thickness) layers as
+a fixed-height hatched band, since infinity has no natural bar height.
+
+**16.3-16.5**: `plot_rt_spectrum` formalizes
+`postprocessing/plot_thin_film_rt.py`'s existing ad hoc R-vs-wavelength
+plot (same axis labels/style), generalized to optionally show `T` and an
+`R+T` conservation trace and a `metadata` annotation.
+`plot_harmonic_convergence` marks the exact index
+`sweep.find_convergence_index` already selected, so the plot visually
+matches the validated criterion rather than a human eyeball guess.
+`plot_diffraction_orders` sorts orders by `(g1, g2)` for a deterministic
+bar order across repeated calls (a `dict`'s insertion order is otherwise
+incidental).
+
+**16.6/16.7**: `plot_field_intensity` formalizes
+`postprocessing/plot_field_cross_section.py`'s `pcolormesh` intensity
+plot (`|E|^2`) into a reusable function. `plot_field_phase` uses a
+cyclic colormap (`twilight`, not a sequential one) since phase wraps at
+`+-pi` and a sequential map would show a spurious discontinuity there.
+`plot_poynting_vector` visualizes already-computed `Sx`/`Sz` values (no
+flux computation of its own, per the target 16.1 data contract) using
+the no-`0.5`-factor real-space flux convention Category 9 target 9.6
+found and documented (`CONVENTIONS.md`, `troubleshooting.md`).
+
+## CI, Static Analysis, and Regression-Guard Design (Category 17 targets 17.2/17.3/17.5/17.6)
+
+**17.2/17.3 CI workflows** (`.github/workflows/`): `ci.yml` runs
+`pytest -m "not slow"` plus `ruff check .` on `windows-latest` across
+the three Python versions `pyproject.toml`'s `requires-python` spans
+(3.10-3.12), on every push/PR to `main` and on manual dispatch.
+`slow-tests.yml` runs `pytest -m slow` on a weekly schedule (catches
+slow drift without gating every push) plus manual dispatch, per this
+target's own "schedule or manually trigger" wording. Both are ordinary
+GitHub Actions YAML with no custom infrastructure.
+
+**17.5 static analysis**: `ruff` (`[tool.ruff]`/`[tool.ruff.lint]` in
+`pyproject.toml`), scoped deliberately narrow for this pass — `select =
+["F", "E7"]` (pyflakes real-bug checks: unused imports/variables,
+undefined names; a small pycodestyle statement-style subset) rather than
+the full pycodestyle/import-sort rule families, which would flag
+formatting-only nitpicks unrelated to this target's "fix the baseline
+before making them required" wording. `line-length = 120` matches this
+project's actual long-docstring/citation style (`rules.md`'s
+Documentation Standards), not ruff's 88-char default. Running it found
+and fixed 24 real baseline issues (22 unused imports, safe autofix; 2
+genuinely dead local variables in `src/sougata_solver/vectorized.py` and
+`tests/test_field_reconstruction.py`, verified unused via a direct grep
+for other references before removing, not assumed).
+
+**17.6 performance regression guard**: see `decisions.md` ADR-028 for
+the full design rationale (a same-run relative-scaling ratio, never an
+absolute wall-clock threshold, per `rules.md`'s Performance
+Requirements).

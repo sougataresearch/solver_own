@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-import pytest
 
 from sougata_solver import eigenmodes
 from sougata_solver.eigenmodes import (

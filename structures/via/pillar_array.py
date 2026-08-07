@@ -10,7 +10,6 @@ Run with:  python structures/via/pillar_array.py
 
 from __future__ import annotations
 
-import csv
 import math
 
 import numpy as np

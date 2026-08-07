@@ -25,7 +25,6 @@ degeneracy (`_canonical_mode_order`'s docstring already states that caveat)
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from sougata_solver.eigenmodes import (
     solve_layer_eigenmodes_patterned_inplane,

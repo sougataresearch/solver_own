@@ -1139,3 +1139,64 @@
 - **Impact**: none (`h5py` is not added to `pyproject.toml`'s dependencies).
   `export.py` (target 15.7) is the complete deliverable for this
   category's data-export scope.
+
+## ADR-027: Test taxonomy — an `oracle` marker for a precise, greppable criterion; no per-tier marker where tiers overlap (Category 17 target 17.1)
+
+- **Decision**: a new `pytest` marker, `oracle`, is applied to every test
+  file that directly imports from `tests/oracles/` (confirmed by
+  grepping for that import across all 54 pre-existing test files, not
+  guessed) — 8 files, 136 tests. No marker is added for the other tiers
+  `testing.md`'s "Testing Strategy By Tier" section already defines
+  (unit, physical-invariant, integration, regression, acceptance).
+- **Reason**: "oracle" has a precise, mechanically-checkable criterion
+  (does this file import a named external-oracle module) that can't
+  silently drift out of sync with reality — the marker means exactly
+  what it says, by construction. The other tiers routinely overlap
+  within a single test function (a reduction-to-simpler-case check is
+  simultaneously a unit test and a permanent regression guard;
+  `tests/test_1d_grating.py`'s own docstring already states it spans
+  four tiers in one file) — forcing one marker per test would
+  misrepresent that overlap, not clarify it, and risks becoming stale as
+  soon as a test's actual scope changes but its marker doesn't. This
+  target's own wording explicitly allows "filenames/docstrings **or**
+  pytest markers" — the existing filename+docstring+Validation-Inventory
+  combination (`testing.md`, target 14.1) already serves the other tiers
+  adequately, audited this session for consistency via spot-checking a
+  representative file sample before writing the "Test Taxonomy" section.
+- **Impact**: `pyproject.toml` (`oracle` marker registration), 8 test
+  files (one `pytestmark = pytest.mark.oracle` line each, no test body
+  changed), `testing.md`'s new "Test Taxonomy" section. `pytest -m
+  oracle` now runs exactly the system-tier suite in isolation.
+
+## ADR-028: Performance regression guard — relative same-run ratio, not an absolute wall-clock threshold (Category 17 target 17.6)
+
+- **Decision**: `tests/test_performance_regression.py` (new,
+  `@pytest.mark.slow`) asserts that the ratio
+  `eigensolve_time(num_orders=81) / eigensolve_time(num_orders=9)` for
+  the same 2D-pillar fixture `profiling/baseline_profile.py` already
+  uses stays below `1000` (and above `1`, guarding against a broken
+  timing harness silently passing), rather than asserting either time is
+  below some fixed number of milliseconds.
+- **Reason**: `rules.md`'s Performance Requirements explicitly rule out
+  hard-coded absolute wall-clock assertions, since timing is
+  machine-dependent — a CI runner, a laptop on battery power, and a
+  dedicated workstation will all report different absolute numbers for
+  identical code. A ratio measured within one run on one machine cancels
+  that dependence: both the numerator and denominator shift together if
+  the machine is faster or slower, so the ratio itself is a genuine,
+  machine-independent signal of *algorithmic* scaling behavior. The
+  bound (`1000`) is set with ~6x headroom above Category 12's measured
+  ~160x baseline for this exact fixture (`design.md`'s "Linear-Algebra
+  Baseline & Factorization-Reuse Design" section) — generous enough to
+  absorb ordinary run-to-run noise on an occasionally-run (`slow`-marked)
+  guard, while still catching a genuine algorithmic regression (e.g. an
+  accidentally-reintroduced `O(n^4)`-or-worse step) that would blow the
+  ratio out far past any plausible noise margin.
+- **Alternatives considered**: storing a cross-run baseline (e.g. a
+  committed reference timing file, compared with tolerance) — rejected
+  as needing periodic manual re-baselining as hardware/dependencies
+  change, adding maintenance burden this target doesn't ask for; a
+  same-run ratio needs no stored baseline to go stale.
+- **Impact**: `tests/test_performance_regression.py` (new, 1 `slow`
+  test). No `src/sougata_solver/` code change — this category adds a
+  regression guard around already-existing, already-profiled behavior.

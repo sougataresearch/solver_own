@@ -297,5 +297,30 @@ Status snapshot (update the source-of-truth file first, then this line):
   metadata into a string array, `tests/test_export.py`; an HDF5
   decision evaluated and deferred, `decisions.md` ADR-026, since
   current result shapes are already well served by the `.npz` exporter).
-□ Categories 16-19 — not yet started at atomic-target grain (see that
+☑ Category 16 (Visualization) — targets 16.1-16.7 all done, 2026-08-07
+  (new `plotting.py` module, every function taking plain arrays/
+  dataclasses/already-computed result objects, never a `Simulation`, and
+  never calling `.solve()`, pinned by a direct structural test;
+  `plot_unit_cell` rasterizes a preview grid via each shape's existing
+  `.contains()` method, respecting `Pattern`'s "later shapes take
+  precedence" rule; `plot_rt_spectrum`/`plot_field_intensity` formalize
+  two existing `postprocessing/` ad hoc plots into reusable functions;
+  `plot_harmonic_convergence`/`plot_diffraction_orders`/
+  `plot_field_phase`/`plot_poynting_vector` are new. 19 new tests,
+  structural checks not pixel comparisons).
+☑ Category 17 (Testing and quality) — targets 17.1-17.6 all done,
+  2026-08-07 (a test taxonomy documenting the existing filename/
+  docstring convention plus one new precisely-scoped `pytest` marker,
+  `oracle`, applied to the 8 files that actually import a named external
+  oracle module; Windows CI (`ci.yml`, 3-version matrix, `ruff` +
+  fast-suite gate on every push/PR) and a separate weekly/manual
+  slow-test workflow (`slow-tests.yml`); a frozen regression-fixture
+  snapshot with explicit provenance and a tolerance rationale
+  distinguishing it from a fresh oracle comparison; `ruff` static
+  analysis configured and its 24-issue baseline fixed, including two
+  genuine dead-code findings in already-shipped code; a performance
+  regression guard using a same-run relative-scaling ratio rather than
+  an absolute wall-clock threshold, per `rules.md`'s Performance
+  Requirements, `decisions.md` ADR-028).
+□ Categories 18-19 — not yet started at atomic-target grain (see that
   file for each category's own small-target checklist).

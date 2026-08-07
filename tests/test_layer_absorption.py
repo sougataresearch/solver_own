@@ -15,7 +15,6 @@ energy-balance validation target 7.5 requires before exposing an API.
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 from sougata_solver.excitation import PlaneWaveExcitation

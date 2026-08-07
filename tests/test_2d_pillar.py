@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 from oracles.rcwa_2djl_eigenvalues import eigenoperator_eigenvalues
 
-from sougata_solver.eigenmodes import solve_layer_eigenmodes_1d, solve_layer_eigenmodes_patterned, solve_layer_eigenmodes_uniform
+from sougata_solver.eigenmodes import solve_layer_eigenmodes_1d, solve_layer_eigenmodes_patterned
 from sougata_solver.excitation import PlaneWaveExcitation
 from sougata_solver.fourier_basis import truncate_fourier_orders
 from sougata_solver.fourier_factorization import toeplitz_matrix
@@ -30,6 +30,9 @@ from sougata_solver.geometry import Circle, Lattice, Lattice1D, Pattern, Rectang
 from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
 from sougata_solver.simulation import Simulation
+
+
+pytestmark = pytest.mark.oracle  # Category 17 target 17.1: system-tier test, cross-checked against a named external oracle
 
 
 PERIOD = 0.7

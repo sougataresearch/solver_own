@@ -29,7 +29,7 @@ import numpy as np
 
 from sougata_solver.eigenmodes import solve_layer_eigenmodes_patterned
 from sougata_solver.excitation import PlaneWaveExcitation
-from sougata_solver.fourier_basis import truncate_fourier_orders, truncate_fourier_orders_1d
+from sougata_solver.fourier_basis import truncate_fourier_orders
 from sougata_solver.fourier_factorization import toeplitz_matrix
 from sougata_solver.geometry import Circle, Lattice, Lattice1D, Pattern, Slab
 from sougata_solver.layer import Layer

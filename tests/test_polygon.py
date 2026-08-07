@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from sougata_solver.geometry import Circle, Lattice, Pattern, Polygon, Rectangle
+from sougata_solver.geometry import Lattice, Pattern, Polygon, Rectangle
 from sougata_solver.materials import Material
 
 CORE = Material("core", 4.0)

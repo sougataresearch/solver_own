@@ -244,8 +244,6 @@ def sweep_wavelength_vectorized(
 
     results: list[SimulationResult] = []
     for i in range(n_wavelengths):
-        modes_inc = LayerEigenmodes(q=all_q[0][i], phi=all_phi[0][i], kp=all_kp[0][i], epsilon_inv=None, is_scalar_isotropic=True)
-        modes_trans = LayerEigenmodes(q=all_q[-1][i], phi=all_phi[-1][i], kp=all_kp[-1][i], epsilon_inv=None, is_scalar_isotropic=True)
         all_modes_i = [
             LayerEigenmodes(q=all_q[j][i], phi=all_phi[j][i], kp=all_kp[j][i], epsilon_inv=None, is_scalar_isotropic=True)
             for j in range(len(layers))

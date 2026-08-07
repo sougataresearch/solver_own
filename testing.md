@@ -152,12 +152,64 @@ runnable example script. This file's job is to make sure every phase's
 "done" claim in `phases.md`/`memory.md` is backed by an actual test in
 `tests/`, not just an example that happens to print a plausible number.
 
+## Test Taxonomy (Category 17 target 17.1)
+
+Every test file already carries two forms of tier identification, audited
+this session (not assumed) by reading a representative sample across the
+full `tests/` directory before writing this section:
+
+1. **Filename** names the *feature under test* (`test_reciprocity.py`,
+   `test_geometry_validation.py`, ...) — deliberately not the tier, since
+   a single file routinely spans several tiers at once (e.g.
+   `test_1d_grating.py` has unit, regression, physical-invariant, *and*
+   system-tier tests in one file, and says so explicitly in its own
+   docstring: `"Tiers per testing.md: unit ..., regression ..., physical-
+   invariant ..., and system ..."`).
+2. **Docstring** cites the `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` category/
+   target the file satisfies and names its oracle/invariant in prose —
+   this file's own "Validation Inventory" (target 14.1) is the
+   authoritative per-feature cross-reference from capability to test file
+   to tier, so tier information isn't duplicated a third time per file.
+
+**What this session adds**: a `pytest` marker, `oracle`
+(`pyproject.toml`), applied to every test file that actually `import`s
+from `tests/oracles/` (confirmed by grepping for that import, not
+guessed) — `tests/test_1d_grating.py`, `test_2d_pillar.py`,
+`test_2d_pillar_stress.py`, `test_analytic_fresnel.py`,
+`test_anisotropic_inplane.py`, `test_anisotropic_uniform.py`,
+`test_optical_outputs.py`, `test_thin_film_empy_cross_check.py` (8 files,
+136 tests). This makes the System Testing tier **queryable**
+(`pytest -m oracle`) the same way `slow` already makes the Performance-
+adjacent convergence/benchmark studies queryable
+(`pytest -m slow`/`pytest -m "not slow"`) — a marker was added only to
+files meeting a precise, greppable criterion (imports a named external
+oracle module) rather than a subjective per-file tier judgment call, so
+the marker can't silently drift from what it claims to mean.
+
+Other tiers (unit, physical-invariant, integration, regression,
+acceptance) are **not** given their own marker in this pass: unlike
+"oracle" (a precise import-based criterion) or "slow" (an explicit,
+already-established opt-out), those tiers overlap heavily within a single
+file and a single test function often serves more than one tier at once
+(e.g. a reduction-to-simpler-case test is simultaneously a unit test and
+a permanent regression guard) — forcing a single marker per test would
+misrepresent that overlap rather than clarify it. The filename+docstring+
+Validation-Inventory combination already documented above remains the
+taxonomy for those tiers, per this target's own "filenames/docstrings or
+pytest markers" wording (either is sufficient, not both required
+everywhere).
+
 ## Running Tests
 
+**Note**: `pyproject.toml` sets no default marker filter, so plain
+`pytest` (no `-m` flag) runs *everything*, `slow`-marked tests included —
+use `-m "not slow"` explicitly for the fast-development-loop subset.
+
 ```bash
-pytest                    # fast suite (excludes `slow`)
+pytest                    # everything, including slow-marked studies
+pytest -m "not slow"      # fast-development-loop suite (excludes `slow`)
 pytest -m slow            # convergence/benchmark studies only
-pytest -m "not slow"      # explicit form of the default
+pytest -m oracle          # system-tier tests cross-checked against a named external oracle (136 tests, ~100s)
 pytest tests/test_analytic_fresnel.py -v   # one file, verbose
 ```
 

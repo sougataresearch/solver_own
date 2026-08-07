@@ -13,13 +13,16 @@ import numpy as np
 import pytest
 from oracles.rcwa_1d_gaylord import solve_te, solve_tm
 
-from sougata_solver.eigenmodes import build_kp_matrix, solve_layer_eigenmodes_1d, solve_layer_eigenmodes_uniform
+from sougata_solver.eigenmodes import build_kp_matrix, solve_layer_eigenmodes_uniform
 from sougata_solver.excitation import PlaneWaveExcitation
 from sougata_solver.fourier_basis import truncate_fourier_orders_1d
 from sougata_solver.geometry import Lattice1D, Pattern, Slab
 from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
 from sougata_solver.simulation import Simulation
+
+
+pytestmark = pytest.mark.oracle  # Category 17 target 17.1: system-tier test, cross-checked against a named external oracle
 
 PERIOD = 0.7
 FILL_FACTOR = 0.3

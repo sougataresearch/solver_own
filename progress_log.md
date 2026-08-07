@@ -997,3 +997,95 @@ whether it was ever actually implemented.
   `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
   `design.md`, `decisions.md`, `architecture.md`, `references.md`, and
   this file.
+
+## 2026-08-07 (Categories 16-17)
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 16
+  (Visualization) and 17 (Testing and quality) in the same explanatory
+  style used for Categories 1-15, per the project owner's request
+  ("continue with category 16,17, explain them like other category and
+  then push and commit").
+- Category 16's plot-data-contract question (target 16.1): whether
+  plotting functions should accept a `Simulation` directly for
+  convenience, or only plain arrays/already-computed result objects --
+  chose the latter, matching `decisions.md` ADR-009/010's existing
+  `structures/`-vs-`postprocessing/` split (plotting never triggers a
+  solve) applied at the library-function level, and pinned it with a
+  direct structural test rather than only a docstring claim.
+- Category 16's unit-cell rendering approach (target 16.2): whether to
+  special-case matplotlib patches per shape class, or reuse each
+  `Shape.contains(x, y)` (already implemented by every shape) to
+  rasterize a preview grid -- chose the latter for a single
+  implementation covering every shape type uniformly, and confirmed it
+  respects `Pattern`'s own "later shapes take precedence" rule.
+- Category 17's test-taxonomy question (target 17.1): whether to add a
+  pytest marker per testing tier (unit/integration/oracle/regression) to
+  every one of 54 pre-existing test files, or document the
+  already-largely-consistent existing filename+docstring convention --
+  chose a narrower, precise addition instead: one new marker (`oracle`)
+  applied only to files meeting a mechanically-checkable criterion
+  (imports `tests/oracles/`), confirmed by grep across all 54 files
+  rather than a per-file subjective judgment call. `decisions.md`
+  ADR-027 records why the other, heavily-overlapping tiers were left to
+  the existing filename/docstring/Validation-Inventory convention.
+- Category 17's performance-regression-guard design (target 17.6):
+  whether to assert an absolute wall-clock threshold or a relative,
+  same-run ratio -- `rules.md`'s Performance Requirements explicitly
+  rule out the former (machine-dependent); chose a same-run ratio
+  (`eigensolve_time(81)/eigensolve_time(9)`, bounded with ~6x headroom
+  above Category 12's measured ~160x baseline for the same fixture),
+  `decisions.md` ADR-028.
+- Category 17's regression-fixture provenance question (target 17.4):
+  whether a frozen snapshot comparison could be described as a fresh
+  oracle validation -- explicitly not: documented it as a regression
+  guard for an already-independently-oracle-validated code path
+  (`test_analytic_fresnel.py`/`test_thin_film_empy_cross_check.py`
+  already validate the same uniform-multilayer solve path), not a new
+  physics claim.
+- Running `ruff` (target 17.5) surfaced two genuine dead-code findings
+  in already-shipped code, not just test-file import cruft: unused local
+  variables `modes_inc`/`modes_trans` in
+  `src/sougata_solver/vectorized.py` (Category 13's vectorized sweep) and
+  `epsilon_hat` in `tests/test_field_reconstruction.py` -- both verified
+  genuinely unused via a direct grep for other references before
+  removing, not assumed safe to delete.
+
+### Action items
+- [x] Target 16.1 (plot data contract) — done 2026-08-07, `plotting.py`.
+- [x] Target 16.2 (geometry plot) — done 2026-08-07, `plot_unit_cell`/
+  `plot_layer_stack`.
+- [x] Target 16.3 (R/T spectrum plot) — done 2026-08-07, `plot_rt_spectrum`.
+- [x] Target 16.4 (harmonic-convergence plot) — done 2026-08-07,
+  `plot_harmonic_convergence`.
+- [x] Target 16.5 (diffraction-order plot) — done 2026-08-07,
+  `plot_diffraction_orders`.
+- [x] Target 16.6 (field-intensity plot) — done 2026-08-07,
+  `plot_field_intensity`.
+- [x] Target 16.7 (Poynting/phase plots) — done 2026-08-07,
+  `plot_field_phase`/`plot_poynting_vector`.
+- [x] Target 17.1 (test taxonomy) — done 2026-08-07, `testing.md`'s "Test
+  Taxonomy" section, `oracle` marker on 8 files, `decisions.md` ADR-027.
+- [x] Target 17.2 (Windows CI) — done 2026-08-07, `.github/workflows/ci.yml`.
+- [x] Target 17.3 (slow-test CI policy) — done 2026-08-07,
+  `.github/workflows/slow-tests.yml`.
+- [x] Target 17.4 (regression fixtures) — done 2026-08-07,
+  `tests/regression_fixtures/thin_film_ar_coating_reference.npz`,
+  `tests/test_regression_fixtures.py`.
+- [x] Target 17.5 (static-analysis setup) — done 2026-08-07, `ruff`
+  configured, 24 baseline issues found and fixed.
+- [x] Target 17.6 (performance regression guard) — done 2026-08-07,
+  `tests/test_performance_regression.py`, `decisions.md` ADR-028.
+- **Session summary**: all 7 Category 16 targets and all 6 Category 17
+  targets resolved. New module `src/sougata_solver/plotting.py`; new
+  test files `tests/test_plotting.py`, `tests/test_regression_fixtures.py`,
+  `tests/test_performance_regression.py`; new directory
+  `tests/regression_fixtures/`; new CI workflows
+  `.github/workflows/ci.yml`/`slow-tests.yml`; `ruff` added and
+  configured, 24 baseline issues fixed (2 genuine dead-code findings, 22
+  unused imports). New `decisions.md` ADR-027 (test taxonomy) and
+  ADR-028 (performance regression guard design). No existing test
+  weakened. 702 tests collected project-wide (683 before this session's
+  work started). Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`,
+  `tasks.md`, `design.md`, `decisions.md`, `architecture.md`,
+  `references.md`, `README.md`, and this file.

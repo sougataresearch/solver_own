@@ -47,6 +47,7 @@ Layer(s)     ─┘            │                              │
 | `config.py` | Category 15 targets 15.2-15.4: minimal JSON simulation-configuration schema (`simulation_from_dict`/`_json_string`/`_json_file`) — reuses `geometry_io.py`'s existing material-dict shape and `pattern_from_dict` rather than a second schema; construction-time-only validation (never calls `.solve()`) | done |
 | `cli.py` | Category 15 targets 15.5/15.6: `sougata-solver run <config.json>` command-line entry point (`main`), exit codes `0`/`1`/`2` (success/solver failure/invalid config), writes results via `output_paths.py`'s existing dated-folder convention | done |
 | `export.py` | Category 15 target 15.7: `export_sweep_npz`/`load_sweep_npz` — serializes a `sweep.SweepResult` to a NumPy `.npz` archive, metadata JSON-encoded into a string array (no `allow_pickle=True` needed on load) | done |
+| `plotting.py` | Category 16 targets 16.1-16.7: `plot_unit_cell`/`plot_layer_stack`/`plot_rt_spectrum`/`plot_harmonic_convergence`/`plot_diffraction_orders`/`plot_field_intensity`/`plot_field_phase`/`plot_poynting_vector` — every function takes plain arrays/already-computed result objects (never a `Simulation`) and returns `(fig, ax)`; `matplotlib` imported lazily per function | done |
 
 ## Data Flow
 
@@ -145,10 +146,11 @@ sougata_solver/src/sougata_solver/
 ├── config.py
 ├── cli.py
 ├── export.py
+├── plotting.py
 └── simulation.py
 ```
 
-Still no sub-packages. **The module count (21, as of Category 15) has now
+Still no sub-packages. **The module count (22, as of Category 16) has now
 crossed the ~15-18 threshold this section previously flagged as the
 revisit point** — noted honestly here rather than silently ignored, but
 not acted on in this session: every module still has one clear,

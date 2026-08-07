@@ -257,7 +257,6 @@ def test_1d_grating_field_reconstruction_is_periodic():
     kx = kx0 + 2 * np.pi * result.g[:, 0] * lk[0, 0]
     ky = np.zeros_like(kx)
 
-    epsilon_hat = toeplitz_matrix(pattern, lattice, result.g, WAVELENGTH, inverse=False)
     epsilon_inv_hat = toeplitz_matrix(pattern, lattice, result.g, WAVELENGTH, inverse=True)
     ex, _ey, _ez, _hx, _hy, _hz = modal_field_components(
         excitation.omega(), kx, ky, modes.q, modes.kp, modes.phi, epsilon_inv_hat, a_z, b_z

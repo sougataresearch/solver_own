@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import math
 
-import numpy as np
 import pytest
 
 from sougata_solver.geometry import Circle, Lattice, Lattice1D, Rectangle, Slab

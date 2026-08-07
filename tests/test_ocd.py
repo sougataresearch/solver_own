@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import math
 
-import numpy as np
 import pytest
 
 from sougata_solver.excitation import PlaneWaveExcitation
-from sougata_solver.geometry import Lattice1D, Slab
+from sougata_solver.geometry import Lattice1D
 from sougata_solver.materials import Material
 from sougata_solver.ocd import OCDTrapezoidParams, rounded_rectangle_polygon, trapezoid_trench_layers
 from sougata_solver.simulation import Simulation

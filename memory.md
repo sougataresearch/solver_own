@@ -5,7 +5,9 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-07 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 15, targets
+As of 2026-08-07 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 17, targets
+17.1-17.6 all resolved), 2026-08-07 (Category 16, targets 16.1-16.7 all
+resolved), 2026-08-07 (Category 15, targets
 15.1-15.8 all resolved), 2026-08-07 (Category 14, targets 14.1-14.8 all
 resolved), 2026-08-05 (Category 13, targets
 13.1-13.6 all resolved, GPU explicitly not approved), 2026-08-05 (Category
@@ -19,6 +21,70 @@ Category 9, targets 9.1-9.8), 2026-08-04
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 17 (Testing and quality), targets 17.1-17.6, are all
+  complete.** 17.1: audited all 54 pre-existing test files' naming/
+  docstring conventions (documented in `testing.md`'s new "Test
+  Taxonomy" section) and added a new `pytest` marker, `oracle`, to every
+  file that directly imports `tests/oracles/` (8 files, 136 tests,
+  confirmed by grep, not guessed) -- `decisions.md` ADR-027 records why
+  no marker was added for the other, heavily-overlapping tiers (unit/
+  integration/regression/acceptance). 17.2/17.3: `.github/workflows/ci.yml`
+  (windows-latest, Python 3.10-3.12 matrix, `ruff check .` + `pytest -m
+  "not slow"` on every push/PR) and `slow-tests.yml` (weekly cron +
+  manual dispatch, `pytest -m slow`). 17.4: `tests/regression_fixtures/
+  thin_film_ar_coating_reference.npz`, a frozen 21-point AR-coating
+  spectrum compared at a deliberately tight `abs=1e-10` tolerance --
+  documented explicitly as a snapshot regression guard (catches
+  unintended future drift), not a fresh oracle comparison (the
+  underlying solve path is already independently oracle-validated
+  elsewhere). 17.5: `ruff` added and configured (`F`+`E7` rules only,
+  `line-length=120` matching this project's actual docstring style);
+  running it found and fixed 24 real baseline issues -- 22 unused
+  imports, and 2 genuinely dead local variables in
+  `src/sougata_solver/vectorized.py` (`modes_inc`/`modes_trans`) and
+  `tests/test_field_reconstruction.py` (`epsilon_hat`), each confirmed
+  unused via a direct grep before removing. 17.6:
+  `tests/test_performance_regression.py`, a same-run relative-scaling
+  guard (`eigensolve_time(81)/eigensolve_time(9) < 1000`, ~6x headroom
+  above Category 12's measured ~160x baseline) rather than an absolute
+  wall-clock threshold, per `rules.md`'s Performance Requirements --
+  `decisions.md` ADR-028. 702 tests collected project-wide (698 at the
+  start of this category: 4 new fast+slow tests, plus an `oracle` marker
+  added to 8 already-existing files with no new test count), full
+  fast+slow suite re-run and confirmed green.
+- **Category 16 (Visualization), targets 16.1-16.7, are all complete.**
+  New module `src/sougata_solver/plotting.py` -- every function takes
+  plain arrays/dataclasses/already-computed result objects, never a bare
+  `Simulation`, and no function calls `.solve()` (target 16.1's data
+  contract, pinned directly by
+  `tests/test_plotting.py::test_plotting_module_never_imports_simulation`);
+  every function returns `(fig, ax)` rather than saving/showing,
+  mirroring `decisions.md` ADR-009/010's `structures/`-vs-
+  `postprocessing/` split at the library-function level; `matplotlib` is
+  imported lazily inside each function so importing `plotting.py` never
+  forces the dependency onto a library user who doesn't plot. 16.2:
+  `plot_unit_cell` rasterizes a preview grid using each `Shape.contains`
+  (already implemented by every shape class, so one implementation
+  covers `Circle`/`Rectangle`/`Ellipse`/`Polygon`/`Slab` uniformly) and
+  respects `Pattern`'s own "later shapes take precedence" rule;
+  `plot_layer_stack` draws semi-infinite layers as a fixed-height
+  hatched band. 16.3-16.5: `plot_rt_spectrum` formalizes
+  `postprocessing/plot_thin_film_rt.py`'s existing plot with an optional
+  `T`/`R+T` trace and a metadata annotation; `plot_harmonic_convergence`
+  marks the exact index `sweep.find_convergence_index` selected;
+  `plot_diffraction_orders` bar-plots
+  `SimulationResult.diffraction_efficiencies()` with deterministic
+  `(g1, g2)`-sorted ordering. 16.6/16.7: `plot_field_intensity`
+  formalizes `postprocessing/plot_field_cross_section.py`'s intensity
+  plot; `plot_field_phase` uses a cyclic (`twilight`) colormap since
+  phase wraps at `+-pi`; `plot_poynting_vector` visualizes already-
+  computed `Sx`/`Sz` values using Category 9's found-and-documented
+  no-`0.5`-factor real-space flux convention. `tests/test_plotting.py`
+  (19 tests, structural checks -- axes/labels/data extents/artist
+  counts -- not pixel comparisons, since this project has no golden-
+  image infrastructure). 698 tests collected project-wide (683 at the
+  start of this category: 19 new fast tests, no new `slow` tests), full
+  fast suite re-run and confirmed green.
 - **Category 15 (User interface and API), targets 15.1-15.8, are all
   complete.** 15.1: `design.md`'s "Public API Inventory" section --
   compiling it found and fixed a real staleness bug in

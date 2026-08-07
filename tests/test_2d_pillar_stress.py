@@ -29,6 +29,9 @@ from sougata_solver.fourier_factorization import toeplitz_matrix
 from sougata_solver.geometry import Circle, Lattice, Pattern, Rectangle
 from sougata_solver.materials import Material
 
+
+pytestmark = pytest.mark.oracle  # Category 17 target 17.1: system-tier test, cross-checked against a named external oracle
+
 PERIOD = 0.7
 AIR = Material("air", 1.0)
 

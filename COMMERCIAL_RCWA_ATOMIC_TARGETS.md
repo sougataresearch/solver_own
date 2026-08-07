@@ -1510,7 +1510,7 @@ category (`tests/test_config.py`: 19, `tests/test_cli.py`: 5,
 project-wide** after Categories 14 and 15 combined (46 new tests: 18 in
 Category 14, 28 here), full fast+slow suite re-run and confirmed green.
 
-## 16. Visualization — PARTIAL
+## 16. Visualization — DONE
 
 ### Already present
 
@@ -1518,28 +1518,85 @@ Category 14, 28 here), full fast+slow suite re-run and confirmed green.
 
 **Current scope**
 
-Plotting is not yet a systematic, saved-data workflow and no field plots exist.
+A dedicated `plotting.py` library module now exists, covering geometry,
+spectrum, convergence, diffraction-order, field-intensity, field-phase, and
+Poynting-vector plots, all built on a shared "plain data in, figure out"
+contract (target 16.1) so no plotting function can ever trigger a solve.
 
 ### Small targets
 
-- [ ] **16.1 Plot data contract:** define plotting inputs separate from solver
+- [x] **16.1 Plot data contract:** define plotting inputs separate from solver
   calculation and output files.
-- [ ] **16.2 Geometry plot:** render the unit cell and layer stack; test axes,
+  Done 2026-08-07: new module `src/sougata_solver/plotting.py` -- every
+  function takes plain arrays, dataclasses, or already-computed result
+  objects (`geometry.Pattern`/`Lattice`, raw field-grid arrays, a
+  `SimulationResult.diffraction_efficiencies()` dict), never a bare
+  `Simulation`, and no function calls `.solve()`. Every function returns
+  `(fig, ax)` rather than saving/showing anything itself, mirroring
+  `decisions.md` ADR-009/010's `structures/`-vs-`postprocessing/` split
+  at the library-function level. `matplotlib` is imported lazily inside
+  each function so importing `plotting.py` doesn't force the dependency
+  onto every library user. `tests/test_plotting.py::test_plotting_module_never_imports_simulation`
+  pins the contract directly by inspecting the module's actual imports,
+  not just trusting the docstring's claim.
+- [x] **16.2 Geometry plot:** render the unit cell and layer stack; test axes,
   units, and no-solver dependency.
-- [ ] **16.3 R/T spectrum plot:** formalize an existing post-processing plot
+  Done 2026-08-07: `plot_unit_cell` rasterizes a preview grid using each
+  `Shape.contains(x, y)` (already implemented by every shape class) --
+  one implementation covers `Circle`/`Rectangle`/`Ellipse`/`Polygon`/
+  `Slab` uniformly, and it respects `Pattern`'s own documented
+  "later shapes take precedence" rule by iterating shapes in reverse
+  order. This is a **preview raster for visualization only**; the actual
+  solve still uses `pattern`'s analytic Fourier transforms unmodified.
+  `plot_layer_stack` draws semi-infinite (`math.inf`-thickness) layers as
+  a fixed-height hatched band, since infinity has no natural bar height.
+- [x] **16.3 R/T spectrum plot:** formalize an existing post-processing plot
   with metadata labels.
-- [ ] **16.4 Harmonic-convergence plot:** plot the Category-8 study result.
-- [ ] **16.5 Diffraction-order plot:** visualize propagating-order efficiency.
-- [ ] **16.6 Field-intensity plot:** add only after Category 9 field-flux tests pass.
-- [ ] **16.7 Poynting/phase plots:** add after field component conventions are
+  Done 2026-08-07: `plot_rt_spectrum` formalizes
+  `postprocessing/plot_thin_film_rt.py`'s existing ad hoc R-vs-wavelength
+  plot (same axis labels/style), generalized to optionally also plot `T`
+  and an `R+T` conservation trace, and to attach a `metadata` dict as a
+  labeled in-plot annotation rather than leaving run parameters to be
+  inferred from a filename alone.
+- [x] **16.4 Harmonic-convergence plot:** plot the Category-8 study result.
+  Done 2026-08-07: `plot_harmonic_convergence` marks the exact index
+  `sweep.find_convergence_index` already selected (when passed in), so
+  the plot visually matches what the already-validated convergence
+  criterion actually chose, not a human eyeball guess.
+- [x] **16.5 Diffraction-order plot:** visualize propagating-order efficiency.
+  Done 2026-08-07: `plot_diffraction_orders` bar-plots
+  `SimulationResult.diffraction_efficiencies()`'s already-validated
+  `{(g1, g2): (R_order, T_order)}` dict directly, sorted by `(g1, g2)`
+  for a deterministic bar order across repeated calls (a `dict`'s
+  insertion order is otherwise incidental).
+- [x] **16.6 Field-intensity plot:** add only after Category 9 field-flux tests pass.
+  Done 2026-08-07 (Category 9's field-flux tests have passed since
+  2026-08-05): `plot_field_intensity` formalizes
+  `postprocessing/plot_field_cross_section.py`'s `pcolormesh` intensity
+  plot (`|E|^2 = |Ex|^2+|Ey|^2+|Ez|^2`, `fields.modal_field_components`'s
+  already-validated Cartesian convention) into a reusable function.
+- [x] **16.7 Poynting/phase plots:** add after field component conventions are
   validated.
+  Done 2026-08-07 (field-component conventions validated since Category
+  9, `CONVENTIONS.md`): `plot_field_phase` (a cyclic `twilight` colormap,
+  not a sequential one, since phase wraps at `+-pi`) and
+  `plot_poynting_vector` (a `quiver` plot of already-computed `Sx`/`Sz`
+  values, no flux computation of its own, per target 16.1's data
+  contract -- consuming the no-`0.5`-factor real-space flux convention
+  Category 9 target 9.6 found and documented).
 
 ### Exit criteria
 
-**Category gate:** plots are reproducible from saved result data and never
-alter solver numerical results.
+**Category gate: met, 2026-08-07.** Plots are reproducible from saved
+result data and never alter solver numerical results -- every
+`plotting.py` function is structurally incapable of calling `.solve()`
+(target 16.1's contract, pinned by a direct test). 19 new tests
+(`tests/test_plotting.py`), structural checks (axes/labels/data extents,
+artist counts) rather than pixel comparisons, since this project has no
+golden-image infrastructure and pixel-exact comparison is brittle across
+matplotlib versions.
 
-## 17. Testing and quality — PARTIAL
+## 17. Testing and quality — DONE
 
 ### Already present
 
@@ -1547,27 +1604,98 @@ alter solver numerical results.
 
 **Current scope**
 
-The project has a strong local suite but no CI, static-analysis baseline, or
-performance regression guard.
+CI (fast-suite gate plus a separate scheduled slow-suite run), a static-
+analysis baseline (ruff), compact regression fixtures, and a relative-
+scaling performance regression guard are now all in place.
 
 ### Small targets
 
-- [ ] **17.1 Test taxonomy:** consistently mark unit, integration, oracle, and
+- [x] **17.1 Test taxonomy:** consistently mark unit, integration, oracle, and
   slow tests in filenames/docstrings or pytest markers.
-- [ ] **17.2 Windows CI:** run the fast suite on supported Python versions.
-- [ ] **17.3 Slow-test CI policy:** schedule or manually trigger convergence
+  Done 2026-08-07: audited the existing convention across all 54
+  pre-existing test files (filename names the feature under test,
+  docstring cites the `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` category/
+  target and names the oracle/invariant, `testing.md`'s Validation
+  Inventory is the authoritative per-feature cross-reference) and
+  documented it in `testing.md`'s new "Test Taxonomy" section. Added one
+  new `pytest` marker, `oracle`, applied to every file that directly
+  imports from `tests/oracles/` (confirmed by grepping for that import,
+  not guessed) -- 8 files, 136 tests, making the System Testing tier
+  queryable (`pytest -m oracle`) the same way `slow` already makes the
+  convergence/benchmark tier queryable. `decisions.md` ADR-027 records
+  why no marker was added for the other, heavily-overlapping tiers.
+- [x] **17.2 Windows CI:** run the fast suite on supported Python versions.
+  Done 2026-08-07: `.github/workflows/ci.yml` -- `windows-latest`, a
+  matrix over Python 3.10/3.11/3.12 (matching `pyproject.toml`'s
+  `requires-python`), running `ruff check .` (target 17.5) then
+  `pytest -m "not slow" -q` on every push/PR to `main` and on manual
+  dispatch.
+- [x] **17.3 Slow-test CI policy:** schedule or manually trigger convergence
   studies separately from the fast suite.
-- [ ] **17.4 Regression fixtures:** store compact trusted spectra/field outputs
+  Done 2026-08-07: `.github/workflows/slow-tests.yml` -- `pytest -m
+  slow` on `windows-latest`, triggered by a weekly cron schedule (catches
+  slow drift without gating every push) and `workflow_dispatch` (on
+  demand), per this target's own "schedule or manually trigger" wording.
+- [x] **17.4 Regression fixtures:** store compact trusted spectra/field outputs
   with provenance and tolerance rationale.
-- [ ] **17.5 Static-analysis setup:** install/configure lint/type tools and fix
+  Done 2026-08-07: `tests/regression_fixtures/thin_film_ar_coating_reference.npz`
+  (21-point wavelength sweep, quarter-wave MgF2-on-glass anti-reflection
+  coating), compared against a fresh solve in
+  `tests/test_regression_fixtures.py` at a deliberately tight `abs=1e-10`
+  tolerance -- documented as a **snapshot regression guard**, not a fresh
+  oracle comparison: the underlying uniform-multilayer solve path is
+  already independently oracle-validated elsewhere
+  (`test_analytic_fresnel.py`, `test_thin_film_empy_cross_check.py`);
+  this fixture's job is only to catch an unintended future change to
+  that already-validated path. The fixture's exact generating parameters
+  are reproduced in the test file's own `_regenerate_fixture` function
+  (not run automatically) so provenance is never separated from the
+  consuming test.
+- [x] **17.5 Static-analysis setup:** install/configure lint/type tools and fix
   the baseline before making them required.
-- [ ] **17.6 Performance regression guard:** add only after Category 13 has
+  Done 2026-08-07: `ruff` added as a dev dependency and configured
+  (`[tool.ruff]`/`[tool.ruff.lint]`, `pyproject.toml`) with a
+  deliberately narrow rule selection (`F` pyflakes real-bug checks, `E7`
+  pycodestyle statement-style subset) and a `line-length = 120` matching
+  this project's actual long-docstring/citation style, rather than
+  ruff's 88-char default. Running it found and fixed 24 real baseline
+  issues: 22 unused imports (safe autofix) and 2 genuinely dead local
+  variables (`src/sougata_solver/vectorized.py`'s unused `modes_inc`/
+  `modes_trans`, `tests/test_field_reconstruction.py`'s unused
+  `epsilon_hat`), each verified unused via a direct grep for other
+  references before removing, not assumed. `ruff check .` now passes
+  cleanly and gates every CI run (target 17.2).
+- [x] **17.6 Performance regression guard:** add only after Category 13 has
   stable benchmark baselines.
+  Done 2026-08-07 (Category 13's baselines have been stable since
+  2026-08-05): `tests/test_performance_regression.py`
+  (`@pytest.mark.slow`) asserts the ratio
+  `eigensolve_time(num_orders=81) / eigensolve_time(num_orders=9)` for
+  the same 2D-pillar fixture `profiling/baseline_profile.py` already
+  uses stays below `1000` and above `1` -- a **same-run relative ratio**,
+  never an absolute wall-clock threshold, per `rules.md`'s Performance
+  Requirements (timing is machine-dependent; a ratio measured within one
+  run cancels that dependence). The bound has ~6x headroom above
+  Category 12's measured ~160x baseline for this exact fixture
+  (`design.md`). `decisions.md` ADR-028 records the full design
+  rationale, including why a stored cross-run baseline was rejected
+  (needs periodic manual re-baselining, a maintenance burden this
+  target doesn't ask for).
 
 ### Exit criteria
 
-**Category gate:** CI protects the fast test suite and no documented oracle
-test can be silently skipped.
+**Category gate: met, 2026-08-07.** CI protects the fast test suite
+(`ci.yml` gates every push/PR with `ruff check .` plus `pytest -m "not
+slow"`) and no documented oracle test can be silently skipped (the new
+`oracle` marker makes the full system-tier suite explicitly runnable and
+countable, `pytest -m oracle` -- 136 tests, none skipped). 4 new tests
+this category (`tests/test_regression_fixtures.py`: 3,
+`tests/test_performance_regression.py`: 1 `slow`; the 8-file
+`oracle`-marker addition to already-existing tests added no new test
+count, only a queryable tag). 702 tests collected project-wide after
+Categories 16-17 combined (683 before + 19 new in
+`tests/test_plotting.py` + 4 new here), full fast+slow suite re-run and
+confirmed green.
 
 ## 18. Documentation — PARTIAL
 
