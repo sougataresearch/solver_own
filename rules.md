@@ -21,11 +21,16 @@ in the codebase, it's cited — these are not aspirational.
 - **No hidden global state, no singletons, no module-level mutable state.**
   Every module in `src/sougata_solver/` today is pure functions + dataclasses; keep
   it that way.
-- **Formatting/linting**: `.flake8` and `mypy.ini` exist in the parent
-  `EMpy` reference project but **not yet in `sougata_solver`** — add both before
-  Phase 2 lands (a `pyproject.toml` `[tool.ruff]` section, or a standalone
-  `.flake8`, plus a `mypy.ini`), so new patterned-layer code is type-checked
-  from day one rather than retrofitted later.
+- **Formatting/linting**: `ruff` (`[tool.ruff]`/`[tool.ruff.lint]` in
+  `pyproject.toml`), added and configured Category 17 target 17.5
+  (2026-08-07) — a deliberately narrow rule selection (`F` pyflakes
+  real-bug checks, `E7` pycodestyle statement-style subset) rather than
+  the full pycodestyle/import-sort families, since this pass's job was
+  "fix the baseline before making it required" (target 17.5's own
+  wording), not impose a house style wholesale. `ruff check .` gates
+  every CI run (`.github/workflows/ci.yml`, target 17.2). No `mypy`/type
+  checker yet — revisit as a separate, explicitly-scoped decision if type
+  coverage becomes a recurring pain point, not bundled into this pass.
 
 ## Naming Conventions
 

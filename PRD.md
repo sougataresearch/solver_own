@@ -173,6 +173,42 @@ depending on them at runtime.
   explicit approval was sought from the project owner and **not
   granted**, per that target's own requirement. See
   `tests/test_eigenmode_cache.py`, `tests/test_vectorized_sweep.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 14 (validation): targets
+  14.1-14.8 all **met** — a validation inventory mapping every public
+  feature to its oracle/invariant/example/limitation (`testing.md`);
+  reciprocity tests built on a Snell's-law-matched-angle comparison,
+  verified numerically before asserting (`decisions.md` ADR-025); a
+  harmonic convergence matrix across all 7 supported geometry families,
+  every candidate/tolerance measured directly rather than guessed
+  (`tests/test_harmonic_convergence_matrix.py`); the external 2D R/T
+  oracle gap (14.2-14.4) re-evaluated and honestly documented as still
+  blocked, not silently closed. See `tests/test_reciprocity.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 15 (user interface and
+  API): targets 15.1-15.8 all **met** — a minimal JSON simulation-
+  configuration schema (`config.py`) reusing `geometry_io.py`'s existing
+  material/pattern sub-schemas, validated at construction time before any
+  numerical calculation; a CLI (`cli.py`, `sougata-solver run`, three
+  distinct exit codes); a NumPy `.npz` result exporter avoiding
+  `allow_pickle=True` (`export.py`); HDF5 evaluated and deferred
+  (`decisions.md` ADR-026). See `tests/test_config.py`, `tests/test_cli.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 16 (visualization):
+  targets 16.1-16.7 all **met** — a plotting library (`plotting.py`)
+  whose functions take only plain arrays/already-computed result objects
+  and never call `.solve()` (target 16.1's data contract, pinned by a
+  direct structural test); geometry/layer-stack, R/T-spectrum, harmonic-
+  convergence, diffraction-order, field-intensity, field-phase, and
+  Poynting-vector plots. See `tests/test_plotting.py`.
+- `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 17 (testing and quality):
+  targets 17.1-17.6 all **met** — Windows CI (`.github/workflows/ci.yml`)
+  gating every push/PR with `ruff check .` plus the fast suite across a
+  Python 3.10-3.12 matrix; a separate weekly/manual slow-test workflow; a
+  documented test taxonomy plus a new `oracle` pytest marker; a frozen
+  regression-fixture snapshot with documented provenance; `ruff` static
+  analysis configured with its 24-issue baseline fixed; a performance
+  regression guard using a same-run relative-scaling ratio, never an
+  absolute wall-clock threshold, per this document's own Non-Functional
+  Requirements (`decisions.md` ADR-028). See
+  `tests/test_regression_fixtures.py`, `tests/test_performance_regression.py`.
 - No phase is marked "done" without: (a) a passing automated test against
   an oracle, and (b) a runnable example script producing physically
   plausible output.

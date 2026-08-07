@@ -406,13 +406,15 @@ sougata_solver/
 ├── memory.md               live project status for future sessions
 ├── progress_log.md          dated log of discussions + action items (new 2026-07-19)
 ├── decisions.md            architecture decision record (ADR)
-├── testing.md              testing strategy
+├── testing.md              testing strategy + Test Taxonomy (Category 17)
 ├── deployment.md           environment/CI/release process
 ├── references.md            literature + reference-implementation index
 ├── troubleshooting.md      known numerical gotchas
 ├── CONVENTIONS.md           frozen field/phasor/S-matrix/tensor conventions
 ├── COMMERCIAL_RCWA_ATOMIC_TARGETS.md   fine-grained Phase 6+ target checklist
-├── pyproject.toml
+├── pyproject.toml           dependencies, `sougata-solver` console script, `ruff`/pytest config
+├── .github/workflows/        ci.yml (fast suite + ruff, every push/PR) and
+│                               slow-tests.yml (weekly/manual, Category 17)
 ├── src/sougata_solver/        see src/sougata_solver/README.md for the module map
 │   ├── materials.py         permittivity models (isotropic + tensor) + analytic dispersion
 │   │                          models (Sellmeier/Cauchy/Lorentz/Drude/Drude-Lorentz)
@@ -442,8 +444,15 @@ sougata_solver/
 │   │                                 corner geometry (Category 11)
 │   ├── vectorized.py                 narrowly-scoped batched wavelength sweep for
 │   │                                  uniform-isotropic-only stacks (Category 13 target 13.4)
+│   ├── config.py                     JSON simulation-configuration schema + validation (Category 15)
+│   ├── cli.py                         `sougata-solver run` command-line entry point (Category 15)
+│   ├── export.py                      NumPy `.npz` result-series export (Category 15 target 15.7)
+│   ├── plotting.py                    geometry/spectrum/convergence/diffraction-order/field/
+│   │                                    Poynting-vector plots -- never calls `.solve()` (Category 16)
 │   └── output_paths.py             outputs/YYYY_MM_DD/HH_MM_SS_<run>/ helper
-├── tests/                    pytest suite (627 tests) + `tests/oracles/` -- see tests/README.md
+├── tests/                    pytest suite (702 tests, `pytest -m oracle`/`-m slow` markers) +
+│   │                           `tests/oracles/` -- see tests/README.md
+│   └── regression_fixtures/    frozen snapshot spectra with documented provenance (Category 17)
 ├── profiling/                  diagnostic timing/benchmark scripts (Category 12/13),
 │                                 never asserted against a hard limit -- see profiling/README.md
 ├── structures/                YOU RUN THESE -- see structures/README.md
@@ -572,11 +581,12 @@ pytest -m slow        # convergence/benchmark studies (several minutes)
 See [`phases.md`](phases.md) for the complete, ordered roadmap and
 [`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`](COMMERCIAL_RCWA_ATOMIC_TARGETS.md) for
 the fine-grained target checklist. Phases 1-7 are shipped, and
-`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-13 (mathematical
+`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 1-17 (mathematical
 foundation/anisotropy, numerical methods, Fourier factorization, geometry
 engine, material models, boundary conditions/excitation, layer handling,
 solver sweeps/convergence, field calculations, optical outputs,
-semiconductor OCD features, linear algebra, performance optimization) are
+semiconductor OCD features, linear algebra, performance optimization,
+validation, user interface/API, visualization, testing and quality) are
 all shipped/resolved except three explicitly-evaluated-and-deferred
 targets, each with its own documented reason (not silently skipped):
 Category 1 target 1.5 (longitudinal tensor coupling — no citable +
@@ -585,9 +595,10 @@ independently-benchmarkable formulation found), Category 10 target 10.5
 S4's actual source found a plausible but numerically-unconfirmed match),
 and Category 11 target 11.8 (stochastic line-edge/line-width roughness —
 fundamentally in tension with RCWA's periodic-Fourier formulation) — plus
-Category 13 target 13.6's GPU/autodiff backend, where explicit approval
-was sought and not granted (a process checkpoint outcome, not an
-unresolved gap). Remaining: Categories 14-19 (future extensions) at the
-atomic-target level, plus an expanded validation suite and example
-gallery (Phase 8's remaining scripted convergence studies/DBR/TSV
-examples).
+Category 13 target 13.6's GPU/autodiff backend (explicit approval sought
+and not granted, a process checkpoint outcome, not an unresolved gap) and
+Category 14 target 14.2's external 2D R/T oracle (re-evaluated and still
+documented-blocked: S4 unbuildable in this environment, no matching
+versioned dataset found — carrying 14.3/14.4 as documented-blocked, not
+falsely passed). Remaining: Categories 18-19 (future extensions) at the
+atomic-target level.

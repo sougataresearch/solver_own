@@ -9,16 +9,16 @@ becomes a shared/public project.
 ## Environment Setup
 
 ```powershell
-cd c:\Users\d14k4\Desktop\Solver_own\sougata_solver
+cd C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 ```
 
 Requirements (from `pyproject.toml`): Python ≥ 3.10, `numpy>=1.24`,
-`scipy>=1.10`; dev extra adds `pytest>=7.0`. `matplotlib` will need to be
-added as a dev/example dependency once Phase 7 (field visualization) lands
-— see `tasks.md`.
+`scipy>=1.10`; dev extra adds `pytest>=7.0`, `matplotlib>=3.7` (field/
+result plotting, Phase 7 and Category 16), and `ruff>=0.16` (static
+analysis, Category 17 target 17.5).
 
 ## Build Steps
 
@@ -45,31 +45,22 @@ speculative multi-stage build built ahead of actual need.
 
 ## CI/CD
 
-**Not yet set up** — `sougata_solver` was just initialized as its own git
-repository in this session (see `decisions.md` ADR-008) and has no remote
-yet. Once a remote (e.g. GitHub) exists, the minimum useful CI is a single
-GitHub Actions workflow:
+**Set up as of Category 17 targets 17.2/17.3 (2026-08-07)** — two GitHub
+Actions workflows under `.github/workflows/`:
 
-```yaml
-# .github/workflows/test.yml (add once a remote exists)
-name: test
-on: [push, pull_request]
-jobs:
-  pytest:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -e ".[dev]"
-      - run: pytest -m "not slow"
-```
-
-Keep `slow`-marked convergence studies out of the default CI run (they're
-for local investigation, not every-push validation) — run them manually or
-in a separate, manually-triggered workflow if they ever become expensive
-enough to matter.
+- **`ci.yml`** ("CI (fast suite)"): on every push/PR to `main` and on
+  manual dispatch, on `windows-latest` across a Python 3.10/3.11/3.12
+  matrix (matching `pyproject.toml`'s `requires-python`) — `ruff check .`
+  (target 17.5's static-analysis gate) then `pytest -m "not slow" -q`.
+  `windows-latest`, not `ubuntu-latest` (the earlier placeholder above
+  this section used to show), since this project has been developed and
+  tested exclusively on Windows so far — matches this target's own
+  explicit "Windows CI" wording.
+- **`slow-tests.yml`**: `pytest -m slow -q` on a weekly cron schedule
+  (Monday 06:00 UTC) plus manual dispatch, per target 17.3's own
+  "schedule or manually trigger" wording — kept separate from `ci.yml` so
+  convergence/benchmark studies (`tests/test_harmonic_convergence_matrix.py`'s
+  4 `slow` cases alone take ~450s) don't gate every push.
 
 No CD (continuous deployment) is applicable — there is no deployment
 target (no server, no package registry) at current scope.

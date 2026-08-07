@@ -1,12 +1,16 @@
 # `tests/` — Test Suite
 
-`pytest`-based, 637 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
-Category 13 (627 fast + 10 `slow`-marked convergence/benchmark studies). Run
-the fast suite with:
+`pytest`-based, 702 tests as of `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+Category 17 (691 default-run + 15 `slow`-marked convergence/benchmark/
+performance-regression studies; `pyproject.toml` sets no default marker
+filter, so plain `pytest` runs everything). See `testing.md`'s "Test
+Taxonomy" section for the full filename/docstring/marker convention.
 
 ```bash
-pytest                # fast suite (excludes slow)
-pytest -m slow        # convergence/benchmark studies only (several minutes)
+pytest                # everything, including slow-marked studies
+pytest -m "not slow"  # fast-development-loop suite (excludes slow)
+pytest -m slow        # convergence/benchmark/performance-regression studies only
+pytest -m oracle       # only tests cross-checked against a named external oracle (136 tests)
 ```
 
 See [`testing.md`](../testing.md) for the full testing strategy and
@@ -67,6 +71,23 @@ oracle — never a self-consistency check against the same code path.
 | [`test_svd_diagnostics.py`](test_svd_diagnostics.py) | Category 12 target 12.4: `eigenmodes.svd_diagnostics` against synthetic near-rank-deficient matrices and Phase 4b's most-ill-conditioned pillar fixture |
 | [`test_eigenmode_cache.py`](test_eigenmode_cache.py) | Category 13 target 13.3: `Simulation._eigenmode_cache` equivalence to forced-uncached recomputation, and cache-entry-count checks across polarization/thickness/wavelength sweeps |
 | [`test_vectorized_sweep.py`](test_vectorized_sweep.py) | Category 13 target 13.4: `vectorized.sweep_wavelength_vectorized` against the scalar `sweep.sweep_wavelength` across polarization states, oblique/azimuthal incidence, a multi-layer stack, and a lossy material |
+| [`test_reciprocity.py`](test_reciprocity.py) | Category 14 targets 14.5/14.6: Snell's-law-matched T reciprocity (lossless and lossy-reciprocal stacks), a negative control pinning the naive same-theta comparison's failure, and a patterned-layer non-reciprocity scope check |
+| [`test_harmonic_convergence_matrix.py`](test_harmonic_convergence_matrix.py) | Category 14 target 14.7: `sweep.harmonic_study`/`find_convergence_index` run across all 7 supported geometry families, every candidate/tolerance measured directly (4 tests `slow`-marked) |
+| [`test_config.py`](test_config.py) | Category 15 targets 15.3/15.4: `config.py`'s JSON schema — malformed-input validation (19 tests), and a config-file-driven reproduction of `structures/thin_film/anti_reflection_coating.py` to `1e-12` |
+| [`test_cli.py`](test_cli.py) | Category 15 target 15.6: `cli.py`'s `sougata-solver run` command — all three exit codes (success/invalid-config/solver-failure) |
+| [`test_export.py`](test_export.py) | Category 15 target 15.7: `export.py`'s `.npz` round-trip, metadata JSON-encoding, and the discrete/labeled-sweep rejection |
+| [`test_plotting.py`](test_plotting.py) | Category 16 targets 16.1-16.7: `plotting.py`'s data contract (structurally never touches `Simulation`/`.solve()`) and every plot function's axes/labels/artist-count structure |
+| [`test_regression_fixtures.py`](test_regression_fixtures.py) | Category 17 target 17.4: a frozen AR-coating reference spectrum (`regression_fixtures/thin_film_ar_coating_reference.npz`) compared against a fresh solve at `abs=1e-10` — a snapshot regression guard, not a fresh oracle comparison |
+| [`test_performance_regression.py`](test_performance_regression.py) | Category 17 target 17.6: a same-run relative-scaling ratio guard (`eigensolve_time(81)/eigensolve_time(9) < 1000`), `slow`-marked, never an absolute wall-clock threshold |
+
+## `regression_fixtures/`
+
+Frozen, trusted spectra with documented provenance and a stated tolerance
+rationale (Category 17 target 17.4) — compared against a fresh solve on
+every test run to catch unintended future drift in an already-
+independently-oracle-validated code path, not to re-establish physical
+correctness from scratch. See `test_regression_fixtures.py`'s module
+docstring for the full provenance/tolerance account.
 
 ## `oracles/`
 
