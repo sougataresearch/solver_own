@@ -220,11 +220,54 @@ Concretely:
 
 ## "API Design" — Public Python API
 
+### Public API Inventory (Category 15 target 15.1)
+
+**Found and fixed while compiling this inventory**: `src/sougata_solver/__init__.py`'s
+top-level `__all__` re-export list had not kept pace with new geometry
+primitives — `Ellipse`/`Polygon` (Category 4 targets 4.3/4.5) and
+`Lattice1D`/`Slab` (Phase 3) were public, working classes for many
+categories but not reachable via `from sougata_solver import ...`. Fixed
+by adding all four; no behavior change, purely an export-surface fix.
+
+**Stable public surface** (safe to depend on; changes here would be a
+breaking-change event):
+
+| Symbol | Module | Stability |
+|---|---|---|
+| `Material` | `materials.py` | stable — construction API (`Material(name, eps)`, `from_nk`, `from_sellmeier`, `from_cauchy`, `from_lorentz`, `from_drude`, `from_drude_lorentz`, `from_permittivity_tensor`) unchanged since introduction |
+| `Lattice`, `Lattice1D` | `geometry.py` | stable |
+| `Circle`, `Rectangle`, `Ellipse`, `Polygon`, `Slab` | `geometry.py` | stable (shape constructors); `Polygon.signed_distance_normal`/`contains` are lower-level, used internally |
+| `Pattern` | `geometry.py` | stable |
+| `Layer`, `LayerStack` | `layer.py` | stable |
+| `PlaneWaveExcitation` | `excitation.py` | stable, not yet top-level re-exported (import from `sougata_solver.excitation`) |
+| `Simulation`, `SimulationResult` | `simulation.py` | stable, not yet top-level re-exported (import from `sougata_solver.simulation`); every `SimulationResult` method (`.reflectance()`, `.transmittance()`, `.diffraction_efficiencies()`, `.order_classification()`, `.layer_absorption()`, `.complex_amplitudes()`, `.diffraction_angles()`, `.energy_balance()`) is public |
+| `sweep.SweepResult`, `sweep_wavelength`/`sweep_theta`/`sweep_phi`/`sweep_polarization`/`sweep_thickness`/`harmonic_study`/`find_convergence_index`/`auto_select_num_orders` | `sweep.py` | stable |
+| `ocd.OCDTrapezoidParams`, `trapezoid_trench_layers`, `rounded_rectangle_polygon` | `ocd.py` | stable |
+| `vectorized.sweep_wavelength_vectorized` | `vectorized.py` | stable, narrow scope (see its own docstring) |
+| `staircase.slice_profile`, `staircase_circle_layers`/`staircase_rectangle_layers`/`staircase_slab_layers` | `staircase.py` | stable |
+| `geometry_io.pattern_from_dict`/`pattern_from_json_string`/`pattern_from_json_file` | `geometry_io.py` | stable (parser only, not solver-wired) |
+| `polarimetry.py`'s Jones/Mueller functions | `polarimetry.py` | stable |
+| `output_paths.py`'s run-folder helpers | `output_paths.py` | stable, intended for `structures/`/`postprocessing/` scripts |
+| `eigenmodes.svd_diagnostics`/`SVDDiagnostics` | `eigenmodes.py` | stable, opt-in diagnostic |
+| `layer.EigenmodeDiagnostics` | `layer.py` | stable, read-only diagnostic data |
+
+**Internal/unstable** (implementation detail, may change without notice —
+identifiable by the `_` prefix convention `rules.md`'s Naming Conventions
+already establishes): every `_`-prefixed function/method across
+`src/sougata_solver/` (e.g. `eigenmodes._select_q_branch`,
+`eigenmodes._dense_inverse`, `smatrix._solve`,
+`simulation.Simulation._cached_toeplitz`/`_cached_layer_eigenmodes`,
+`vectorized._batched_*`, `geometry._require_finite`). Also unstable: the
+exact internal dict-key shape of `Simulation._toeplitz_cache`/
+`_eigenmode_cache` (an implementation detail of the caching design,
+`decisions.md` ADR-016/ADR-022, not part of the public contract even
+though the attributes themselves are inspectable).
+
 The intended import surface (already `__all__`-exported from
 `src/sougata_solver/__init__.py`):
 
 ```python
-from sougata_solver import Material, Lattice, Circle, Rectangle, Pattern, Layer, LayerStack
+from sougata_solver import Material, Lattice, Lattice1D, Circle, Rectangle, Ellipse, Polygon, Slab, Pattern, Layer, LayerStack
 ```
 
 Plus, imported directly from their submodules (not yet re-exported at
@@ -770,3 +813,70 @@ repeated identical patterned layers, not across an angle sweep — a
 narrower, different benefit than ADR-016's, worth stating precisely
 rather than overclaiming. Revisit if a future session profiles a
 concrete workload where this narrower reuse would actually matter.
+
+## Configuration, CLI, and Export Design (Category 15 targets 15.2/15.5/15.7)
+
+**15.2 configuration schema** (`config.py`). A single JSON document
+describes one `Simulation` + one `PlaneWaveExcitation`: `unit`, `lattice`,
+`materials` (a name → `{eps_re, eps_im, source}` dict, reusing
+`geometry_io.py`'s existing material-dict shape unchanged rather than
+inventing a second one), `layers` (each either `material`-referencing or
+`pattern`-holding — a `pattern` value is passed straight through to
+`geometry_io.pattern_from_dict`, so patterned-layer JSON has exactly one
+schema project-wide, not two), `incidence`/`transmission` (material
+names), `num_orders`, `truncation`, and `excitation`. Every numeric length
+field is expressed in the top-level `unit` (`"m"`/`"um"`/`"nm"`) and
+converted to meters before any `Simulation`/`Layer`/`Material` object is
+constructed — the same unit-scale convention `geometry_io.py` already
+uses for imported geometry, not a new one.
+
+**Validation ordering (15.3)**: `simulation_from_dict` only *constructs*
+objects — `Layer`, `Material`, `Lattice`/`Lattice1D`, `Simulation`,
+`PlaneWaveExcitation` — and never calls `.solve()`. Every malformed-input
+check (missing key, wrong type, unknown material name referenced by a
+layer/incidence/transmission, non-positive `num_orders`, unrecognized
+`truncation`) therefore necessarily raises before any numerical work
+starts, satisfying target 15.3's ordering requirement structurally (by
+what the function does, not by an extra guard) —
+`tests/test_config.py::test_validation_never_reaches_a_numerical_solve`
+pins this directly by monkeypatching `Simulation.solve` to fail loudly if
+ever reached from an invalid config.
+
+**15.4 configuration runner**: `simulation_from_dict`/
+`simulation_from_json_string`/`simulation_from_json_file` (`config.py`)
+are the runner — a caller still calls `.solve(excitation)` explicitly
+afterward, keeping "build and validate a `Simulation`" and "run it"
+distinct steps, mirroring `Simulation`'s own existing two-phase
+construct-then-solve API rather than adding a third, config-specific
+solving entry point. `tests/test_config.py::test_config_reproduces_anti_reflection_coating_example`
+confirms a config-file-driven run reproduces
+`structures/thin_film/anti_reflection_coating.py`'s result to `1e-12`.
+
+**15.5/15.6 CLI design and implementation** (`cli.py`). One subcommand,
+`run <config.json>`, three exit codes (`0` solved, `2` invalid
+config/file, `1` any other solver failure) — kept as two distinct
+non-zero codes so a caller (e.g. a shell script or CI step) can tell "your
+input was wrong" apart from "the solve itself failed" without parsing
+stderr text. Output reuses `output_paths.py`'s existing
+`outputs/YYYY_MM_DD/HH_MM_SS_<run_name>/` convention (via
+`run_output_dir`/`write_run_metadata`, the same functions every
+`structures/*.py` example already calls) rather than inventing a second
+output-location convention; `--output-dir` overrides it for
+scripted/CI use.
+
+**15.7 NumPy export** (`export.py`). `export_sweep_npz`/`load_sweep_npz`
+serialize a `sweep.SweepResult` to a plain `.npz` archive:
+`parameter_values`/`reflectance`/`transmittance` as numeric arrays, plus
+a JSON-encoded `metadata` string array (not a pickled object array) — so
+`np.load` never needs `allow_pickle=True`, keeping this export path free
+of the untrusted-deserialization risk class `rules.md`'s Security Rules
+already flag for `eval`/`exec`/`pickle` on file-sourced data. Scope is
+deliberately limited to *numeric* (1D) `parameter_values` — a discrete/
+labeled sweep (e.g. Category 8's polarization-Jones-tuple sweep) raises
+rather than silently truncating, since `.npz` needs a homogeneous
+per-array dtype and there is no lossless numeric encoding of an arbitrary
+label without guessing a convention no caller asked for.
+
+**15.8 HDF5 — evaluated and deferred**, see ADR-026: no dependency
+justifies itself against this project's actual (small, flat) result
+shapes yet.

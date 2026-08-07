@@ -304,10 +304,44 @@ Current (Category 13, Performance optimization, targets 13.1-13.6, resolved):
   sought from the project owner (per this target's own requirement) and
   **not granted** — GPU work stays deferred to Phase 9.
 
+Current (Category 14, Validation, targets 14.1-14.8, all resolved):
+- A validation inventory mapping every public feature to its oracle,
+  invariant test, example, and known limitation (`testing.md`).
+- Reciprocity tests (`tests/test_reciprocity.py`) built on a Snell's-
+  law-matched-angle comparison — verified numerically that the naive
+  same-angle comparison is wrong at oblique incidence before writing any
+  assertion (`decisions.md` ADR-025); patterned/diffractive layers are
+  explicitly out of scope for total-T reciprocity, checked directly, not
+  assumed.
+- A harmonic convergence matrix across every supported geometry family
+  (`tests/test_harmonic_convergence_matrix.py`), every candidate/
+  tolerance measured directly, not guessed.
+- A validation report of tolerances, versions, and results (`testing.md`);
+  the external 2D R/T oracle gap remains honestly documented as blocked
+  (S4 unbuildable in this environment, no matching published dataset
+  found), not silently closed.
+
+Current (Category 15, User interface and API, targets 15.1-15.8, all
+resolved):
+- A public API inventory (`design.md`) — found and fixed a real staleness
+  bug in `src/sougata_solver/__init__.py`'s public exports.
+- A minimal JSON simulation-configuration schema
+  ([`src/sougata_solver/config.py`](src/sougata_solver/config.py)),
+  reusing `geometry_io.py`'s existing material/pattern sub-schemas,
+  validated at construction time (before any numerical calculation) —
+  see "Usage" below.
+- A command-line interface
+  ([`src/sougata_solver/cli.py`](src/sougata_solver/cli.py)), one `run`
+  command, installed as the `sougata-solver` console script.
+- A NumPy `.npz` result-series exporter
+  ([`src/sougata_solver/export.py`](src/sougata_solver/export.py)) —
+  metadata JSON-encoded into a string array so loading never needs
+  `allow_pickle=True`.
+- HDF5 evaluated and **deferred** (`decisions.md` ADR-026) — current
+  result shapes are already well served by the `.npz` exporter.
+
 Planned (see [`phases.md`](phases.md) for the full roadmap):
-- Expanded systematic validation sweep across all geometry types and an
-  example gallery (Phase 8, `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories
-  14-19)
+- Categories 16-19 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md`)
 - Optional vectorized/GPU/autodiff backend (later, not currently
   approved; see `decisions.md` ADR-024)
 
@@ -438,6 +472,20 @@ re-solving):
 python structures/thin_film/sio2_on_si_ellipsometry_run.py
 python postprocessing/jones_mueller_ellipsometry.py
 ```
+
+### Command-line interface
+
+For a JSON-configuration-driven run (no Python script needed) — see
+`src/sougata_solver/config.py`'s module docstring for the full schema:
+
+```bash
+sougata-solver run path/to/config.json
+```
+
+Exits `0` on success (reflectance/transmittance printed and written to
+`outputs/YYYY_MM_DD/HH_MM_SS_<config-name>/`), `2` if the configuration
+file is missing/malformed/invalid, `1` if the solve itself fails. Pass
+`--output-dir DIR` to write results to a fixed location instead.
 
 ### Output files
 

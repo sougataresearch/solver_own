@@ -16,6 +16,34 @@ validates against. Update when a new phase cites a new source.
 
 ## Phases With No Vendored-Repo Source
 
+### Category 15 (User interface and API) targets 15.1-15.8 (2026-08-07)
+
+No new external citation was needed. This category is packaging/tooling,
+not physics: `config.py` parses and validates configuration data (stdlib
+`json` only, reusing `geometry_io.py`'s already-cited/validated material
+and pattern sub-schemas rather than introducing new formulas or a new
+dependency); `cli.py` is bookkeeping around already-cited
+`Simulation.solve()`; `export.py` serializes already-computed
+`SweepResult` values with NumPy's own `.npz` format, no new numerics. See
+`decisions.md` ADR-026 for the one genuine technical decision this
+category made (HDF5 evaluated and deferred).
+
+### Category 14 (Validation) targets 14.1-14.8 (2026-08-07)
+
+No new external citation was needed. This category validates
+already-implemented, already-cited solver behavior against physical
+invariants (electromagnetic reciprocity, harmonic-order convergence) and
+compiles existing test/oracle coverage into inventory/report documents
+(`testing.md`) — it adds no new formula. Target 14.2's external 2D R/T
+oracle search reused the same bounded-search discipline as Category 3's
+FFF/NVM literature search (`ADR-012`) and Category 1 target 1.5's
+longitudinal-coupling search: S4 remains unbuildable in this environment
+(same conclusion as every prior session's attempt, re-confirmed rather
+than assumed still true) and no versioned published R/T dataset matching
+this project's exact fixtures (materials, geometry, wavelength range) was
+found via `WebSearch`/`WebFetch` this session either — documented as a
+standing gap in `testing.md`'s Validation Report, not silently dropped.
+
 ### Category 13 (Performance optimization) targets 13.1-13.6 (2026-08-05)
 
 No new external citation was needed. Every implemented target (13.1,

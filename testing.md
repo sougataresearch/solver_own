@@ -161,6 +161,85 @@ pytest -m "not slow"      # explicit form of the default
 pytest tests/test_analytic_fresnel.py -v   # one file, verbose
 ```
 
+## Validation Inventory (Category 14 target 14.1)
+
+Every public feature, its validating oracle/invariant test, its runnable
+example, and any known limitation — kept in one table so a "done" claim
+in `memory.md`/`phases.md` is always traceable to an actual test file, per
+this file's own Acceptance Testing rule above. Updated whenever a new
+public capability ships (the same discipline `rules.md` AI Coding Rule 6
+already requires for `memory.md`/`decisions.md`).
+
+| Feature | Oracle / invariant test | Example | Known limitation |
+|---|---|---|---|
+| Uniform multilayer R/T (Phase 1) | `tests/oracles/fresnel.py` (from-scratch Fresnel/TMM) + `tests/oracles/empy_tmm.py` (EMpy) | `structures/thin_film/sio2_on_si_thin_film.py` | none |
+| Jones/Mueller polarimetry | Known reference matrices (identity, ideal polarizer) | `postprocessing/jones_mueller_ellipsometry.py` | s/p phase convention not externally matched (see Category 10 target 10.5 entry) |
+| Toeplitz Fourier factorization (Phase 2) | Rasterize-and-sum + FFT-of-raster (RCWA.jl `convmat2D.py` reproduction) | n/a (library-internal) | none |
+| 1D lamellar grating (Phase 3) | `tests/oracles/rcwa_1d_gaylord.py` (Moharam/Gaylord) | `structures/trench/trench_grating.py` | TM convergence is slow at sharp interfaces (Li's-rule-sensitive), documented not hidden |
+| 2D patterned layer, moderate contrast (Phase 4a) | `tests/oracles/rcwa_2djl_eigenvalues.py` (independent RCWA.jl eigenoperator) | `structures/via/pillar_array.py` | **no external R/T oracle** — see Category 14 targets 14.2-14.4, evaluated and deferred, `references.md` |
+| 2D patterned layer, near-degenerate/ill-conditioned (Phase 4b) | Same RCWA.jl oracle, high-contrast stress cases | `tests/test_2d_pillar_stress.py` | same external-oracle gap as above |
+| Tapered sidewalls (Phase 5) | Zero-taper reduction + convergence-vs-`num_slices` study (no external oracle exists for this technique family) | `structures/via/tapered_via.py`, `structures/trench/tapered_trench.py` | convergence can be slow for steep tapers (`tests/test_staircase.py`) |
+| Anisotropic uniform/patterned layers (Phase 6 / Category 1) | Closed-form birefringence benchmark + `tests/oracles/rcwa_anisotropic_inplane_jl.py` | `tests/test_anisotropic_*.py` | longitudinal coupling (target 1.5) explicitly deferred, no citable formulation found |
+| Numerical-methods robustness (Category 2) | `design.md` Failure Contract, backed 1:1 by `tests/test_failure_contract.py` | n/a (library-internal) | none |
+| Fourier-factorization rule inventory (Category 3) | `tests/test_fourier_factorization_rules.py`, measured convergence fixtures | n/a | FFF/NVM deferred, `decisions.md` ADR-012 |
+| Geometry engine (Category 4) | From-scratch rasterized references, PNPoly point-in-polygon | `structures/via/elliptical_pillar.py`, `triangular_pillar.py` | GDS/raster import out of scope |
+| Material dispersion models (Category 5) | BK7 published Sellmeier index, Rakić et al. (1998) published Au/Ag/Al/Ti coefficients | `structures/thin_film/tio2_sio2_dbr_on_si.py` | none |
+| Boundary conditions/excitation (Category 6) | Symmetry invariants (rotational at normal incidence, azimuthal), Stokes reciprocity | `tests/test_polarization_states.py`, `tests/test_bottom_incidence.py` | none |
+| Layer handling (Category 7) | Equivalence to uncached/unrepeated representations | `tests/test_layer_cache.py`, `tests/test_layer_absorption.py` | interior-amplitude reconstruction can overflow for thick/highly-lossy/high-`num_orders` cases (`troubleshooting.md`) |
+| Solver sweeps (Category 8) | Equivalence to manual per-point `solve()` loops | `tests/test_sweep.py`, `tests/test_harmonic_convergence.py` | none |
+| Real-space field reconstruction (Category 9 / Phase 7) | Analytic plane wave, transversality, interface continuity, flux-matches-R/T | `structures/trench/trench_field_cross_section.py`, `structures/via/pillar_field_cross_section.py` | same interior-amplitude overflow limitation as Category 7 |
+| Optical outputs (Category 10) | `tests/oracles/fresnel.py::multilayer_complex_rt` (both polarizations), classical grating equation | `tests/test_optical_outputs.py` | per-order s/p conversion (target 10.5) deferred, no external validation achieved |
+| Semiconductor OCD features (Category 11) | Closed-form rounded-rectangle area, periodicity self-consistency (overlay) | `structures/via/tsv_ocd_sweep.py`, `structures/trench/trench_ocd_sweep.py` | stochastic LER/LWR (target 11.8) explicitly deferred |
+| Linear algebra (Category 12) | Bit-for-bit equivalence to pre-refactor results, measured density | `profiling/baseline_profile.py` | none |
+| Performance optimization (Category 13) | Bit-for-bit-scale equivalence (eigenmode cache, vectorized sweep) | `profiling/benchmark_suite.py` | GPU/autodiff not approved (target 13.6) |
+| Reciprocity (Category 14 targets 14.5/14.6) | Snell's-law-matched transmittance symmetry | `tests/test_reciprocity.py` | uniform layers only — does not extend to patterned/diffractive layers, verified not assumed |
+| Harmonic convergence matrix (Category 14 target 14.7) | `sweep.find_convergence_index` across every geometry family | `tests/test_harmonic_convergence_matrix.py` | tapered/high-contrast cases converge slowly, documented per-fixture, not hidden |
+
+**Standing gap, not silently dropped**: no external, third-party 2D R/T
+oracle exists for this project (Category 14 targets 14.2-14.4) — S4 is not
+buildable in this environment (no `cmake`/Lua/C++ toolchain, re-confirmed
+2026-08-05) and no published numeric benchmark table was located via a
+bounded literature search (same conclusion Phase 4a/4b already reached).
+Every 2D-patterned-layer capability above is instead cross-validated
+against an independent, structurally-different eigenoperator formula
+(`RigorousCoupledWaveAnalysis.jl`, hand-transcribed since Julia is not
+installed either) — a real, if narrower, form of independent validation,
+not a self-consistency check, but explicitly not the same as an external
+R/T match. Revisit if S4/Julia become available in a future environment.
+
+## Validation Report (Category 14 target 14.8)
+
+**As of 2026-08-05** (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 14, this
+category's own session).
+
+**Environment**: Python 3.12.10, NumPy 2.5.1, SciPy 1.18.0, `numpy>=1.24`/
+`scipy>=1.10` required (`pyproject.toml`). No compiled extensions, no GPU.
+
+**Results**: 637 tests pass project-wide (627 fast + 10 `slow`-marked
+convergence/benchmark studies), full fast+slow suite re-run and confirmed
+green as of this category's own completion. See the Validation Inventory
+above for the per-feature oracle/test breakdown; see `memory.md`'s
+"Current Project Status" for the full per-category narrative history.
+
+**Tolerances actually used** (not a single project-wide constant — the
+right tolerance depends on what's being compared, per `rules.md`'s
+"tolerance-scale" lesson from Category 1 target 1.4's first mistake):
+
+| Comparison class | Typical tolerance | Example |
+|---|---|---|
+| Bit-for-bit refactor equivalence (same formula, different code path) | `1e-12` to `1e-16` | `tests/test_linear_algebra_audit.py`, `tests/test_vectorized_sweep.py` |
+| Oracle-comparison (independent formula/source) | `1e-6` to `1e-10` | `tests/test_analytic_fresnel.py`, `tests/test_1d_grating.py` |
+| Energy conservation (`R+T+sum(DE)[+A]=1`) | `1e-6` to `1e-8` | `tests/test_layer_absorption.py`, `tests/test_reciprocity.py` |
+| Convergence-vs-`num_orders` (genuinely slow-converging fixtures) | `1e-2` to `5e-2`, honestly matched to measured behavior, not tightened to force a pass | `tests/test_harmonic_convergence_matrix.py`'s tapered-via/high-contrast cases |
+
+**Known, explicitly-scoped gaps** (not silently missing): Category 1
+target 1.5 (longitudinal anisotropic coupling), Category 10 target 10.5
+(per-order s/p conversion), Category 11 target 11.8 (stochastic LER/LWR),
+Category 13 target 13.6 (GPU backend, not approved), and Category 14
+targets 14.2-14.4 (external 2D R/T oracle — S4/Julia unavailable in this
+environment, no published benchmark table located). Each has its own
+`decisions.md` ADR or `references.md` entry recording why, not just that.
+
 ## What Is Explicitly Not Required (at current scope)
 
 - Code-coverage percentage targets — a physics library's risk is

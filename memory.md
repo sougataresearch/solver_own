@@ -5,7 +5,9 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-05 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 13, targets
+As of 2026-08-07 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 15, targets
+15.1-15.8 all resolved), 2026-08-07 (Category 14, targets 14.1-14.8 all
+resolved), 2026-08-05 (Category 13, targets
 13.1-13.6 all resolved, GPU explicitly not approved), 2026-08-05 (Category
 12, targets 12.1-12.5 all done), 2026-08-05 (Category 11, targets
 11.1-11.7, 11.8 deferred), 2026-08-05 (Category 10, targets 10.1-10.4/10.6, 10.5
@@ -17,6 +19,75 @@ Category 9, targets 9.1-9.8), 2026-08-04
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Category 15 (User interface and API), targets 15.1-15.8, are all
+  complete.** 15.1: `design.md`'s "Public API Inventory" section --
+  compiling it found and fixed a real staleness bug in
+  `src/sougata_solver/__init__.py` (missing `Lattice1D`/`Ellipse`/
+  `Polygon`/`Slab` from `__all__`/imports). 15.2/15.3: new module
+  `config.py` -- a minimal JSON simulation-configuration schema (`json`
+  stdlib only, no new dependency), reusing `geometry_io.py`'s existing
+  material-dict shape and `pattern_from_dict` for patterned layers rather
+  than inventing a second schema for the same data; validation is
+  structural (every function only constructs objects, never calls
+  `.solve()`), pinned directly by
+  `tests/test_config.py::test_validation_never_reaches_a_numerical_solve`
+  (monkeypatches `Simulation.solve` to fail loudly if ever reached from
+  bad input). 15.4: `tests/test_config.py::test_config_reproduces_anti_reflection_coating_example`
+  reproduces `structures/thin_film/anti_reflection_coating.py` to
+  `1e-12` through the config API. 19 tests total in `tests/test_config.py`.
+  15.5/15.6: new module `cli.py`, one `run` subcommand, exit codes
+  `0`/`1`/`2` (success / solver failure / invalid config), output under
+  `output_paths.py`'s existing dated-folder convention (not a new one);
+  `sougata-solver` console-script entry point added to `pyproject.toml`;
+  `tests/test_cli.py` (5 tests) covers all three exit codes. 15.7: new
+  module `export.py`, `export_sweep_npz`/`load_sweep_npz` -- metadata is
+  JSON-encoded into a plain string array (not a pickled object array) so
+  the archive never needs `allow_pickle=True`, keeping this export path
+  free of the untrusted-deserialization risk class `rules.md`'s Security
+  Rules already flag for `eval`/`exec`/`pickle`; a discrete/labeled sweep
+  (e.g. polarization tuples) raises rather than silently truncating,
+  `tests/test_export.py` (4 tests). 15.8: evaluated and **deferred**
+  (`decisions.md` ADR-026) -- this project's actual result shapes (small,
+  flat arrays) are already well served by 15.7's `.npz` export; no HDF5
+  dependency added, matching the same "evaluate before deciding"
+  discipline as ADR-006/007/021/024. 656 tests pass project-wide (627 at
+  the start of this category: no new `slow` tests, 29 new fast tests
+  across `tests/test_config.py`/`test_export.py`/`test_cli.py`), full
+  fast suite re-run and confirmed green.
+- **Category 14 (Validation), targets 14.1-14.8, are all complete.**
+  14.1: `testing.md`'s "Validation Inventory" section, mapping every
+  public feature to its oracle/invariant test/example/known limitation.
+  14.2: re-evaluated the external 2D R/T oracle gap -- S4 remains
+  unbuildable in this environment and no versioned published dataset
+  matching this project's exact fixtures was found; documented as a
+  standing, honestly-labeled gap (`testing.md`'s Validation Report), not
+  silently left unexamined. 14.3/14.4: documented as blocked on 14.2
+  rather than a false pass. 14.5/14.6: `tests/test_reciprocity.py` (11
+  tests), `decisions.md` ADR-025. **Non-obvious finding, verified
+  numerically before writing any assertion**: a first naive comparison
+  (same nominal `theta` for the forward and reversed/materials-swapped
+  stack) is **wrong** at oblique incidence -- the physically correct
+  comparison requires Snell's-law-matched angles (constant transverse
+  `kx`), which restores T reciprocity to `~1e-15/1e-16` for both lossless
+  and lossy (but reciprocal) stacks; a second finding, also verified
+  directly rather than assumed to generalize, is that total-T reciprocity
+  does **not** extend to patterned/diffractive layers (per-order
+  reciprocity is a materially different, out-of-scope statement) -- both
+  findings are pinned as permanent regression tests, including a negative
+  control for the naive-comparison failure. 14.7:
+  `tests/test_harmonic_convergence_matrix.py` (7 tests: thin-film, 1D
+  trench moderate/high contrast, 2D pillar moderate/high contrast,
+  tapered via, anisotropic patterned), built on Category 8's
+  `sweep.harmonic_study`/`find_convergence_index` infrastructure --
+  every candidate/tolerance value was measured directly first, not
+  guessed (e.g. the 2D pillar moderate-contrast fixture's low-order
+  non-monotonic dip at `num_orders=49`, true plateau only from `81`; the
+  tapered via's genuinely slow `2e-2`, not `1e-2`, convergence rate). All
+  4 `slow`-marked tests in this file confirmed passing (447.5s). 14.8:
+  `testing.md`'s "Validation Report" section (tolerances-by-comparison-
+  class table, environment info, known gaps list). 627 tests pass
+  project-wide (612 at the start of this category: no new `slow` tests
+  beyond the 4 already counted in the 627, 15 new fast tests).
 - **Category 13 (Performance optimization), targets 13.1-13.6, are all
   resolved.** 13.1: `profiling/benchmark_suite.py`, extending Category
   12's baseline profiler with the one structure type it hadn't covered

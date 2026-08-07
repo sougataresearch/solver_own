@@ -1050,3 +1050,92 @@
   as naively applied), and re-measure — don't assume either conclusion
   transfers to a different machine's core count/BLAS configuration
   without checking.
+
+## ADR-025: Reciprocity test scope — uniform layers only, Snell's-law-matched angles, not naive same-theta (Category 14 targets 14.5/14.6)
+
+- **Decision**: reciprocity tests cover only **uniform (unpatterned)**
+  layer stacks, comparing forward-direction transmittance at incidence
+  angle `theta1` (in medium 1) against reverse-direction transmittance at
+  the Snell's-law-refracted angle `theta2` (`n1*sin(theta1) =
+  n2*sin(theta2)`, in medium 2) — **not** the same nominal `theta` value
+  reused for both directions. Both lossless and lossy (but still
+  reciprocal, i.e. ordinary absorption, not a gain/nonreciprocal medium)
+  cases are covered.
+- **Reason / non-obvious finding, verified numerically before writing any
+  assertion (`rules.md`'s "verify before asserting" discipline)**: a
+  first attempt compared T at the *same* `theta` value for both the
+  forward and reversed (materials-swapped) stack — this is the naive
+  reading of "reciprocity" and is **wrong**: measured directly, the
+  difference between forward and reversed T grows with angle and
+  reaches total mismatch (`T_reversed -> 0` from total internal
+  reflection) at `theta=45 deg` for an air/glass asymmetric stack. The
+  physically correct statement requires matching the transverse
+  wavevector `kx` (conserved across every interface, Snell's law) — when
+  angles are chosen this way instead, T reciprocity holds to `~1e-15/1e-16`
+  at every angle tested (`0`/`15`/`30`/`40 deg`), including for a lossy
+  reciprocal medium. This distinction between "same theta" and
+  "Snell-matched theta" was not previously documented anywhere in this
+  project (`tests/test_bottom_incidence.py`'s existing reciprocity check,
+  Category 6 target 6.6, only tested normal incidence, where the two
+  notions coincide since `theta=0` in both media — the naive/correct
+  distinction was invisible until oblique incidence was actually tried).
+- **Second finding, also verified numerically, not assumed**: total
+  transmittance reciprocity (even at Snell-matched angles) does **not**
+  hold for a **patterned** (diffractive) layer — measured directly for a
+  1D lamellar grating, with mismatches up to ~0.56 at normal incidence.
+  This is physically expected on reflection: reciprocity for a
+  diffraction grating relates *individual diffraction orders* between
+  the forward and reversed configurations (a materially more complex
+  statement — which orders correspond to which — not derived or tested
+  here), not the simple sum-over-all-orders total T a uniform stack's
+  single-mode two-port picture gives. Scoping this category's reciprocity
+  tests to uniform layers only is therefore a deliberate, verified
+  boundary, not an arbitrary simplification — attempting to assert total-T
+  reciprocity for a patterned layer would have been a **wrong** test, not
+  a merely-incomplete one, which is exactly why it was checked first
+  rather than assumed to generalize.
+- **Validation**: `tests/test_reciprocity.py` — Snell-matched T
+  reciprocity for a lossless stack across four angles; the same for a
+  lossy (but reciprocal) stack; an explicit negative control confirming
+  the *naive* same-theta comparison genuinely fails at oblique incidence
+  (pinning the first finding above as a permanent regression guard, not
+  just a decisions.md narrative); and a normal-incidence-only sanity
+  check that a patterned layer's total T is *not* asserted reciprocal
+  (documenting the scope boundary, not silently omitting it).
+- **Alternatives considered**: deriving and testing the full per-order
+  diffraction-grating reciprocity relation for patterned layers —
+  explicitly out of scope for this pass (a materially larger derivation
+  task); left as a documented possible extension, not silently dropped.
+- **Impact**: `tests/test_reciprocity.py` (new file). No `src/sougata_solver/`
+  code change — this category is validation-only, confirming existing
+  solver behavior against a physical invariant, not adding a new
+  capability.
+
+## ADR-026: HDF5 deferred — NumPy `.npz` export is sufficient for current data shapes (Category 15 target 15.8)
+
+- **Decision**: no HDF5 dependency or implementation is added. Target
+  15.7's NumPy export (`export.py`'s `export_sweep_npz`/`load_sweep_npz`,
+  a plain `.npz` archive of `parameter_values`/`reflectance`/
+  `transmittance`/JSON-encoded metadata) covers every result-series shape
+  this project currently produces.
+- **Reason**: HDF5's actual advantages over `.npz` — hierarchical
+  grouping, partial/chunked I/O into arrays too large to hold in memory,
+  and cross-language structured access to deeply nested datasets — only
+  matter once a single result exceeds comfortable in-memory `.npz` size
+  or needs internal hierarchy `.npz`'s flat namespace can't express. This
+  project's actual sweep outputs (`SweepResult`: one 1D array per swept
+  parameter, at most a few thousand points; `fields.py`'s 2D field grids,
+  Category 9 target 9.8, already export via existing means) are small
+  flat arrays, not the scale or structure that would justify HDF5 — the
+  same "evaluate before deciding" discipline this project already applied
+  to Category 3's FFF/normal-vector decisions (ADR-006/007) and Category
+  12/13's sparse-solver and parallelism decisions (ADR-021/024): add
+  complexity only once a measured need, not a hypothetical one, exists.
+- **Revisit when**: a future capability produces genuinely large (multi-GB)
+  or deeply hierarchical structured output — e.g. a dense 3D field-grid
+  sweep, or a multi-simulation batch run whose results are naturally
+  nested by structure/wavelength/angle — that `.npz`'s flat, whole-file-
+  in-memory model can no longer serve comfortably.
+- **Impact**: none (`h5py` is not added to `pyproject.toml`'s dependencies).
+  `export.py` (target 15.7) is the complete deliverable for this
+  category's data-export scope.

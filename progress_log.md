@@ -903,3 +903,97 @@ whether it was ever actually implemented.
   itself before being trusted. Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`,
   `memory.md`, `tasks.md`, `decisions.md` (new ADR-022, ADR-023,
   ADR-024), `architecture.md`, `references.md`, and this file.
+
+## 2026-08-07
+
+### Discussed
+- Completing `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Categories 14
+  (Validation) and 15 (User interface and API) in one session, per the
+  project owner's request ("complete phase 14 and 15 and push it").
+- Category 14's central design question: what electromagnetic reciprocity
+  actually predicts for a reversed multilayer stack at oblique incidence
+  -- a naive same-`theta` comparison was tried first, found to fail badly
+  (up to total mismatch at 45 deg), then the correct Snell's-law-matched
+  comparison (constant transverse `kx`) was derived and verified to
+  `~1e-15/1e-16` instead. A second question -- does this extend to
+  patterned/diffractive layers -- was checked directly (not assumed) and
+  found **not** to hold in the simple total-T sense.
+- Category 14's harmonic convergence matrix: rather than guessing
+  candidate `num_orders` lists and tolerances, each of the 7 geometry
+  families was measured directly first. Found a new instance of the
+  already-documented low-order non-monotonic wobble (this time in a
+  "moderate contrast" 2D pillar, not just the previously-documented
+  high-contrast case), and a genuinely slow (not `1e-2`-meeting)
+  convergence rate for the tapered-via fixture, honestly reflected in a
+  looser (`2e-2`) tolerance rather than tuned away.
+- Category 15's configuration schema design: whether to invent a new
+  material/pattern JSON sub-schema or reuse `geometry_io.py`'s existing
+  one -- reused it unchanged (same material-dict shape,
+  `pattern_from_dict` called directly for patterned layers), per
+  `rules.md`'s "don't invent when something adequate already exists."
+- Category 15's CLI exit-code design: whether "bad config" and "solver
+  failure" should share one non-zero exit code or two distinct ones --
+  chose two (`2` vs `1`) so a caller can tell them apart programmatically
+  without parsing stderr text.
+- Category 15's NumPy-export security question: how to serialize
+  per-sweep metadata (a dict) into a `.npz` archive without needing
+  `allow_pickle=True` on load -- JSON-encoded the metadata into a plain
+  string array instead of a pickled object array, keeping the export path
+  free of the untrusted-deserialization risk class `rules.md`'s Security
+  Rules already flag for `eval`/`exec`/`pickle`.
+- Category 15's HDF5 decision (target 15.8): evaluated against this
+  project's actual result shapes (small, flat per-sweep arrays) and found
+  no genuine advantage over the already-implemented `.npz` export yet --
+  deferred, not implemented, per the same "evaluate before deciding"
+  discipline as ADR-006/007/021/024.
+- A user question mid-session ("Phase 11 and 12 is not written properly")
+  was investigated in full (both sections re-read end to end) and found
+  to have no actual defect; the user confirmed via a direct follow-up
+  ("Category 11 and 12 look fine, keep going with 13") that no fix was
+  actually needed -- no speculative edits were made to either section as
+  a result.
+
+### Action items
+- [x] Target 14.1 (validation inventory) — done 2026-08-07.
+  `testing.md`'s "Validation Inventory" section.
+- [x] Target 14.2 (external 2D R/T oracle) — done 2026-08-07, re-evaluated
+  and still blocked (S4 unbuildable in this environment, no versioned
+  published dataset found); documented, not silently left unexamined.
+- [x] Targets 14.3/14.4 (moderate/high-contrast 2D R/T tests) — done
+  2026-08-07, documented as blocked on 14.2 rather than a false pass.
+- [x] Target 14.5 (reciprocity test design) — done 2026-08-07,
+  `decisions.md` ADR-025.
+- [x] Target 14.6 (reciprocity tests) — done 2026-08-07,
+  `tests/test_reciprocity.py` (11 tests).
+- [x] Target 14.7 (harmonic convergence matrix) — done 2026-08-07,
+  `tests/test_harmonic_convergence_matrix.py` (7 tests, all 4 `slow`-
+  marked tests confirmed passing, 447.5s).
+- [x] Target 14.8 (validation report) — done 2026-08-07, `testing.md`'s
+  "Validation Report" section.
+- [x] Target 15.1 (public API inventory) — done 2026-08-07, `design.md`'s
+  "Public API Inventory" section; fixed a real staleness bug in
+  `src/sougata_solver/__init__.py` (missing `Lattice1D`/`Ellipse`/
+  `Polygon`/`Slab` exports) found while compiling it.
+- [x] Target 15.2 (configuration schema) — done 2026-08-07, `config.py`.
+- [x] Target 15.3 (configuration validation) — done 2026-08-07,
+  `tests/test_config.py` (19 tests including malformed-input coverage).
+- [x] Target 15.4 (configuration runner) — done 2026-08-07, reproduces
+  `structures/thin_film/anti_reflection_coating.py` to `1e-12`.
+- [x] Target 15.5 (CLI design) — done 2026-08-07, `cli.py`'s module
+  docstring.
+- [x] Target 15.6 (CLI implementation) — done 2026-08-07, `cli.py`,
+  `sougata-solver` console-script entry, `tests/test_cli.py` (5 tests).
+- [x] Target 15.7 (NumPy export) — done 2026-08-07, `export.py`,
+  `tests/test_export.py` (4 tests).
+- [x] Target 15.8 (HDF5 decision) — done 2026-08-07, evaluated and
+  deferred, `decisions.md` ADR-026.
+- **Session summary**: all 8 Category 14 targets and all 8 Category 15
+  targets resolved. New modules `config.py`, `cli.py`, `export.py`; new
+  test files `tests/test_reciprocity.py`, `tests/test_harmonic_convergence_matrix.py`,
+  `tests/test_config.py`, `tests/test_cli.py`, `tests/test_export.py`.
+  New `decisions.md` ADR-025 (reciprocity scope) and ADR-026 (HDF5
+  deferred). `pyproject.toml` gained a `sougata-solver` console-script
+  entry point. No existing test weakened. Updated
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`, `tasks.md`,
+  `design.md`, `decisions.md`, `architecture.md`, `references.md`, and
+  this file.

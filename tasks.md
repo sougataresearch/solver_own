@@ -267,5 +267,35 @@ Status snapshot (update the source-of-truth file first, then this line):
   `decisions.md` ADR-024; a GPU decision checkpoint where explicit
   approval was sought from the project owner and not granted, deferring
   GPU/autodiff work to Phase 9).
-□ Categories 14-19 — not yet started at atomic-target grain (see that
+☑ Category 14 (Validation) — targets 14.1-14.8 all done, 2026-08-07
+  (a validation inventory mapping every public feature to its oracle/
+  invariant test/example/limitation, `testing.md`; the external 2D R/T
+  oracle re-evaluated and still documented-blocked, S4 unbuildable in
+  this environment and no matching versioned dataset found, 14.3/14.4
+  documented as blocked on it rather than a false pass; reciprocity
+  tests built on a Snell's-law-matched-angle comparison verified
+  numerically before writing any assertion -- the naive same-theta
+  comparison was tried first and found wrong at oblique incidence,
+  `decisions.md` ADR-025, `tests/test_reciprocity.py`; a harmonic
+  convergence matrix across all 7 supported geometry families, every
+  candidate/tolerance measured directly rather than guessed,
+  `tests/test_harmonic_convergence_matrix.py`, all 4 `slow`-marked cases
+  confirmed passing; a validation report of tolerances/versions/results,
+  `testing.md`).
+☑ Category 15 (User interface and API) — targets 15.1-15.8 all done,
+  2026-08-07 (a public API inventory that found and fixed a real
+  `__init__.py` export staleness bug; a minimal JSON simulation-
+  configuration schema, `config.py`, reusing `geometry_io.py`'s existing
+  material/pattern sub-schemas rather than inventing new ones, with
+  construction-time-only validation and malformed-input tests,
+  `tests/test_config.py`; a config-file-driven reproduction of
+  `structures/thin_film/anti_reflection_coating.py` to `1e-12`; a CLI
+  (`cli.py`, one `run` subcommand, three distinct exit codes, a
+  `sougata-solver` console-script entry point) with
+  `tests/test_cli.py`; a NumPy `.npz` result-series exporter,
+  `export.py`, deliberately avoiding `allow_pickle=True` by JSON-encoding
+  metadata into a string array, `tests/test_export.py`; an HDF5
+  decision evaluated and deferred, `decisions.md` ADR-026, since
+  current result shapes are already well served by the `.npz` exporter).
+□ Categories 16-19 — not yet started at atomic-target grain (see that
   file for each category's own small-target checklist).

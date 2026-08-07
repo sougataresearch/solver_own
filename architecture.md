@@ -44,6 +44,9 @@ Layer(s)     ─┘            │                              │
 | `sweep.py` | Category 8 targets 8.1-8.8: `SweepResult` (typed one-parameter-sweep container), `sweep_wavelength`/`sweep_theta`/`sweep_phi`/`sweep_polarization`/`sweep_thickness` (thin wrappers repeating `Simulation.solve()`, no new physics), `harmonic_study`/`find_convergence_index`/`auto_select_num_orders` (harmonic-order convergence study and a conservative, `decisions.md` ADR-018, stopping criterion) | done |
 | `ocd.py` | Category 11 targets 11.1/11.2/11.4: `OCDTrapezoidParams` (validated CD-first OCD parameters), `trapezoid_trench_layers` (thin wrapper around `staircase.staircase_slab_layers`), `rounded_rectangle_polygon` (arc-sampled corner rounding, built on `geometry.Polygon`'s already-validated analytic Fourier transform) — no new physics formula anywhere in this module | done |
 | `vectorized.py` | Category 13 target 13.4: `sweep_wavelength_vectorized` — a narrowly-scoped batched wavelength sweep for uniform-isotropic-only (thin-film) stacks, every batched function a formula-identical re-expression of an already-cited scalar function (`decisions.md` ADR-023) | done (bounded scope, not a general vectorized backend) |
+| `config.py` | Category 15 targets 15.2-15.4: minimal JSON simulation-configuration schema (`simulation_from_dict`/`_json_string`/`_json_file`) — reuses `geometry_io.py`'s existing material-dict shape and `pattern_from_dict` rather than a second schema; construction-time-only validation (never calls `.solve()`) | done |
+| `cli.py` | Category 15 targets 15.5/15.6: `sougata-solver run <config.json>` command-line entry point (`main`), exit codes `0`/`1`/`2` (success/solver failure/invalid config), writes results via `output_paths.py`'s existing dated-folder convention | done |
+| `export.py` | Category 15 target 15.7: `export_sweep_npz`/`load_sweep_npz` — serializes a `sweep.SweepResult` to a NumPy `.npz` archive, metadata JSON-encoded into a string array (no `allow_pickle=True` needed on load) | done |
 
 ## Data Flow
 
@@ -122,6 +125,7 @@ this size:
 
 ```
 sougata_solver/src/sougata_solver/
+├── __init__.py
 ├── materials.py
 ├── geometry.py
 ├── geometry_io.py
@@ -134,17 +138,26 @@ sougata_solver/src/sougata_solver/
 ├── fields.py
 ├── polarimetry.py
 ├── staircase.py
+├── ocd.py
 ├── output_paths.py
+├── sweep.py
+├── vectorized.py
+├── config.py
+├── cli.py
+├── export.py
 └── simulation.py
 ```
 
-No sub-packages yet. A `fourier_factorization.py` module is planned for
-Phase 2 (see `phases.md`), and a `staircase.py` helper for Phase 5 — both
-new top-level modules in `src/sougata_solver/`, not new sub-packages, to keep the
-import graph flat as long as the module count stays in the low teens.
-**Revisit this if the module count exceeds ~15-18** — at that point, group
-into sub-packages (e.g. `sougata_solver/geometry/`, `sougata_solver/solve/`) rather than
-letting `src/sougata_solver/` become an unstructured flat pile.
+Still no sub-packages. **The module count (21, as of Category 15) has now
+crossed the ~15-18 threshold this section previously flagged as the
+revisit point** — noted honestly here rather than silently ignored, but
+not acted on in this session: every module still has one clear,
+independent responsibility (see the table above), imports stay
+acyclic, and no category's own target asked for a directory
+reorganization. Group into sub-packages (e.g. `sougata_solver/geometry/`,
+`sougata_solver/solve/`, `sougata_solver/io/`) the next time a category
+touches module layout directly, rather than as an unscoped side effect of
+an unrelated target.
 
 ## Scalability Considerations
 
