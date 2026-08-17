@@ -559,7 +559,9 @@ calculator that also implements Fresnel/Airy with tabulated `n,k`.
 
 Settings: substrate = Si, film = SiO2, `d = 500 nm`, `theta = 0°`,
 `lambda = 550 nm`. Reading `R(lambda=550)` from KLA and overlaying the
-solver's `output_R.csv` spectrum via `postprocessing/KLA_plot_norm.py`:
+solver's `output_R.csv` spectrum via `postprocessing/RCWA_plot_norm.py`
+(renamed from `KLA_plot_norm.py`; KLA is no longer the comparison source,
+see `progress_log.md`'s 2026-08-17 entry):
 
 ```
 max_lambda |R_solver - R_KLA| ~= 1.1e-3
