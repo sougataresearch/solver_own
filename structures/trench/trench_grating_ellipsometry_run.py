@@ -52,15 +52,25 @@ NUM_ORD = 5                      # orders per side; total Fourier orders = 2*NUM
 OUTPUT_CSV_PATH = "trench_grating_ellipsometry_raw.csv"  # saved under outputs/YYYY_MM_DD/
 
 
-def main():
+def build_geometry(period=None, fill_factor=None, thickness=None):
+    """Returns (layers, lattice, incidence, transmission)."""
+    period = period if period is not None else PERIOD
+    fill_factor = fill_factor if fill_factor is not None else FILL_FACTOR
+    thickness = thickness if thickness is not None else THICKNESS
+
     air = Material("air", 1.0)
     ridge = Material("ridge", N_RIDGE**2)
 
     pattern = Pattern(background=air)
-    pattern.add(Slab(center_x=-PERIOD * (1 - FILL_FACTOR) / 2, halfwidth=0.5 * FILL_FACTOR * PERIOD, material=ridge))
+    pattern.add(Slab(center_x=-period * (1 - fill_factor) / 2, halfwidth=0.5 * fill_factor * period, material=ridge))
 
-    lattice = Lattice1D(PERIOD)
-    layers = [Layer("grating", THICKNESS, pattern=pattern)]
+    lattice = Lattice1D(period)
+    layers = [Layer("grating", thickness, pattern=pattern)]
+    return layers, lattice, air, air
+
+
+def main():
+    layers, lattice, air, _transmission = build_geometry()
     num_orders = 2 * NUM_ORD + 1
     sim = Simulation(lattice, layers, num_orders=num_orders, incidence=air, transmission=air)
 

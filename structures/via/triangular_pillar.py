@@ -57,7 +57,13 @@ def _equilateral_triangle_vertices(base: float, height: float) -> tuple[tuple[fl
     return ((0.0, y_top), (-base / 2, y_bottom), (base / 2, y_bottom))
 
 
-def main() -> None:
+def build_geometry(period=None, triangle_base=None, triangle_height=None, thickness=None):
+    """Returns (layers, lattice, incidence, transmission)."""
+    period = period if period is not None else PERIOD
+    triangle_base = triangle_base if triangle_base is not None else TRIANGLE_BASE
+    triangle_height = triangle_height if triangle_height is not None else TRIANGLE_HEIGHT
+    thickness = thickness if thickness is not None else THICKNESS
+
     air = Material("air", N_BG**2)
     pillar = Material("pillar", N_PILLAR**2)
 
@@ -65,15 +71,20 @@ def main() -> None:
         background=air,
         shapes=[
             Polygon(
-                center=(PERIOD / 2, PERIOD / 2),
-                vertices=_equilateral_triangle_vertices(TRIANGLE_BASE, TRIANGLE_HEIGHT),
+                center=(period / 2, period / 2),
+                vertices=_equilateral_triangle_vertices(triangle_base, triangle_height),
                 material=pillar,
             )
         ],
     )
-    lattice = Lattice(a=(PERIOD, 0.0), b=(0.0, PERIOD))
-    layers = [Layer("pillar_layer", THICKNESS, pattern=pattern)]
-    sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=air)
+    lattice = Lattice(a=(period, 0.0), b=(0.0, period))
+    layers = [Layer("pillar_layer", thickness, pattern=pattern)]
+    return layers, lattice, air, air
+
+
+def main() -> None:
+    layers, lattice, air, transmission = build_geometry()
+    sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=transmission)
 
     reflectance = np.zeros(len(WAVELENGTHS))
     transmittance = np.zeros(len(WAVELENGTHS))

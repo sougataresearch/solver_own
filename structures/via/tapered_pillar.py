@@ -66,10 +66,36 @@ SLICE_COUNTS = [1, 2, 4, 8, 16, 32]
 OUTPUT_CSV = "output_tapered_pillar_convergence.csv"
 
 
-def main() -> None:
+def build_geometry(num_slices=None, period=None, tcd=None, bcd=None, thickness=None):
+    """Returns (layers, lattice, incidence, transmission).
+
+    `num_slices` defaults to `SLICE_COUNTS[-1]` (the finest/most
+    representative geometry) -- this file's own `main()` sweeps over every
+    value in `SLICE_COUNTS` itself, calling this with each one explicitly.
+    """
+    num_slices = num_slices if num_slices is not None else SLICE_COUNTS[-1]
+    period = period if period is not None else PERIOD
+    tcd = tcd if tcd is not None else TCD
+    bcd = bcd if bcd is not None else BCD
+    thickness = thickness if thickness is not None else THICKNESS
+
     air = Material("air", N_BG**2)
     pillar = Material("pillar", N_PILLAR**2)
-    lattice = Lattice(a=(PERIOD, 0.0), b=(0.0, PERIOD))
+    lattice = Lattice(a=(period, 0.0), b=(0.0, period))
+    layers = staircase_rectangle_layers(
+        center=(period / 2, period / 2),
+        top_halfwidth=(0.5 * tcd, 0.5 * tcd),
+        bottom_halfwidth=(0.5 * bcd, 0.5 * bcd),
+        thickness=thickness,
+        num_slices=num_slices,
+        shape_material=pillar,
+        background_material=air,
+        name_prefix="pillar",
+    )
+    return layers, lattice, air, air
+
+
+def main() -> None:
     excitation = PlaneWaveExcitation(
         wavelength=WAVELENGTH,
         theta=math.radians(INCIDENT_ANGLE_DEG),
@@ -83,17 +109,8 @@ def main() -> None:
 
     print(f"{'num_slices':>10}  {'R':>10}  {'T':>10}  {'R+T':>10}")
     for i, num_slices in enumerate(SLICE_COUNTS):
-        layers = staircase_rectangle_layers(
-            center=(PERIOD / 2, PERIOD / 2),
-            top_halfwidth=(0.5 * TCD, 0.5 * TCD),
-            bottom_halfwidth=(0.5 * BCD, 0.5 * BCD),
-            thickness=THICKNESS,
-            num_slices=num_slices,
-            shape_material=pillar,
-            background_material=air,
-            name_prefix="pillar",
-        )
-        sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=air)
+        layers, lattice, air, transmission = build_geometry(num_slices=num_slices)
+        sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=transmission)
         result = sim.solve(excitation)
         reflectance[i] = result.reflectance()
         transmittance[i] = result.transmittance()

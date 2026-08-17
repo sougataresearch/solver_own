@@ -1,13 +1,13 @@
-"""SiO2 (50 nm) on Si (12 um), both semi-infinite air above and below.
+"""One SiO2 or SiO film on a semi-infinite Si or Ni substrate.
 
 Stack (top to bottom):
-    air   (incidence, semi-infinite)
-    SiO2  (50 nm, finite layer)
-    Si    (12 um, finite layer -- thick enough to show real interference
-           fringes in R/T vs wavelength, not treated as infinite)
-    air   (exit, semi-infinite)
 
-Run with:  python structures/thin_film/sio2_on_si_thin_film.py
+    air (semi-infinite) / selected finite film / selected substrate (semi-infinite)
+
+This is the appropriate stack for the KLA/Filmetrics Reflectance Calculator
+when its substrate is set to Si or Ni.  The substrate is deliberately passed
+as ``transmission=substrate`` rather than added to ``layers``: transmission
+media in the solver are semi-infinite half-spaces.
 """
 
 import math
@@ -23,123 +23,151 @@ from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
 
 
-# ============================================================================
-# EDIT (1): point these at your actual Si and SiO2 n,k CSV files
-# ============================================================================
-# Resolved relative to this script's own location (Solver_own/NK_FILE), not
-# a hardcoded drive letter -- keeps working after moving/copying the whole
-# Solver_own folder to another device where it might not be on G:\.
+# KLA material files have columns: wavelength [nm], n, k.
 NK_DIR = Path(__file__).resolve().parents[3] / "NK_FILE"
-SI_CSV_PATH = str(NK_DIR / "Si_nk.csv")       # <-- put your Si data file path here
-SIO2_CSV_PATH = str(NK_DIR / "SiO2_nk.csv")   # <-- put your SiO2 data file path here
-CSV_WAVELENGTH_UNIT = "um"                  # "um", "nm", or "m" -- match your file
+SUBSTRATE_NK_PATHS = {
+    "Si": NK_DIR / "si_KLA.txt",
+    "Ni": NK_DIR / "ni_KLA.txt",
+}
+FILM_NK_PATHS = {
+    "SiO": NK_DIR / "sio_KLA.txt",
+    "SiO2": NK_DIR / "sio2_KLA.txt",
+}
+NK_WAVELENGTH_UNIT = "nm"
 
-# ============================================================================
-# EDIT (2): layer thicknesses (meters)
-# ============================================================================
-SIO2_THICKNESS = 50e-9   # 50 nm
-SI_THICKNESS = 12e-6     # 2 μm
+# Select exactly one semi-infinite substrate.  Use "Si" or "Ni".
+SUBSTRATE_MATERIAL = "Si"
 
-# ============================================================================
-# EDIT (3): incident light -- angle (degrees), polarization
-# ============================================================================
-INCIDENT_ANGLE_DEG = 0.0     # angle from surface normal
-AZIMUTHAL_ANGLE_DEG = 0.0    # usually 0 unless the sample is in-plane anisotropic
+# Select exactly one finite film.  Use "SiO" or "SiO2".
+FILM_MATERIAL = "SiO2"
+FILM_THICKNESS_M = 500e-9
 
-# s_amplitude / p_amplitude are COMPLEX -- their relative magnitude and phase
-# set the polarization state:
-S_AMPLITUDE = 1.0            # linear s-pol (TE)
-P_AMPLITUDE = 0.0
-# S_AMPLITUDE, P_AMPLITUDE = 1.0, 1.0                  # linear, 45 deg
-# S_AMPLITUDE, P_AMPLITUDE = 1.0, 1j                   # circular (90 deg phase)
-# S_AMPLITUDE, P_AMPLITUDE = 1.0, 0.5j                 # elliptical
-# for unpolarized light, run twice (S_AMPLITUDE=1,P_AMPLITUDE=0 and vice
-# versa) and average the resulting R and T.
+# Match these three settings to the KLA calculator before comparing curves.
+INCIDENT_ANGLE_DEG = 40.0
+AZIMUTHAL_ANGLE_DEG = 0.0
+# "s", "p", "mixed" (equal-power average of s and p), "rcp"/"lcp" (circular),
+# or "elliptical" (uses ELLIPTICAL_ALPHA_DEG/ELLIPTICAL_DELTA_DEG below).
+POLARIZATION = "elliptical"
 
-# ============================================================================
-# EDIT (4): wavelength sweep (meters)
-# ============================================================================
-WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 401)  # 400-800 nm, 401 points
+# Only used when POLARIZATION == "elliptical": s_amplitude = cos(alpha),
+# p_amplitude = sin(alpha) * exp(1j * delta), per CONVENTIONS.md's "Worked
+# polarization examples" table (delta != 0, pi, or it degenerates to linear).
+ELLIPTICAL_ALPHA_DEG = 20.0
+ELLIPTICAL_DELTA_DEG = 50.0
 
-# ============================================================================
-# EDIT (5): where to save results (set to None to skip saving)
-#
-# Plotting is NOT done here -- this script only builds the structure, runs
-# the solver, and saves raw R/T data. Run postprocessing/plot_thin_film_rt.py
-# afterward to plot it (it finds this run's CSV automatically and saves the
-# plot into this same output folder).
-# ============================================================================
-OUTPUT_CSV_PATH = "output_RT.csv"  # filename only; saved under outputs/YYYY_MM_DD/
+# KLA export supports this same 400--800 nm, 1 nm grid.  Adjust if needed.
+WAVELENGTHS = np.linspace(400e-9, 800e-9, 401)
+OUTPUT_CSV_PATH = "output_R.csv"
 
 
-def main():
-    try:
-        si = Material.from_nk_file("Si", SI_CSV_PATH, CSV_WAVELENGTH_UNIT)
-        sio2 = Material.from_nk_file("SiO2", SIO2_CSV_PATH, CSV_WAVELENGTH_UNIT)
-    except OSError:
-        print(f"Could not find {SI_CSV_PATH!r} / {SIO2_CSV_PATH!r} -- using placeholder constants instead.\n")
-        si = Material("Si", (3.9 + 0.02j) ** 2)      # rough placeholder, NOT real Si data
-        sio2 = Material("SiO2", 1.46**2)              # rough placeholder, NOT real SiO2 data
+def _polarization_amplitudes(polarization: str) -> tuple[complex, complex]:
+    """Return one pure polarization state's `(s_amplitude, p_amplitude)`;
+    "mixed" light is calculated separately (equal-power average of two
+    solves, not a single Jones vector).
 
-    air = Material("air", 1.0)
+    RCP/LCP/elliptical values are exactly `CONVENTIONS.md`'s "Worked
+    polarization examples" table (also exercised by
+    `tests/test_polarization_states.py`, Category 6 targets 6.2/6.3):
+    `PlaneWaveExcitation.s_amplitude`/`p_amplitude` are already complex, so
+    circular/elliptical states need no solver changes -- only the phase
+    relationship between the two amplitudes.
+    """
+    if polarization == "s":
+        return 1.0, 0.0
+    if polarization == "p":
+        return 0.0, 1.0
+    if polarization == "rcp":
+        return 1 / math.sqrt(2), 1j / math.sqrt(2)
+    if polarization == "lcp":
+        return 1 / math.sqrt(2), -1j / math.sqrt(2)
+    if polarization == "elliptical":
+        alpha = math.radians(ELLIPTICAL_ALPHA_DEG)
+        delta = math.radians(ELLIPTICAL_DELTA_DEG)
+        return math.cos(alpha), math.sin(alpha) * complex(np.exp(1j * delta))
+    raise ValueError("polarization must be 's', 'p', 'rcp', 'lcp', or 'elliptical'")
 
-    lattice = Lattice((1e-6, 0.0), (0.0, 1e-6))  # unused for uniform (unpatterned) layers
-    layers = [
-        Layer("SiO2", SIO2_THICKNESS, material=sio2),
-        Layer("Si", SI_THICKNESS, material=si),
-    ]
-    sim = Simulation(lattice, layers, num_orders=1, incidence=air, transmission=air)
 
-    # Collect results into plain arrays as we go -- this is the pattern to
-    # reuse whenever you need the data beyond just printing it (plotting,
-    # fitting, saving, comparing against a measured spectrum, etc.).
+def _solve_spectrum(sim: Simulation, polarization: str) -> np.ndarray:
+    s_amplitude, p_amplitude = _polarization_amplitudes(polarization)
     reflectance = np.zeros(len(WAVELENGTHS))
-    transmittance = np.zeros(len(WAVELENGTHS))
-
-    print(f"{'wavelength (nm)':>16}  {'R':>8}  {'T':>8}  {'A':>8}")
     for i, wavelength in enumerate(WAVELENGTHS):
         excitation = PlaneWaveExcitation(
             wavelength=wavelength,
             theta=math.radians(INCIDENT_ANGLE_DEG),
             phi=math.radians(AZIMUTHAL_ANGLE_DEG),
-            s_amplitude=S_AMPLITUDE,
-            p_amplitude=P_AMPLITUDE,
+            s_amplitude=s_amplitude,
+            p_amplitude=p_amplitude,
         )
         result = sim.solve(excitation)
         reflectance[i] = result.reflectance()
-        transmittance[i] = result.transmittance()
-        print(f"{wavelength * 1e9:16.1f}  {reflectance[i]:8.4f}  {transmittance[i]:8.4f}  {1 - reflectance[i] - transmittance[i]:8.4f}")
+    return reflectance
+
+
+def build_geometry():
+    """Returns (layers, lattice, incidence, transmission)."""
+    if SUBSTRATE_MATERIAL not in SUBSTRATE_NK_PATHS:
+        raise ValueError(
+            f"SUBSTRATE_MATERIAL must be one of {tuple(SUBSTRATE_NK_PATHS)}, got {SUBSTRATE_MATERIAL!r}"
+        )
+    if FILM_MATERIAL not in FILM_NK_PATHS:
+        raise ValueError(f"FILM_MATERIAL must be one of {tuple(FILM_NK_PATHS)}, got {FILM_MATERIAL!r}")
+
+    substrate_nk_path = SUBSTRATE_NK_PATHS[SUBSTRATE_MATERIAL]
+    substrate = Material.from_nk_file(SUBSTRATE_MATERIAL, str(substrate_nk_path), NK_WAVELENGTH_UNIT)
+    film_nk_path = FILM_NK_PATHS[FILM_MATERIAL]
+    film = Material.from_nk_file(FILM_MATERIAL, str(film_nk_path), NK_WAVELENGTH_UNIT)
+    air = Material("air", 1.0)
+
+    lattice = Lattice((1e-6, 0.0), (0.0, 1e-6))
+    layers = [Layer(FILM_MATERIAL, FILM_THICKNESS_M, material=film)]
+    # The substrate is semi-infinite, not a finite layer in ``layers``.
+    return layers, lattice, air, substrate
+
+
+def main():
+    if POLARIZATION not in ("s", "p", "mixed", "rcp", "lcp", "elliptical"):
+        raise ValueError("POLARIZATION must be 's', 'p', 'mixed', 'rcp', 'lcp', or 'elliptical'")
+
+    layers, lattice, air, substrate = build_geometry()
+    substrate_nk_path = SUBSTRATE_NK_PATHS[SUBSTRATE_MATERIAL]
+    film_nk_path = FILM_NK_PATHS[FILM_MATERIAL]
+    sim = Simulation(lattice, layers, num_orders=1, incidence=air, transmission=substrate)
+
+    if POLARIZATION == "mixed":
+        reflectance = (_solve_spectrum(sim, "s") + _solve_spectrum(sim, "p")) / 2.0
+    else:
+        reflectance = _solve_spectrum(sim, POLARIZATION)
+
+    print(f"Stack: air / {FILM_MATERIAL} ({FILM_THICKNESS_M * 1e9:g} nm) / semi-infinite {SUBSTRATE_MATERIAL}")
+    print(f"Angle: {INCIDENT_ANGLE_DEG:g} deg; polarization: {POLARIZATION}")
+    print(f"{'wavelength (nm)':>16}  {'R':>8}")
+    for wavelength, r in zip(WAVELENGTHS, reflectance):
+        print(f"{wavelength * 1e9:16.1f}  {r:8.4f}")
 
     if OUTPUT_CSV_PATH:
-        output_dir = run_output_dir("sio2_on_si_thin_film")
+        output_dir = run_output_dir(f"{FILM_MATERIAL.lower()}_on_semi_infinite_{SUBSTRATE_MATERIAL.lower()}")
         write_run_metadata(
             output_dir,
             __file__,
-            si_csv_path=SI_CSV_PATH,
-            sio2_csv_path=SIO2_CSV_PATH,
-            sio2_thickness_m=SIO2_THICKNESS,
-            si_thickness_m=SI_THICKNESS,
+            stack=f"air / {FILM_MATERIAL} / semi-infinite {SUBSTRATE_MATERIAL}",
+            substrate_material=SUBSTRATE_MATERIAL,
+            substrate_is_semi_infinite=True,
+            substrate_nk_path=str(substrate_nk_path),
+            film_material=FILM_MATERIAL,
+            film_nk_path=str(film_nk_path),
+            film_thickness_m=FILM_THICKNESS_M,
             incident_angle_deg=INCIDENT_ANGLE_DEG,
             azimuthal_angle_deg=AZIMUTHAL_ANGLE_DEG,
-            s_amplitude=S_AMPLITUDE,
-            p_amplitude=P_AMPLITUDE,
+            polarization=POLARIZATION,
             wavelength_range_m=(WAVELENGTHS[0], WAVELENGTHS[-1], len(WAVELENGTHS)),
         )
-        absorptance = 1.0 - reflectance - transmittance
-        table = np.column_stack([WAVELENGTHS * 1e9, reflectance, transmittance, absorptance])
+        table = np.column_stack([WAVELENGTHS * 1e9, reflectance])
         output_path = output_dir / OUTPUT_CSV_PATH
-        np.savetxt(
-            output_path,
-            table,
-            delimiter=",",
-            header="wavelength_nm,R,T,A",
-            comments="",
-        )
+        np.savetxt(output_path, table, delimiter=",", header="wavelength_nm,R", comments="")
         print(f"\nSaved {len(WAVELENGTHS)} rows to {output_path}")
         print(f"Run metadata: {output_dir / 'run_metadata.txt'}")
-        print("To plot this run: python postprocessing/plot_thin_film_rt.py")
 
-    return reflectance, transmittance
+    return reflectance
 
 
 if __name__ == "__main__":

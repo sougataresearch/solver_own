@@ -53,9 +53,15 @@ AZIMUTHAL_ANGLE_DEG = 0.0
 OUTPUT_CSV_PATH = "sio2_on_si_ellipsometry_raw.csv"  # filename only; saved under outputs/YYYY_MM_DD/
 
 
-def main():
+def build_geometry():
+    """Returns (layers, lattice, incidence, transmission)."""
     lattice = Lattice((1e-6, 0.0), (0.0, 1e-6))  # unused for uniform (unpatterned) layers
-    sim = Simulation(lattice, layers, num_orders=1, incidence=air, transmission=air)
+    return layers, lattice, air, air
+
+
+def main():
+    layers, lattice, incidence, transmission = build_geometry()
+    sim = Simulation(lattice, layers, num_orders=1, incidence=incidence, transmission=transmission)
 
     rows = []
     for wavelength in WAVELENGTHS:

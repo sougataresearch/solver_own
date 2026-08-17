@@ -14,6 +14,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "matplotlib>=3.7", "ruff>=0.16"]
+# Category 16/Phase 10 follow-up (`decisions.md` ADR-030): a separate
+# extra, not folded into `dev`, since pyvista/vtk is a heavy binary
+# dependency (~85MB) the fast test suite/CI never needs -- only
+# `postprocessing/live_structure_viewer.py` imports it, lazily, same
+# pattern `plotting.py` already uses for `matplotlib`.
+gui = ["pyvista>=0.44"]
 
 [project.scripts]
 sougata-solver = "sougata_solver.cli:main"

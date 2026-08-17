@@ -15,6 +15,7 @@ folders and templates.
 Run with:  python structures/thin_film/custom_multistack.py
 """
 
+import cmath
 import math
 from pathlib import Path
 
@@ -26,17 +27,21 @@ from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
 from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
+from sougata_solver.sweep import sweep_polarization
 
+# KLA material files have columns: wavelength [nm], n, k.
 NK_DIR = Path(__file__).resolve().parents[3] / "NK_FILE"
+NK_WAVELENGTH_UNIT = "nm"
 
 
 # ============================================================================
 # EDIT (1): define every material you need, one of three ways
 # ============================================================================
-air = Material("air", 1.0)                                       # constant, lossless
-tio2 = Material("TiO2", 2.4**2)                                   # constant n, lossless (n=2.4)
-sio2 = Material.from_nk("SiO2", n=1.46, k=0.0)                    # constant n and k
-si = Material.from_nk_file("Si", str(NK_DIR / "si_nk.csv"))       # dispersive, from file
+air = Material("air", 1.0)                                                          # constant, lossless
+sio2 = Material.from_nk_file("SiO2", str(NK_DIR / "sio2_KLA.txt"), NK_WAVELENGTH_UNIT)
+sio = Material.from_nk_file("SiO", str(NK_DIR / "sio_KLA.txt"), NK_WAVELENGTH_UNIT)
+ni = Material.from_nk_file("Ni", str(NK_DIR / "ni_KLA.txt"), NK_WAVELENGTH_UNIT)
+si = Material.from_nk_file("Si", str(NK_DIR / "si_KLA.txt"), NK_WAVELENGTH_UNIT)     # dispersive, from file
 
 # ============================================================================
 # EDIT (2): the stack itself -- as many Layer(name, thickness, material=...)
@@ -49,20 +54,61 @@ TRANSMISSION_MATERIAL = si   # semi-infinite substrate below the stack
 #   semi-infinite, add it as a normal Layer(...) in the list below and set
 #   TRANSMISSION_MATERIAL back to whatever is truly underneath it (e.g. air).
 
+# Stack: air / SiO2 (200 nm) / SiO (300 nm) / Ni (10 nm) / SiO2 (500 nm) / semi-infinite Si
 layers = [
-    Layer("TiO2", 60e-9, material=tio2),
-    Layer("SiO2", 90e-9, material=sio2),
-    Layer("TiO2", 60e-9, material=tio2),
-    Layer("SiO2", 90e-9, material=sio2),
+    Layer("SiO2", 200e-9, material=sio2),
+    Layer("SiO", 300e-9, material=sio),
+    Layer("Ni", 10e-9, material=ni),
+    Layer("SiO2", 500e-9, material=sio2),
 ]
 
 # ============================================================================
-# EDIT (3): incident light -- angle (degrees), polarization
+# EDIT (3): incident light -- angle (degrees), polarization.
+#
+# Every polarization state -- TE/TM, any linear angle, RCP/LCP, any ellipse
+# -- is one formula, per CONVENTIONS.md's "Worked polarization examples"
+# table (Category 6 target 6.1): s=cos(alpha), p=sin(alpha)*exp(i*delta).
+# Linear/circular are just special-case (alpha, delta) values of that same
+# formula, not separate physics -- so POLARIZATION_STATES_DEG below is a
+# single flat list of (name, alpha_deg, delta_deg) triples, all run through
+# the one `_jones_state` function. Add/remove/edit rows freely -- as many
+# linear angles (delta=0) or general ellipses as you want, in one place.
 # ============================================================================
-INCIDENT_ANGLE_DEG = 0.0
+INCIDENT_ANGLE_DEG = 45.0
 AZIMUTHAL_ANGLE_DEG = 0.0
-S_AMPLITUDE = 1.0   # s_amplitude/p_amplitude set polarization state:
-P_AMPLITUDE = 0.0   #   (1,0)=s-pol, (0,1)=p-pol, (1,1)=45deg, (1,1j)=circular
+
+POLARIZATION_STATES_DEG = [
+    ("TE", 0.0, 0.0),              # alpha=0 -> pure s; delta irrelevant (sin(0)=0 kills p)
+    ("TM", 90.0, 0.0),             # alpha=90 -> pure p; delta irrelevant (cos(90)=0 kills s)
+    ("RCP", 45.0, 90.0),           # equal split, +90 deg phase -> right-hand circular
+    ("LCP", 45.0, -90.0),          # equal split, -90 deg phase -> left-hand circular
+    ("linear_15deg", 15.0, 0.0),   # delta=0 -> linear, at whatever angle alpha is
+    ("linear_30deg", 30.0, 0.0),
+    ("elliptical_a30_d45", 30.0, 45.0),    # general (alpha, delta) -> a genuine ellipse
+    ("elliptical_a45_d90", 45.0, 90.0),
+    ("elliptical_a60_d135", 60.0, 135.0),
+]
+
+
+def _jones_state(alpha_deg: float, delta_deg: float) -> tuple[complex, complex]:
+    """The one formula behind every polarization state in this file --
+    s=cos(alpha), p=sin(alpha)*exp(i*delta) -- per CONVENTIONS.md's table."""
+    alpha, delta = math.radians(alpha_deg), math.radians(delta_deg)
+    return math.cos(alpha), math.sin(alpha) * cmath.exp(1j * delta)
+
+
+POLARIZATION_STATES = {name: _jones_state(a, d) for name, a, d in POLARIZATION_STATES_DEG}
+
+# Pick exactly one state (a POLARIZATION_STATES key, printed by main() if
+# unsure of the exact generated name) for the main R/T-vs-wavelength run.
+POLARIZATION_STATE = "linear_30deg"
+S_AMPLITUDE, P_AMPLITUDE = POLARIZATION_STATES[POLARIZATION_STATE]
+
+# Optionally compare EVERY generated state side-by-side at one wavelength
+# (set to None to skip). Per CONVENTIONS.md, at exactly INCIDENT_ANGLE_DEG=0
+# every state gives identical R/T (no preferred in-plane direction at normal
+# incidence) -- this comparison is only informative away from theta=0.
+COMPARE_POLARIZATIONS_AT_M = 550e-9
 
 # ============================================================================
 # EDIT (4): wavelength sweep (meters)
@@ -74,16 +120,42 @@ WAVELENGTHS = np.linspace(0.4e-6, 0.8e-6, 401)
 # saving); RUN_NAME tags the output subfolder -- rename it if you copy this
 # file for a new stack, so its outputs don't get labeled "custom_multistack".
 # ============================================================================
-RUN_NAME = "custom_multistack"
+RUN_NAME = "sio2_sio_ni_sio2_on_semi_infinite_si"
 OUTPUT_CSV_PATH = "output_multistack_RT.csv"
 
 
-def main():
+def build_geometry():
+    """Returns (layers, lattice, incidence, transmission)."""
     lattice = Lattice((1e-6, 0.0), (0.0, 1e-6))  # unused -- only matters for patterned layers
+    return layers, lattice, INCIDENCE_MATERIAL, TRANSMISSION_MATERIAL
+
+
+def main():
+    layers, lattice, incidence, transmission = build_geometry()
     sim = Simulation(
         lattice, layers, num_orders=1,
-        incidence=INCIDENCE_MATERIAL, transmission=TRANSMISSION_MATERIAL,
+        incidence=incidence, transmission=transmission,
     )
+
+    print(f"Polarization: {POLARIZATION_STATE}  (s_amplitude={S_AMPLITUDE}, p_amplitude={P_AMPLITUDE})")
+    print(f"Incidence angle: {INCIDENT_ANGLE_DEG:g} deg\n")
+
+    if COMPARE_POLARIZATIONS_AT_M is not None:
+        state_names = list(POLARIZATION_STATES)
+        jones_states = [POLARIZATION_STATES[name] for name in state_names]
+        comparison = sweep_polarization(
+            sim,
+            wavelength=COMPARE_POLARIZATIONS_AT_M,
+            theta=math.radians(INCIDENT_ANGLE_DEG),
+            phi=math.radians(AZIMUTHAL_ANGLE_DEG),
+            jones_states=jones_states,
+        )
+        r_cmp, t_cmp = comparison.reflectance(), comparison.transmittance()
+        print(f"Polarization comparison at {COMPARE_POLARIZATIONS_AT_M * 1e9:.1f} nm:")
+        print(f"{'state':>12}  {'R':>8}  {'T':>8}  {'A':>8}")
+        for name, r_i, t_i in zip(state_names, r_cmp, t_cmp):
+            print(f"{name:>12}  {r_i:8.4f}  {t_i:8.4f}  {1 - r_i - t_i:8.4f}")
+        print()
 
     reflectance = np.zeros(len(WAVELENGTHS))
     transmittance = np.zeros(len(WAVELENGTHS))
@@ -113,8 +185,10 @@ def main():
             transmission_material=TRANSMISSION_MATERIAL.name,
             incident_angle_deg=INCIDENT_ANGLE_DEG,
             azimuthal_angle_deg=AZIMUTHAL_ANGLE_DEG,
+            polarization_state=POLARIZATION_STATE,
             s_amplitude=S_AMPLITUDE,
             p_amplitude=P_AMPLITUDE,
+            polarization_states_deg=POLARIZATION_STATES_DEG,
             wavelength_range_m=(WAVELENGTHS[0], WAVELENGTHS[-1], len(WAVELENGTHS)),
         )
         absorptance = 1.0 - reflectance - transmittance

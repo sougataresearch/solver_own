@@ -50,7 +50,12 @@ WAVELENGTHS = np.linspace(0.5e-6, 1.5e-6, 21)
 OUTPUT_CSV = "output_elliptical_pillar_RT.csv"
 
 
-def main() -> None:
+def build_geometry(period=None, pillar_halfwidth=None, thickness=None):
+    """Returns (layers, lattice, incidence, transmission)."""
+    period = period if period is not None else PERIOD
+    pillar_halfwidth = pillar_halfwidth if pillar_halfwidth is not None else PILLAR_HALFWIDTH
+    thickness = thickness if thickness is not None else THICKNESS
+
     air = Material("air", N_BG**2)
     pillar = Material("pillar", N_PILLAR**2)
 
@@ -58,16 +63,21 @@ def main() -> None:
         background=air,
         shapes=[
             Ellipse(
-                center=(PERIOD / 2, PERIOD / 2),
-                halfwidth=PILLAR_HALFWIDTH,
+                center=(period / 2, period / 2),
+                halfwidth=pillar_halfwidth,
                 material=pillar,
                 angle=math.radians(PILLAR_ANGLE_DEG),
             )
         ],
     )
-    lattice = Lattice(a=(PERIOD, 0.0), b=(0.0, PERIOD))
-    layers = [Layer("pillar_layer", THICKNESS, pattern=pattern)]
-    sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=air)
+    lattice = Lattice(a=(period, 0.0), b=(0.0, period))
+    layers = [Layer("pillar_layer", thickness, pattern=pattern)]
+    return layers, lattice, air, air
+
+
+def main() -> None:
+    layers, lattice, air, transmission = build_geometry()
+    sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=transmission)
 
     reflectance = np.zeros(len(WAVELENGTHS))
     transmittance = np.zeros(len(WAVELENGTHS))

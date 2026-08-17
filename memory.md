@@ -5,7 +5,8 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-07 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 17, targets
+As of 2026-08-12 (Phase 10, Structure Visualization / 3D Preview, shipped),
+2026-08-07 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 17, targets
 17.1-17.6 all resolved), 2026-08-07 (Category 16, targets 16.1-16.7 all
 resolved), 2026-08-07 (Category 15, targets
 15.1-15.8 all resolved), 2026-08-07 (Category 14, targets 14.1-14.8 all
@@ -21,6 +22,210 @@ Category 9, targets 9.1-9.8), 2026-08-04
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **Phase 10 (Structure Visualization / 3D Preview) is complete.**
+  Requested directly by the project owner ("a GUI like Lumerical where I
+  can see what I build"), scoped via `AskUserQuestion` to a static 3D
+  solid preview first (live/interactive editing explicitly deferred as a
+  separate future ask). New `plotting.plot_structure_3d(layer_stack,
+  lattice, ...)` renders a full `Layer` stack -- including a
+  `staircase.py`-generated tapered via/pillar/trench -- as stacked
+  non-cubic `Axes3D.voxels` slabs at each layer's real z-offset, reusing
+  a `_rasterize_pattern` helper factored out of Category 16's
+  `plot_unit_cell` (same "later shape wins" precedence, no new per-`Shape`
+  geometry code, no new physics/geometry citation burden). No new
+  dependency -- `mpl_toolkits.mplot3d` ships inside the already-optional
+  `matplotlib` dependency. `postprocessing/plot_structure_3d_preview.py`
+  is the runnable demo/entry point, per ADR-009/010's `structures/`-builds
+  vs. `postprocessing/`-shows split. **Two honest findings this session**:
+  (a) `Lattice1D.b == (0, 0)` means `plot_unit_cell`'s own bounding-box
+  logic already silently collapses to zero height for a 1D lattice -- a
+  pre-existing latent gap in already-shipped code, not introduced here,
+  fixed in the new function via an explicit `extrusion_length` parameter
+  (left as-is in `plot_unit_cell` itself, out of this phase's scope); (b)
+  a measured (not assumed) performance characterization --
+  `Axes3D.voxels` scales worse than linearly in
+  `resolution**2 * len(layer_stack)` (its hidden-face computation checks
+  every voxel's neighbors): `resolution=20`/8 staircase slices renders in
+  ~3s, `resolution=40`/16 slices takes ~2 minutes on the dev machine --
+  documented in the function's own docstring, and the demo script defaults
+  to the faster settings. **Known, honestly-documented limitation**: this
+  is an opaque solid render, so a via's tapered shaft is occluded by the
+  surrounding substrate from a side view (only the top-face opening is
+  visible) -- confirmed by rendering and visually inspecting the demo
+  script's actual output, not glossed over; a cutaway/transparency view
+  would fix this but is out of scope for this static-preview target.
+  `decisions.md` ADR-029, `phases.md` Phase 10. 6 new fast tests in
+  `tests/test_plotting.py` (return-shape, z-extent, material-legend count,
+  staircase voxel count, `Lattice1D` non-collapse regression, empty-stack
+  error path) -- all pass, plus the full pre-existing
+  `tests/test_plotting.py` suite (25 total) re-run and confirmed green,
+  including the unchanged `test_plotting_module_never_imports_simulation`
+  contract test. **Correction, same day, caught by the project owner
+  reviewing an actual render, not by a test**: two real bugs in the
+  first shipped version -- (1) the demo script never wrapped its
+  patterned layers in the actual `LayerStack(layers, incidence=...,
+  transmission=...)` each real `structures/*.py` script builds, so no
+  substrate/incidence half-space rendered at all (fixed; also confirmed
+  by reading each real script, not assumed, that `tapered_via.py` and
+  `trench_ocd_sweep.py` both genuinely use `incidence=air,
+  transmission=air` -- free-standing, no substrate -- while only
+  `tapered_trench.py` has `transmission=substrate`); (2) the `math.inf`
+  end-cap formula used `max()` over individual staircase-slice
+  thicknesses (each only `total/num_slices`), rendering a substrate
+  thinner than the trench it should contain -- fixed to
+  `1.5 * sum(finite_thicknesses)`, deliberately not reusing
+  `plot_layer_stack`'s own `0.5 * max(...)` convention. One new
+  regression test pins the fixed behavior. `decisions.md` ADR-029's
+  "Correction" addendum has the full account. 698 tests pass
+  project-wide (27 in `tests/test_plotting.py`), `ruff check .` clean,
+  both fixes re-verified by re-rendering all three demo structures and
+  visually inspecting the output, not just re-running tests.
+  **Second correction, same day, again caught by the project owner
+  reviewing an actual render**: fixing the above traded one bug for
+  another -- a single shared end-cap height made the incidence (air)
+  half-space look as visually dominant as the substrate, backwards from
+  a real device cross-section (substrate = bulk, incidence medium above
+  = just context). Fixed to asymmetric end-caps keyed by **position** in
+  the layer list (`LayerStack`'s own `[incidence, ...finite...,
+  transmission]` ordering): first layer renders at
+  `0.3 * sum(finite_thicknesses)` (thin), last layer at
+  `2.5 * sum(finite_thicknesses)` (dominant). Regression test updated to
+  pin both halves of the asymmetry. Re-verified by re-rendering again --
+  `tapered_trench.py` now shows a thin air cap above a dominant Si
+  substrate block with the trench notch near the top, matching the
+  project owner's stated expectation exactly. `decisions.md` ADR-029's
+  second "Correction" addendum has the full account.
+  **Third correction, same day, again caught by the project owner
+  reviewing an actual render**: two rounds of tuning a fabricated
+  end-cap thickness was the wrong axis to iterate on -- the project
+  owner pointed back to the very first (pre-`LayerStack`) render of
+  `tapered_via.py` (finite patterned layer alone, no end-caps) as the
+  correct reference style. **Reverted** end-cap rendering entirely --
+  `math.inf`-thickness layers are now filtered out before rendering and
+  never drawn; a via/trench's own finite patterned layer(s) already read
+  correctly on their own (background material fills the whole
+  cross-section except the via/trench footprint, already "air etched
+  into a solid substrate"). `layer_stack` with no finite layer now
+  raises a more specific `ValueError`. Tests updated (one replaced, one
+  added). Re-verified by re-rendering all three demo structures and
+  visually comparing directly against the project owner's own referenced
+  screenshot -- `tapered_via.py`'s render is now visually identical to
+  it. `decisions.md` ADR-029's third "Correction" addendum has the full
+  account, including why the docstring was rewritten rather than
+  layering a fourth explanation on top of three. 27 tests in
+  `tests/test_plotting.py`, 699 tests pass project-wide, `ruff check .`
+  clean.
+  **Fourth correction, same day, again caught by the project owner
+  comparing two renders side by side**: `pillar_array.py` (Si pillar in
+  air) and `via_array.py` (air via in Si) -- physical opposites --
+  rendered with visually identical-looking colors. Root cause: colors
+  were assigned by *encounter order* (background material first, then
+  shape material), so "air" landed on the same color slot both times
+  purely by coincidence of *where* it appeared in each pattern, not
+  *what* it was. Fixed by sorting material names case-insensitively
+  before assigning colors, so the same material name always gets the
+  same color across every call -- air is now always the same color
+  whether it's the background or the shape. New regression test pins
+  this directly (builds a pillar pattern and a via pattern, asserts both
+  legends assign "air"/"si" the identical color). Re-verified with a
+  genuine side-by-side comparison figure (two `plot_structure_3d` calls
+  composed via its existing `ax=` parameter) -- air is now consistently
+  blue and Si consistently orange in both panels. `decisions.md`
+  ADR-029's fourth "Correction" addendum has the full account. 28 tests
+  in `tests/test_plotting.py`, 700 tests pass project-wide, `ruff
+  check .` clean.
+  **Fifth correction, same day, caught by the project owner questioning
+  whether the preview's numbers actually matched the real code -- found
+  correct**: `postprocessing/plot_structure_3d_preview.py`'s `_build_*`
+  functions hand-copied each real `structures/*.py` script's constants,
+  and one had already gone stale -- `_build_tapered_via` used
+  `tcd=0.36e-6/bcd=0.26e-6/spacing=0.34e-6` while
+  `structures/via/tapered_via.py`'s real values are
+  `TCD=0.48e-6/BCD=0.20e-6/SPACING=0.22e-6`, and had also silently
+  swapped the shape/background material roles (rendering an etched hole
+  instead of the real script's raised solid Si post). **Fixed
+  structurally, not just numerically**: every `_build_*` function now
+  dynamically loads the real `structures/*.py` file via
+  `importlib.util.spec_from_file_location` and reads its actual current
+  constants directly (new `_load_structure_module` helper) -- this bug
+  class (a hand-copied number silently drifting from its source) is now
+  structurally impossible to reintroduce. No change to
+  `src/sougata_solver/plotting.py` itself; all 700 project-wide tests
+  re-run and confirmed still green, `ruff check .` clean. `decisions.md`
+  ADR-029's fifth "Correction" addendum has the full account.
+- **`build_geometry()` generic-loading convention + live PyVista GUI,
+  requested directly by the project owner, are complete.** Two asks,
+  confirmed via `AskUserQuestion`: (1) a generic loader that works on
+  *any* `structures/*.py` file, not one hand-written builder per
+  structure; (2) a live GUI where changing a dimension updates the 3D
+  structure in real time, using a new dependency (PyVista, explicitly
+  approved) for smooth interactivity instead of matplotlib's slow
+  `voxels()`. **Part 1**: every one of the 18
+  `structures/{thin_film,trench,via}/*.py` scripts now exposes
+  `build_geometry(**overrides) -> (layers, lattice, incidence,
+  transmission)` -- a pure extraction (`main()` calls it for the geometry-
+  building portion it already had, no behavior change), with each
+  script's geometrically-tunable EDIT constants as optional keyword
+  overrides. 3 files rebuilding geometry inside a `SLICE_COUNTS`
+  convergence loop (`tapered_trench.py`/`tapered_pillar.py`/`tapered_via.py`)
+  default `num_slices` to `SLICE_COUNTS[-1]`; 2 files sweeping
+  `sweep_wavelength` per `BOTTOM_CDS` entry (`trench_ocd_sweep.py`/
+  `tsv_ocd_sweep.py`) default `bottom_cd` to `BOTTOM_CDS[0]`.
+  `postprocessing/plot_structure_3d_preview.py` rewritten: every
+  hand-written `_build_*` function and the `_BUILDERS` dict deleted,
+  replaced with one generic `module.build_geometry(**OVERRIDES)` call --
+  `STRUCTURE` is now any relative path under `structures/`. **Part 2**:
+  new `postprocessing/live_structure_viewer.py` -- `pyvista` verified
+  installable and functional in `.venv` before building on it (per the
+  session's own explicit gate), sliders auto-discovered from each
+  script's `build_geometry()` signature via `inspect.signature`
+  (default/range read from the real module constant, e.g. `period` ->
+  `module.PERIOD` -- never hand-copied), reuses `plotting.rasterize_pattern`
+  (promoted from `_rasterize_pattern`, one-line rename) and the same
+  skip-infinite-layers/sort-colors-by-name conventions
+  `plot_structure_3d` already established, so live-GUI and static-preview
+  colors match. **Verification, explicitly scoped honestly**: every
+  `structures/*.py` script re-run end-to-end (17/18 -- `tio2_sio2_dbr_on_si.py`
+  fails on a pre-existing, unrelated missing vendored NK data file,
+  confirmed by running the original unmodified script directly, not a
+  regression from this session's changes); `build_meshes()` and the full
+  slider-rebuild pipeline exercised programmatically in PyVista's
+  offscreen mode (three simulated slider changes, actor counts and
+  screenshots confirmed correct); the live GUI's actual interactive-
+  dragging experience has **not** been visually confirmed by a human in
+  this sandbox (no display available) -- stated as an open item, not
+  claimed as done. `decisions.md` ADR-030 (the `build_geometry()`
+  convention) and ADR-031 (the PyVista dependency + live-GUI design)
+  record the full account. 700 tests pass project-wide (unchanged --
+  this work touches `structures/`/`postprocessing/` scripts and one
+  rename in `plotting.py`, no solver-module behavior change), `ruff
+  check .` clean.
+- **`PyRCWA` vendored as a second, structurally-different Phase 3 (1D
+  grating) oracle, requested directly by the project owner (a specific
+  GitHub URL), is complete.** Assessed honestly first: small (v0.0.1, 6
+  stars, no test suite, uses pre-2.0-NumPy APIs `np.NAN`/`np.mat` that no
+  longer exist -- cannot even be imported here without a numpy-global
+  monkeypatch) -- but the actual RCWA math, read directly, is a real
+  general 2D P/Q eigenoperator implementation (same architecture family
+  as this project's own solver), used on the code's own merits despite
+  the low community-adoption signal. `tests/oracles/rcwa_1d_pyrcwa.py`
+  hand-transcribes its normal-incidence TE path (scoped there because
+  `PyRCWA`'s `(alpha,theta)` angle convention wasn't confidently mapped
+  onto this project's `(theta,phi)` -- not asserted without verification).
+  **Two real findings, both caught by testing before trusting, not
+  assumed**: (1) a live run of the actual repo (via a one-off numpy
+  monkeypatch, never in the permanent oracle) at increasing
+  `fft_resolution` converged toward `sougata_solver`'s own R value
+  (0.912281 -> 0.912194 -> 0.912151 -> ~0.912109), confirming the
+  formulations genuinely agree before any transcription was trusted; (2)
+  the transcription's first draft had a real bug (per-order `Kz` matrix
+  used where the source reads a single incident-wave scalar `kz` instead
+  -- `self.Kz` is computed but never actually read in
+  `compute_diffraction_efficiency`), caught immediately as a loud `nan`,
+  fixed by re-reading the source line-by-line. After the fix, matches
+  `sougata_solver` to ~1e-10. `decisions.md` ADR-032 has the full account,
+  `references.md` updated. 701 tests pass project-wide (1 new), `ruff
+  check .` clean.
 - **Category 17 (Testing and quality), targets 17.1-17.6, are all
   complete.** 17.1: audited all 54 pre-existing test files' naming/
   docstring conventions (documented in `testing.md`'s new "Test

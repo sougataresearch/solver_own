@@ -469,6 +469,74 @@ plan-mode scratch file) as phases complete.
 - **Dependencies**: Phases 2-8 (explicitly deferred until correctness is
   solid — see `decisions.md`).
 
+## Phase 10 — Structure Visualization (3D Preview) — **DONE**
+
+- **Objectives**: let a user visually inspect the actual geometry a
+  `structures/*.py` script builds (via/pillar/trench, including tapered/
+  staircased ones) as a 3D solid, before or instead of running a solve —
+  a lightweight analogue of a commercial RCWA/FDTD tool's structure
+  viewer. Requested directly by the project owner, scoped down (via
+  `AskUserQuestion`) to a **static** 3D solid preview, Python desktop
+  window, no new dependency; live/interactive parameter editing is an
+  explicit, separate, not-yet-scoped follow-up — a future session should
+  not assume this phase covers it.
+- **Deliverables**: `plotting.plot_structure_3d(layer_stack, lattice, ...)`
+  (new, `src/sougata_solver/plotting.py`), reusing a `_rasterize_pattern`
+  helper factored out of Category 16's `plot_unit_cell` for in-plane
+  cross-sections, rendered as stacked non-cubic `Axes3D.voxels` slabs at
+  each layer's real z-offset; `postprocessing/plot_structure_3d_preview.py`
+  demo/entry-point script; `tests/test_plotting.py` structural tests
+  (return shape, z-extent, material-legend count, staircase voxel count,
+  `Lattice1D` non-collapse regression, empty-stack error path).
+- **Estimated complexity**: Low-Medium — no new physics/geometry formula
+  (reuses already-validated rasterization and layer/staircase data
+  structures unchanged), the real work was the 3D voxel-rendering
+  mechanics and a measured performance characterization.
+- **Dependencies**: Category 16 (Visualization, `plot_unit_cell`) for the
+  rasterization logic it reuses; Phase 5 (staircase taper generation) for
+  the tapered-structure rendering case.
+- **Status**: shipped. `decisions.md` ADR-029 records the full design
+  rationale, including two honest findings from this session: (a)
+  `Lattice1D.b == (0, 0)` means `plot_unit_cell`'s own bounding-box logic
+  already silently collapses to zero height for a 1D lattice — a
+  pre-existing latent gap in shipped code, not introduced here, fixed in
+  the new function via an explicit `extrusion_length` parameter (left
+  unfixed in `plot_unit_cell` itself, out of this phase's scope); (b) a
+  measured (not assumed) performance characterization —
+  `Axes3D.voxels` scales worse than linearly in
+  `resolution**2 * len(layer_stack)`, `resolution=20`/8 slices ~3s vs.
+  `resolution=40`/16 slices ~2 minutes on the dev machine — documented in
+  the function's own docstring and reflected in the demo script's chosen
+  defaults. **Known, honestly-documented limitation**: this is an opaque
+  solid render, so a via's tapered shaft is occluded by the surrounding
+  substrate from a side view (only the top-face opening is visible) —
+  confirmed by rendering and visually inspecting the demo script's output,
+  not glossed over; a cutaway/transparency view would fix this but is out
+  of scope for this static-preview target.
+- **Follow-up, same day, shipped**: the project owner's own review of
+  actual renders (not test failures) drove three more corrections to the
+  static preview's rendering conventions before it was visually correct
+  (fabricated `math.inf`-layer end-caps were tried, tuned, and ultimately
+  **reverted** entirely — no size for a semi-infinite half-space reads
+  correctly next to a finite patterned stack; material colors are now
+  keyed by name, not encounter-order position, so the same material
+  always renders the same color across every structure) — full account in
+  `decisions.md` ADR-029's four "Correction" addenda. **Then, requested
+  directly**: (1) a **generic** loader (`decisions.md` ADR-030) — every
+  `structures/*.py` script now exposes `build_geometry(**overrides)`, so
+  `postprocessing/plot_structure_3d_preview.py` works on *any* structure
+  file, no per-structure Python needed, eliminating the drift-prone
+  hand-copied-builder pattern ADR-029's fifth correction had caught, by
+  construction rather than by discipline; (2) a **live** PyVista GUI
+  (`decisions.md` ADR-031, new `postprocessing/live_structure_viewer.py`,
+  new `gui` optional dependency) — sliders auto-generated from each
+  script's own `build_geometry()` signature, real-time rebuild on change.
+  Explicitly noted limitation: the live GUI's actual interactive-dragging
+  experience has not been visually confirmed by a human in this sandbox
+  (no display available) — only its data-prep/rebuild pipeline was
+  verified programmatically in PyVista's offscreen mode; the project
+  owner needs to run it themselves to confirm the live experience.
+
 ## Phase Sequencing Summary
 
 ```
@@ -479,6 +547,8 @@ Phase 1 (done) ──► Phase 2 ──► Phase 3 ──► Phase 4a ──► 
                                    │            └────► Phase 5 (needs Phase 4a only)
                                    │
                        Phase 3/4a ──────────► Phase 7 ──► Phase 8 ──► Phase 9 (optional)
+
+Phase 5 (staircase) ─────────────────────────────────────► Phase 10
 ```
 
 Phase 4b is a dependency of nothing else — it hardens Phase 4a's solver
@@ -487,3 +557,8 @@ capability, so Phases 5-8 only need Phase 4a to proceed. It should still
 land before Phase 8's systematic convergence studies are trusted at high
 `num_orders`/high-contrast settings, since that's exactly the regime Phase
 4b is meant to have already stress-tested.
+
+Phase 10 depends only on Category 16 (Visualization, for
+`plot_unit_cell`'s rasterization it reuses) and Phase 5 (for the
+tapered-structure rendering case) — it's a visualization-only addition
+with no dependency on, or effect on, the solver phases above.

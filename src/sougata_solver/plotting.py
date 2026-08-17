@@ -31,9 +31,32 @@ dependency onto every user of the library -- the same lazy-import pattern
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from sougata_solver.geometry import Pattern
+
+
+def rasterize_pattern(pattern: Pattern, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
+    """Rasterize `pattern` on the `xs x ys` sample grid, one integer per
+    sample point: `0` = background, `i+1` = `pattern.shapes[i]`.
+
+    Extracted from `plot_unit_cell` (Category 16 target 16.2, the original
+    caller) so `plot_structure_3d` can reuse the identical "iterate shapes
+    in reverse, first `.contains(x, y)` match wins" logic that already
+    implements `Pattern`'s documented "later shapes take precedence" rule
+    (`geometry.Pattern`'s docstring) -- one rasterization implementation,
+    not two that could silently drift apart.
+    """
+    grid = np.zeros((len(ys), len(xs)), dtype=int)  # 0 = background
+    for iy, y in enumerate(ys):
+        for ix, x in enumerate(xs):
+            for shape_index in range(len(pattern.shapes) - 1, -1, -1):
+                if pattern.shapes[shape_index].contains(x, y):
+                    grid[iy, ix] = shape_index + 1
+                    break
+    return grid
 
 
 def plot_unit_cell(pattern: Pattern, lattice, *, resolution: int = 200, ax=None):
@@ -60,13 +83,7 @@ def plot_unit_cell(pattern: Pattern, lattice, *, resolution: int = 200, ax=None)
     y_min, y_max = corners[:, 1].min(), corners[:, 1].max()
     xs = np.linspace(x_min, x_max, resolution)
     ys = np.linspace(y_min, y_max, resolution)
-    grid = np.zeros((resolution, resolution), dtype=int)  # 0 = background
-    for iy, y in enumerate(ys):
-        for ix, x in enumerate(xs):
-            for shape_index in range(len(pattern.shapes) - 1, -1, -1):
-                if pattern.shapes[shape_index].contains(x, y):
-                    grid[iy, ix] = shape_index + 1
-                    break
+    grid = rasterize_pattern(pattern, xs, ys)
 
     n_shapes = len(pattern.shapes)
     colors = ["#dddddd"] + [plt.cm.tab10(i % 10) for i in range(n_shapes)]
@@ -123,6 +140,159 @@ def plot_layer_stack(thicknesses, labels, *, ax=None):
     ax.set_xticks([])
     ax.set_ylabel("depth (same units as thickness input)")
     ax.set_title("Layer stack")
+    return fig, ax
+
+
+def plot_structure_3d(layer_stack, lattice, *, resolution: int = 40, extrusion_length: float | None = None, ax=None):
+    """New target (`decisions.md` ADR-029): render a full `Layer` stack as
+    a 3D solid, one voxel slab per layer stacked at its real cumulative
+    z-offset -- a static structure preview, the 3D analogue of
+    `plot_unit_cell` (per-layer cross-section) x `plot_layer_stack`
+    (z-ordering), so a via/pillar/trench (including a tapered one built as
+    a `staircase.py` `list[Layer]`) can be visually inspected before or
+    instead of running a solve.
+
+    **Not a physics formula** -- this function computes no new solver
+    quantity, only a visualization of geometry the solver already
+    consumes unmodified (same class of exemption `plot_unit_cell`/
+    `plot_layer_stack` already rely on, per `rules.md` Documentation
+    Standards). It is independently derived (not transcribed from any
+    vendored oracle), and validated by structural tests in
+    `tests/test_plotting.py` (voxel z-extent/slice-count/material-count
+    checks), not pixel comparison -- this project has no golden-image
+    infrastructure (see `tests/test_plotting.py`'s own module docstring).
+
+    Reuses `rasterize_pattern` (this module, factored out of
+    `plot_unit_cell`) for each layer's in-plane cross-section, so a
+    patterned layer's rendering uses the exact same "later shape wins"
+    precedence rasterization already validated for `plot_unit_cell` --
+    no new per-`Shape` geometry code. A `Slab` (1D `Lattice1D` shape,
+    infinite in y) is handled automatically by its own `.contains()`
+    semantics for whatever y-range is rasterized here, no special case
+    needed.
+
+    Takes `layer_stack` (a `layer.LayerStack` or a plain `list[Layer]`,
+    e.g. `staircase.staircase_circle_layers(...)`'s direct return value)
+    and `lattice` (`geometry.Lattice`/`Lattice1D`) directly -- never a
+    bare `Simulation`, and this function never calls `.solve()`, per
+    target 16.1's data contract (`plot_unit_cell`'s docstring) that every
+    function in this module already follows.
+
+    `math.inf`-thickness incidence/transmission half-spaces are **not
+    rendered at all** -- reverted here after two rounds of a fabricated
+    end-cap thickness reading as visually wrong (first a shared
+    `max()`-based height rendered a staircased substrate *thinner* than
+    the trench it should contain; fixing that to a shared `sum()`-based
+    height next made the incidence half-space look as visually dominant
+    as the substrate). There is no size for a genuinely semi-infinite
+    half-space that reads correctly next to a finite patterned stack, so
+    per the project owner's explicit direction this function only ever
+    renders the **finite** layers -- the patterned/staircased region
+    itself, which for a via/trench already reads correctly on its own
+    (background material fills the full cross-section except the
+    via/trench footprint, exactly "air etched into a solid substrate"),
+    with no separate substrate block competing for visual attention. A
+    `layer_stack` with no finite layer raises `ValueError`.
+
+    `lattice.b == (0, 0)` for a `Lattice1D` grating (`geometry.Lattice1D`)
+    means there is no natural y-extent to rasterize -- `plot_unit_cell`
+    has this same latent gap (its bounding box collapses to zero height
+    for a 1D lattice), not something new to this function.
+    `extrusion_length` (default: `lattice.a`'s magnitude, i.e. one period)
+    makes the y-depth an explicit, documented visualization choice for
+    the 1D case rather than an implicit zero-height result.
+
+    **Measured performance note** (not assumed, per `rules.md`
+    Performance Requirements): matplotlib's `Axes3D.voxels` is slow and
+    scales worse than linearly in `resolution**2 * len(layer_stack)` (its
+    hidden-face computation checks every voxel's neighbors) --
+    `resolution=20` with an 8-slice staircase renders in ~3s,
+    `resolution=40` with a 16-slice staircase takes ~2 minutes on this
+    project's dev machine. Keep `resolution` in the 15-25 range for a
+    many-slice staircase preview; raise it only for a final, one-off look.
+    """
+    import matplotlib.pyplot as plt
+
+    layers = list(layer_stack)
+    if not layers:
+        raise ValueError("layer_stack must contain at least one layer")
+    layers = [ly for ly in layers if math.isfinite(ly.thickness)]
+    if not layers:
+        raise ValueError("layer_stack must contain at least one finite-thickness layer to render")
+
+    a = np.asarray(lattice.a, dtype=float)
+    b = np.asarray(lattice.b, dtype=float)
+    is_1d = not np.any(b)
+    if is_1d:
+        length = extrusion_length if extrusion_length is not None else float(np.linalg.norm(a))
+        x_min, x_max = -0.5 * float(np.linalg.norm(a)), 0.5 * float(np.linalg.norm(a))
+        y_min, y_max = -0.5 * length, 0.5 * length
+    else:
+        corners = np.array([[0, 0], a, a + b, b, [0, 0]])
+        x_min, x_max = corners[:, 0].min(), corners[:, 0].max()
+        y_min, y_max = corners[:, 1].min(), corners[:, 1].max()
+    x_edges = np.linspace(x_min, x_max, resolution + 1)
+    y_edges = np.linspace(y_min, y_max, resolution + 1)
+    xs = 0.5 * (x_edges[:-1] + x_edges[1:])
+    ys = 0.5 * (y_edges[:-1] + y_edges[1:])
+
+    material_names: list[str] = []
+    for ly in layers:
+        names = [ly.material.name] if ly.is_uniform() else [ly.pattern.background.name] + [
+            shape.material.name for shape in ly.pattern.shapes
+        ]
+        for name in names:
+            if name not in material_names:
+                material_names.append(name)
+    # Color by material *name*, sorted case-insensitively -- not by
+    # encounter order (found and fixed this session, third finding):
+    # encounter order made "air" land on whichever color slot its
+    # background/shape position happened to be in, so e.g. a Si pillar-
+    # in-air and an air-via-in-Si rendered with identical-looking colors
+    # (air landed on the same slot both times purely by coincidence of
+    # which one was `Pattern.background` first), even though physically
+    # one structure is mostly air and the other mostly solid. Sorting by
+    # name means the same material always gets the same color across
+    # every call, so which material is majority/minority is visible from
+    # color alone, not just position.
+    color_map = {name: plt.cm.tab10(i % 10) for i, name in enumerate(sorted(material_names, key=str.lower))}
+
+    if ax is None:
+        fig = plt.figure(figsize=(7, 7))
+        ax = fig.add_subplot(projection="3d")
+    else:
+        fig = ax.figure
+
+    filled = np.ones((resolution, resolution, 1), dtype=bool)
+    z = 0.0
+    for ly in layers:
+        height = ly.thickness
+        if ly.is_uniform():
+            grid = np.zeros((resolution, resolution), dtype=int)
+            names_by_index = {0: ly.material.name}
+        else:
+            grid = rasterize_pattern(ly.pattern, xs, ys)
+            names_by_index = {0: ly.pattern.background.name}
+            names_by_index.update({i + 1: shape.material.name for i, shape in enumerate(ly.pattern.shapes)})
+        facecolors = np.empty((resolution, resolution, 1, 4))
+        for iy in range(resolution):
+            for ix in range(resolution):
+                facecolors[iy, ix, 0] = color_map[names_by_index[grid[iy, ix]]]
+        z_edges = np.array([z, z + height])
+        xg, yg, zg = np.meshgrid(x_edges, y_edges, z_edges, indexing="ij")
+        ax.voxels(xg, yg, zg, filled, facecolors=facecolors.swapaxes(0, 1), edgecolor=None)
+        z += height
+
+    handles = [plt.Line2D([0], [0], marker="s", linestyle="", color=color_map[name]) for name in material_names]
+    ax.legend(handles, material_names, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z (depth)")
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_zlim(0.0, z)
+    ax.invert_zaxis()
+    ax.set_title("Structure preview")
     return fig, ax
 
 

@@ -19,8 +19,10 @@ import numpy as np
 import pytest
 
 from sougata_solver import plotting
-from sougata_solver.geometry import Circle, Lattice, Pattern, Rectangle
+from sougata_solver.geometry import Circle, Lattice, Lattice1D, Pattern, Rectangle, Slab
+from sougata_solver.layer import Layer, LayerStack
 from sougata_solver.materials import Material
+from sougata_solver.staircase import staircase_circle_layers
 
 AIR = Material("air", 1.0)
 SI = Material("si", 3.48**2)
@@ -91,6 +93,125 @@ def test_plot_layer_stack_handles_semi_infinite_layers():
     fig, ax = plotting.plot_layer_stack([np.inf, 1.0, np.inf], ["air", "SiO2", "Si"])
     assert ax.get_ylim()[0] > 0  # inverted axis, top (0) < bottom
     assert len(ax.patches) == 3
+
+
+# ---------------------------------------------------------------------------
+# New target (`decisions.md` ADR-029): 3D structure preview
+# ---------------------------------------------------------------------------
+
+
+def test_plot_structure_3d_returns_fig_and_ax():
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    pattern = Pattern(background=AIR, shapes=[Circle(center=(0.5, 0.5), radius=0.2, material=SI)])
+    layers = [Layer("pillar", 0.5, pattern=pattern)]
+    fig, ax = plotting.plot_structure_3d(layers, lattice, resolution=8)
+    assert fig is ax.figure
+
+
+def test_plot_structure_3d_empty_stack_raises():
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    with pytest.raises(ValueError, match="at least one layer"):
+        plotting.plot_structure_3d([], lattice, resolution=8)
+
+
+def test_plot_structure_3d_z_extent_matches_finite_thicknesses():
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    layers = [Layer("l1", 0.3, material=AIR), Layer("l2", 0.7, material=SI)]
+    _, ax = plotting.plot_structure_3d(layers, lattice, resolution=6)
+    zlim = ax.get_zlim()
+    assert min(zlim) == pytest.approx(0.0, abs=1e-9)
+    assert max(zlim) == pytest.approx(1.0, abs=1e-9)  # 0.3 + 0.7
+
+
+def test_plot_structure_3d_semi_infinite_layers_are_not_rendered():
+    """Regression for two rounds of a fabricated end-cap thickness reading
+    as visually wrong to the project owner (first too thin, then -- after
+    a fix -- too visually dominant relative to the patterned region). Per
+    their explicit direction, `math.inf`-thickness incidence/transmission
+    layers are no longer rendered at all -- this pins that a `LayerStack`'s
+    semi-infinite layers contribute nothing to the rendered z-extent, only
+    the finite (patterned/staircased) layers do."""
+    num_slices = 8
+    total_depth = 1.0
+    layers = staircase_circle_layers(
+        center=(0.5, 0.5), top_radius=0.3, bottom_radius=0.1, thickness=total_depth,
+        num_slices=num_slices, shape_material=SI, background_material=AIR,
+    )
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    layer_stack = LayerStack(layers, incidence=AIR, transmission=SI)
+    _, ax = plotting.plot_structure_3d(layer_stack, lattice, resolution=6)
+    zlim = ax.get_zlim()
+    assert max(zlim) - min(zlim) == pytest.approx(total_depth, abs=1e-9)
+
+
+def test_plot_structure_3d_all_infinite_layer_stack_raises():
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    layer_stack = LayerStack([], incidence=AIR, transmission=SI)
+    with pytest.raises(ValueError, match="finite-thickness layer"):
+        plotting.plot_structure_3d(layer_stack, lattice, resolution=6)
+
+
+def test_plot_structure_3d_material_legend_matches_unique_material_count():
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    pattern = Pattern(background=AIR, shapes=[Circle(center=(0.5, 0.5), radius=0.2, material=SI)])
+    layers = [Layer("l1", 0.3, material=AIR), Layer("l2", 0.5, pattern=pattern)]
+    _, ax = plotting.plot_structure_3d(layers, lattice, resolution=6)
+    legend = ax.get_legend()
+    assert legend is not None
+    assert len(legend.get_texts()) == 2  # "air" and "si", each counted once
+
+
+def test_plot_structure_3d_color_keyed_by_material_name_not_encounter_order():
+    """Regression for a real bug caught by the project owner comparing two
+    renders side by side: coloring materials by *encounter order*
+    (background first, then shape) made "air" land on whichever color
+    slot its background/shape position happened to occupy, so a Si
+    pillar-in-air and an air-via-in-Si structure rendered with
+    identical-looking colors despite being physically opposite (mostly
+    air vs. mostly solid) -- purely because `air` was `Pattern.background`
+    in one case and `Pattern.shapes[0].material` in the other. This pins
+    that `air` gets the *same* color regardless of whether it is the
+    background or the shape."""
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    pillar_pattern = Pattern(background=AIR, shapes=[Circle(center=(0.5, 0.5), radius=0.2, material=SI)])
+    via_pattern = Pattern(background=SI, shapes=[Circle(center=(0.5, 0.5), radius=0.2, material=AIR)])
+
+    _, ax_pillar = plotting.plot_structure_3d([Layer("l", 0.5, pattern=pillar_pattern)], lattice, resolution=6)
+    _, ax_via = plotting.plot_structure_3d([Layer("l", 0.5, pattern=via_pattern)], lattice, resolution=6)
+
+    def _color_by_label(ax):
+        return {t.get_text(): h.get_color() for h, t in zip(ax.get_legend().legend_handles, ax.get_legend().get_texts())}
+
+    assert _color_by_label(ax_pillar)["air"] == _color_by_label(ax_via)["air"]
+    assert _color_by_label(ax_pillar)["si"] == _color_by_label(ax_via)["si"]
+
+
+def test_plot_structure_3d_staircase_slice_count_matches_num_slices():
+    """`ax.voxels` adds one `Poly3DCollection` per individual voxel cell
+    (confirmed directly against the installed matplotlib version, not
+    assumed), so `num_slices` staircase layers at `resolution x resolution`
+    in-plane voxels each produce `num_slices * resolution**2` collections
+    -- still a direct, deterministic function of `num_slices`, so this
+    regresses "did every staircase slice actually get rendered"."""
+    num_slices = 5
+    resolution = 6
+    layers = staircase_circle_layers(
+        center=(0.5, 0.5), top_radius=0.3, bottom_radius=0.1, thickness=1.0,
+        num_slices=num_slices, shape_material=SI, background_material=AIR,
+    )
+    lattice = Lattice((1.0, 0.0), (0.0, 1.0))
+    _, ax = plotting.plot_structure_3d(layers, lattice, resolution=resolution)
+    assert len(ax.collections) == num_slices * resolution**2
+
+
+def test_plot_structure_3d_lattice1d_extrudes_finite_y_extent():
+    lattice = Lattice1D(0.7)
+    pattern = Pattern(background=AIR)
+    pattern.add(Slab(center_x=0.0, halfwidth=0.2, material=SI))
+    layers = [Layer("trench", 0.4, pattern=pattern)]
+    _, ax = plotting.plot_structure_3d(layers, lattice, resolution=6)
+    assert ax.get_xlim()[1] - ax.get_xlim()[0] > 0
+    assert ax.get_ylim()[1] - ax.get_ylim()[0] > 0  # regression: not collapsed to zero height
 
 
 # ---------------------------------------------------------------------------

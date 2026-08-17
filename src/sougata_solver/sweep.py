@@ -269,6 +269,88 @@ def harmonic_study(
     )
 
 
+def rayleigh_wood_wavelengths(
+    period: float, num_orders: int, theta: float = 0.0, n_incidence: float = 1.0, n_check: float = 1.0
+) -> list[float]:
+    """Wavelengths where a diffraction order's out-of-plane wavenumber `q`
+    is exactly zero (the Rayleigh/Wood's-anomaly condition) for a 1D
+    lattice of the given `period`, within the `[-num_orders, num_orders]`
+    truncated order set -- the exact singular points where
+    `smatrix.py::interface_smatrix`'s `kp @ phi / q` divides by zero
+    (`troubleshooting.md`'s documented, pre-existing Rayleigh-threshold
+    limitation).
+
+    Derived directly from this solver's own formulas, not a separately
+    assumed grating equation: `kx0 = n_incidence*omega*sin(theta)`
+    (`excitation.py::k_parallel`), `kx_m = kx0 + 2*pi*m/period`
+    (`simulation.py:498`, for a `Lattice1D` whose reciprocal vector is
+    `1/period`), and `q_sq = eps*omega**2 - kx**2` (`eigenmodes.py:332`,
+    `ky=0` case). Setting `q_sq=0` for a lossless medium of index
+    `n_check` (`eps = n_check**2`) and solving for wavelength gives::
+
+        wavelength = period * (s*n_check - n_incidence*sin(theta)) / m
+
+    for each nonzero integer order `m` in `[-num_orders, num_orders]` and
+    `s` in `{+1, -1}`. `n_check` defaults to air (`1.0`) since that's the
+    lossless medium (incidence half-space, or an air-filled groove) this
+    singularity actually bites in practice -- an absorbing medium's `q_sq`
+    is generically complex and does not hit exactly zero at a real
+    wavelength, so it never needs checking here.
+
+    Confirmed against an actual observed failure (a `PERIOD=2.032e-6`
+    grating's divide-by-zero at exactly `508e-9`, `structures/trench/
+    trench_ocd_sweep.py`): `rayleigh_wood_wavelengths(2.032e-6, 15)`
+    includes `508e-9` (order `m=4`), matching what was found by hand.
+    """
+    if not (period > 0):
+        raise ValueError(f"period must be > 0, got {period!r}")
+    if num_orders < 1:
+        raise ValueError(f"num_orders must be >= 1, got {num_orders!r}")
+
+    sin_theta = math.sin(theta)
+    wavelengths = []
+    for m in list(range(-num_orders, 0)) + list(range(1, num_orders + 1)):
+        for s in (1.0, -1.0):
+            denom = m
+            wl = period * (s * n_check - n_incidence * sin_theta) / denom
+            if wl > 0:
+                wavelengths.append(wl)
+    return sorted(set(wavelengths))
+
+
+def avoid_rayleigh_wood_anomalies(
+    wavelengths: np.ndarray,
+    period: float,
+    num_orders: int,
+    theta: float = 0.0,
+    n_incidence: float = 1.0,
+    n_check: float = 1.0,
+    nudge: float = 0.5e-9,
+) -> np.ndarray:
+    """Return a copy of `wavelengths` with any grid point that lands
+    (to float precision) on a `rayleigh_wood_wavelengths(...)` singularity
+    nudged by `nudge` (meters) -- so a `structures/*.py` script never has
+    to hand-derive/hardcode the singular wavelength for its own
+    `period`/`num_orders`/`theta` the way `troubleshooting.md`'s original
+    entries did. Only the offending point(s) move; every other point in
+    `wavelengths`, including its endpoints, is returned unchanged.
+
+    `nudge` defaults to 0.5nm, confirmed by direct probing (see the
+    conversation this was added in) to already be comfortably clear of the
+    singularity's divide-by-zero (0.1nm away was already clean).
+    """
+    wavelengths = np.array(wavelengths, dtype=float, copy=True)
+    singular = rayleigh_wood_wavelengths(period, num_orders, theta, n_incidence, n_check)
+    if len(wavelengths) < 2:
+        return wavelengths
+    step = np.median(np.abs(np.diff(wavelengths)))
+    tol = max(step * 1e-6, 1e-15)
+    for wl_singular in singular:
+        idx = np.flatnonzero(np.abs(wavelengths - wl_singular) < tol)
+        wavelengths[idx] += nudge
+    return wavelengths
+
+
 def find_convergence_index(values: Sequence[float], tolerance: float) -> int | None:
     """Category 8 target 8.7: a conservative convergence criterion.
 

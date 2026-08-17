@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from oracles.rcwa_1d_gaylord import solve_te, solve_tm
+from oracles.rcwa_1d_pyrcwa import solve_te_normal_incidence
 
 from sougata_solver.eigenmodes import build_kp_matrix, solve_layer_eigenmodes_uniform
 from sougata_solver.excitation import PlaneWaveExcitation
@@ -213,6 +214,38 @@ def test_te_matches_gaylord_oracle(theta_deg):
     )
     assert result.reflectance() == pytest.approx(de_r.sum(), abs=1e-6)
     assert result.transmittance() == pytest.approx(de_t.sum(), abs=1e-6)
+
+
+def test_te_matches_pyrcwa_oracle_at_normal_incidence():
+    """Second, independently-derived oracle (`tests/oracles/rcwa_1d_pyrcwa.py`,
+    transcribed from `REFERENCE/PyRCWA` -- a general 2D P/Q eigenoperator
+    restricted to 1D, a structurally different derivation route from
+    `rcwa_1d_gaylord.py`'s reduced TE-specific operator). Scoped to normal
+    incidence only -- see that oracle module's own docstring for why its
+    angle convention isn't asserted to map onto this project's `(theta,
+    phi)` at oblique incidence. Agrees to ~1e-10 (tight tolerance, unlike
+    the live-PyRCWA-vs-this-project ~2e-4 gap recorded in that oracle's
+    docstring, which is FFT/raster discretization error specific to
+    PyRCWA's own default example resolution, not present in this
+    analytic-Fourier-coefficient transcription)."""
+    air = Material("air", 1.0)
+    si = Material("si", N_RIDGE**2)
+    num_ord = 15
+    sim = _grating_simulation(num_ord, incidence=air, transmission=air, ridge=si)
+    excitation = PlaneWaveExcitation(wavelength=1.0, theta=0.0, phi=0.0, s_amplitude=1.0, p_amplitude=0.0)
+    result = sim.solve(excitation)
+
+    de_r, de_t = solve_te_normal_incidence(
+        wavelength=1.0,
+        n_ridge=N_RIDGE,
+        n_groove=N_GROOVE,
+        fill_factor=FILL_FACTOR,
+        lattice_constant=PERIOD,
+        thickness=THICKNESS,
+        num_ord=num_ord,
+    )
+    assert result.reflectance() == pytest.approx(de_r.sum(), abs=1e-8)
+    assert result.transmittance() == pytest.approx(de_t.sum(), abs=1e-8)
 
 
 @pytest.mark.slow

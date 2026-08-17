@@ -1089,3 +1089,52 @@ whether it was ever actually implemented.
   work started). Updated `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`, `memory.md`,
   `tasks.md`, `design.md`, `decisions.md`, `architecture.md`,
   `references.md`, `README.md`, and this file.
+
+## 2026-08-17 (RCWA postprocessing overlay)
+
+### Discussed
+- The project owner is no longer comparing against the KLA reflectance
+  calculator; comparison oracle data now comes from an external
+  RCWA_module tool, exported as `OUTPUT_RCWA/**/*.txt` files with a
+  `lambda(m), Y` header (comma-delimited, wavelength in **meters**,
+  reflectance column literally named `Y`) rather than KLA's
+  `"Wavelength (nm)"`/`"Reflectance"` (tab-delimited, nm) format.
+- `postprocessing/RCWA_plot_norm.py` (new script, overlays one RCWA
+  export against one solver `output_*_RT.csv`) was raising
+  `ValueError: Could not find wavelength/R columns ... got fields
+  ('lambdam', 'Y')` because its column-detection helper only recognized
+  headers starting with `wavelength`/`r`. Even with detection fixed, the
+  meters-vs-nanometers unit mismatch (RCWA: `8e-07` = 800 nm; solver
+  CSV: `4.000000e+02` = 400 nm) would have plotted the two curves on
+  incompatible x-axis scales.
+- Fix: extended the column matcher to also accept `lambda*`/`y` as
+  wavelength/R aliases, and added an auto meters->nm conversion
+  triggered when the matched wavelength field starts with `lambda` and
+  its max value is under 1e-3 (unambiguously meters, never a real nm
+  spectrum). Applied identically to `postprocessing/RCWA_plot_norm.py`
+  and to `postprocessing/plot_rcwa_reflectance.py` (renamed from
+  `plot_kla_reflectance.py`, its single-file KLA plotting counterpart,
+  which is now retired since KLA is no longer the comparison source).
+- Verified by running both scripts end to end against
+  `OUTPUT_RCWA/Thin_Film/17_08_26/Multi/0_degree.txt`: both parse the
+  file and save a plot without error. The two example runs used for
+  `RCWA_plot_norm.py` (`0_degree.txt` vs.
+  `outputs/2026_08_06/12_50_00_.../output_multistack_RT.csv`) have
+  non-matching wavelength grids, so the script correctly falls back to
+  its documented "visual guide only" path rather than printing a
+  per-point max-diff.
+- No `rules.md`/`testing.md` doc specifies a required RCWA-export schema
+  or wavelength-unit convention for this comparison; the meters-vs-nm
+  handling above is inferred directly from the two files' contents, not
+  cited from a doc.
+
+### Action items
+- [x] Fix `RCWA_plot_norm.py` column detection + unit conversion for
+  RCWA_module's `lambda(m), Y` export format — done 2026-08-17.
+- [x] Retire KLA-specific `plot_kla_reflectance.py`, replace with
+  `plot_rcwa_reflectance.py` (RCWA_module format, same column-detection
+  and meters->nm fix) — done 2026-08-17.
+- [ ] If RCWA_module ever exports a numeric-comparison-ready wavelength
+  grid matching the solver's own sweep points, revisit
+  `RCWA_plot_norm.py`'s "visual guide only" fallback to also print a
+  per-point max-diff for that case.

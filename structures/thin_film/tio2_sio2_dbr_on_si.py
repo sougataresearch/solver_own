@@ -75,14 +75,19 @@ RUN_NAME = "tio2_sio2_dbr_on_si"
 OUTPUT_CSV_PATH = "output_dbr_RT.csv"
 
 
-def main():
+def build_geometry():
+    """Returns (layers, lattice, incidence, transmission)."""
     if SI_SUBSTRATE_THICKNESS is None:
         raise ValueError("Set SI_SUBSTRATE_THICKNESS (meters) before running -- see EDIT (2).")
-
     lattice = Lattice((1e-6, 0.0), (0.0, 1e-6))  # unused -- only matters for patterned layers
+    return layers, lattice, INCIDENCE_MATERIAL, TRANSMISSION_MATERIAL
+
+
+def main():
+    layers, lattice, incidence, transmission = build_geometry()
     sim = Simulation(
         lattice, layers, num_orders=1,
-        incidence=INCIDENCE_MATERIAL, transmission=TRANSMISSION_MATERIAL,
+        incidence=incidence, transmission=transmission,
     )
 
     reflectance = np.zeros(len(WAVELENGTHS))

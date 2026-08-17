@@ -56,13 +56,24 @@ DEPTH_FRACTION = 0.5  # 0.0 = top of pillar layer, 1.0 = bottom
 OUTPUT_NPZ_PATH = "output_pillar_field_xy.npz"
 
 
-def main():
+def build_geometry(period=None, pillar_radius=None, thickness=None):
+    """Returns (layers, lattice, incidence, transmission)."""
+    period = period if period is not None else PERIOD
+    pillar_radius = pillar_radius if pillar_radius is not None else PILLAR_RADIUS
+    thickness = thickness if thickness is not None else THICKNESS
+
     air = Material("air", N_BG**2)
     pillar = Material("pillar", N_PILLAR**2)
-    pattern = Pattern(background=air, shapes=[Circle(center=(PERIOD / 2, PERIOD / 2), radius=PILLAR_RADIUS, material=pillar)])
-    lattice = Lattice((PERIOD, 0.0), (0.0, PERIOD))
-    layer = Layer("pillar_layer", THICKNESS, pattern=pattern)
-    sim = Simulation(lattice, [layer], num_orders=NUM_ORDERS, incidence=air, transmission=air)
+    pattern = Pattern(background=air, shapes=[Circle(center=(period / 2, period / 2), radius=pillar_radius, material=pillar)])
+    lattice = Lattice((period, 0.0), (0.0, period))
+    layers = [Layer("pillar_layer", thickness, pattern=pattern)]
+    return layers, lattice, air, air
+
+
+def main():
+    layers, lattice, air, transmission = build_geometry()
+    pattern = layers[0].pattern
+    sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=transmission)
 
     excitation = PlaneWaveExcitation(
         WAVELENGTH, math.radians(INCIDENT_ANGLE_DEG), 0.0, s_amplitude=S_AMPLITUDE, p_amplitude=P_AMPLITUDE

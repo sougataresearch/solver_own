@@ -50,17 +50,27 @@ WAVELENGTHS = np.linspace(0.5e-6, 1.5e-6, 21)
 OUTPUT_CSV = "output_via_RT.csv"
 
 
-def main() -> None:
+def build_geometry(period=None, via_radius=None, thickness=None):
+    """Returns (layers, lattice, incidence, transmission)."""
+    period = period if period is not None else PERIOD
+    via_radius = via_radius if via_radius is not None else VIA_RADIUS
+    thickness = thickness if thickness is not None else THICKNESS
+
     air = Material("air", N_VIA**2)
     substrate = Material("substrate", N_SUBSTRATE**2)
 
     # Via (air hole) centered in the unit cell at (period/2, period/2)
     pattern = Pattern(
         background=substrate,
-        shapes=[Circle(center=(PERIOD / 2, PERIOD / 2), radius=VIA_RADIUS, material=air)],
+        shapes=[Circle(center=(period / 2, period / 2), radius=via_radius, material=air)],
     )
-    lattice = Lattice(a=(PERIOD, 0.0), b=(0.0, PERIOD))
-    layers = [Layer("via_layer", THICKNESS, pattern=pattern)]
+    lattice = Lattice(a=(period, 0.0), b=(0.0, period))
+    layers = [Layer("via_layer", thickness, pattern=pattern)]
+    return layers, lattice, air, substrate
+
+
+def main() -> None:
+    layers, lattice, air, substrate = build_geometry()
     sim = Simulation(lattice, layers, num_orders=NUM_ORDERS, incidence=air, transmission=substrate)
 
     reflectance = np.zeros(len(WAVELENGTHS))
