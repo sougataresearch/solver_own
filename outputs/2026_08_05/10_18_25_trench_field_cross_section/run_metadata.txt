@@ -1,0 +1,12 @@
+script: C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\trench\trench_field_cross_section.py
+run_at: 2026-08-05T10:18:25
+
+period_m: 7e-07
+fill_factor: 0.3
+thickness_m: 4.6e-07
+n_ridge: 3.48
+n_groove: 1.0
+wavelength_m: 6e-07
+incident_angle_deg: 10.0
+num_orders: 19
+grid: (200, 80)

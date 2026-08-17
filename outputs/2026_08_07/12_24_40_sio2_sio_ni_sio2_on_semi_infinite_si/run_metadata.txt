@@ -1,0 +1,11 @@
+script: c:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\thin_film\custom_multistack.py
+run_at: 2026-08-07T12:24:40
+
+layers: [('SiO2', 2e-07), ('SiO', 3e-07), ('Ni', 1e-08), ('SiO2', 5e-07)]
+incidence_material: air
+transmission_material: Si
+incident_angle_deg: 60.0
+azimuthal_angle_deg: 0.0
+s_amplitude: 1.0
+p_amplitude: 0.0
+wavelength_range_m: (np.float64(4e-07), np.float64(8e-07), 401)

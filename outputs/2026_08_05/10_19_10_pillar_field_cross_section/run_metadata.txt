@@ -1,0 +1,13 @@
+script: C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\via\pillar_field_cross_section.py
+run_at: 2026-08-05T10:19:10
+
+period_m: 7e-07
+pillar_radius_m: 1.8e-07
+thickness_m: 4.6e-07
+n_pillar: 3.48
+n_bg: 1.0
+wavelength_m: 6e-07
+incident_angle_deg: 0.0
+num_orders: 25
+depth_fraction: 0.5
+grid: (80, 80)

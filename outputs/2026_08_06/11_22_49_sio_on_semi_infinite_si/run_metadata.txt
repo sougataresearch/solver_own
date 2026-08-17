@@ -1,0 +1,14 @@
+script: c:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\thin_film\sio2_on_si_thin_film.py
+run_at: 2026-08-06T11:22:49
+
+stack: air / SiO / semi-infinite Si
+substrate_material: Si
+substrate_is_semi_infinite: True
+substrate_nk_path: C:\Users\sougata.bhunia\Desktop\Solver_own\NK_FILE\si_KLA.txt
+film_material: SiO
+film_nk_path: C:\Users\sougata.bhunia\Desktop\Solver_own\NK_FILE\sio_KLA.txt
+film_thickness_m: 5e-07
+incident_angle_deg: 60.0
+azimuthal_angle_deg: 0.0
+polarization: s
+wavelength_range_m: (np.float64(4e-07), np.float64(8e-07), 401)

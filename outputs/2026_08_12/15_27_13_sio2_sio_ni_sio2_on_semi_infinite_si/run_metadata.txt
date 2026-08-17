@@ -1,0 +1,13 @@
+script: c:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\thin_film\custom_multistack.py
+run_at: 2026-08-12T15:27:13
+
+layers: [('SiO2', 2e-07), ('SiO', 3e-07), ('Ni', 1e-08), ('SiO2', 5e-07)]
+incidence_material: air
+transmission_material: Si
+incident_angle_deg: 45.0
+azimuthal_angle_deg: 0.0
+polarization_state: linear_15deg
+s_amplitude: 0.9659258262890683
+p_amplitude: (0.25881904510252074+0j)
+polarization_states_deg: [('TE', 0.0, 0.0), ('TM', 90.0, 0.0), ('RCP', 45.0, 90.0), ('LCP', 45.0, -90.0), ('linear_15deg', 15.0, 0.0), ('linear_30deg', 30.0, 0.0), ('elliptical_a30_d45', 30.0, 45.0), ('elliptical_a45_d90', 45.0, 90.0), ('elliptical_a60_d135', 60.0, 135.0)]
+wavelength_range_m: (np.float64(4e-07), np.float64(8e-07), 401)

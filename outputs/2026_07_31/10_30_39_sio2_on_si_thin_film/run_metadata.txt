@@ -1,0 +1,12 @@
+script: c:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\thin_film\sio2_on_si_thin_film.py
+run_at: 2026-07-31T10:30:39
+
+si_csv_path: C:\Users\sougata.bhunia\Desktop\Solver_own\NK_FILE\Si_nk.csv
+sio2_csv_path: C:\Users\sougata.bhunia\Desktop\Solver_own\NK_FILE\SiO2_nk.csv
+sio2_thickness_m: 5e-08
+si_thickness_m: 1.2e-05
+incident_angle_deg: 0.0
+azimuthal_angle_deg: 0.0
+s_amplitude: 1.0
+p_amplitude: 0.0
+wavelength_range_m: (np.float64(4e-07), np.float64(8e-07), 401)
