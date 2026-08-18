@@ -1244,3 +1244,51 @@ whether it was ever actually implemented.
   beneath) is not representable by this solver today (`Simulation.
   transmission` must be one uniform `Material`) — logged as a real
   capability gap in `decisions.md` ADR-034, not implemented.
+
+## 2026-08-18 (trench/via Lumerical build guidance -- structure identity still open)
+
+### Discussed
+- Project owner asked for help building "the trench structure" from
+  `structures/trench/` in Lumerical RCWA, to eventually cross-validate the
+  same way `multistack_composite_grating.py` was (ADR-034). Walked through
+  concrete Lumerical build steps for `trench_grating.py` (period 0.7 um,
+  30% fill-factor Si ridge in air, constant `n=3.48` matching the
+  Moharam/Gaylord 1995 oracle `tests/test_1d_grating.py` cross-checks --
+  flagged that swapping in dispersive Palik-Si data would decouple the
+  comparison from that oracle test per `rules.md` AI Coding Rule 3, so it
+  should be a new script, not an edit to `trench_grating.py` itself, if
+  wanted later).
+- Also clarified (not yet built): only one Rectangle/Slab object is needed
+  for a two-material patterned layer when one side is the RCWA background
+  material (air) -- a second explicit object is only needed when *neither*
+  side is the background, as in `multistack_composite_grating.py`.
+- Three rounds of hand-drawn sketches from the project owner progressively
+  changed the actual target structure's identity: (1) an XY sketch
+  initially looked like a bounded island (finite in both x and y) rather
+  than a y-invariant strip: a `Lattice1D` ridge/groove strip must touch the
+  frame's top/bottom edges in an XY view, since it's invariant in y -- a
+  gap there would mean an unintended 2D pattern; (2) a side/cross-section
+  sketch then showed the roles inverted from `trench_grating.py`'s
+  convention -- Air as the minority (trench) region cut into a Si
+  majority background, not a Si ridge sitting in an air groove; (3) the
+  actual top view showed the "Air" region bounded in *both* x and y (a
+  finite rectangle, not a full-height strip) -- meaning the real target is
+  a 2D array of rectangular air holes in a Si background (`structures/
+  via/`-family, `Lattice`+`Rectangle`), not a 1D trench (`Lattice1D`) at
+  all. Closest existing template identified: `structures/via/via_array.py`
+  (circular air via in Si, Si semi-infinite below) -- would need only a
+  `Circle`->`Rectangle` shape swap, but exact dimensions (period(s), hole
+  width/height, thickness, constant-vs-dispersive Si) are still unknown --
+  no numbers given yet, only hand sketches.
+- Project owner will share the *actual* Lumerical trench structure
+  tomorrow instead of continuing to iterate on sketches; work on this
+  paused until then.
+
+### Action items
+- [ ] Build the real trench/via structure once the project owner shares
+  their actual Lumerical model (not yet built -- today's sketches kept
+  changing the identified geometry, so nothing should be assumed from them
+  alone). Likely `structures/via/rectangular_via_array.py` based on the
+  last sketch, but confirm against the real model first, including the
+  incidence/transmission stack (air / Si-semi-infinite, matching
+  `via_array.py`? not yet confirmed).
