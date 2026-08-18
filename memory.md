@@ -5,7 +5,9 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-12 (Phase 10, Structure Visualization / 3D Preview, shipped),
+As of 2026-08-18 (ADR-033, linear-polarization `alpha` convention flipped
+to match a commercial RCWA tool), 2026-08-12 (Phase 10, Structure
+Visualization / 3D Preview, shipped),
 2026-08-07 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 17, targets
 17.1-17.6 all resolved), 2026-08-07 (Category 16, targets 16.1-16.7 all
 resolved), 2026-08-07 (Category 15, targets
@@ -22,6 +24,29 @@ Category 9, targets 9.1-9.8), 2026-08-04
 2026-08-04 (Category 3, targets 3.1-3.6), 2026-08-04 (Category 2, targets
 2.1-2.5), 2026-08-03 (Phase 6, target 1.3), 2026-07-24 (Phase 5), 2026-07-23
 (Phase 4b), 2026-07-21 (Phase 4a) and earlier entries below:
+- **ADR-033: linear-polarization `alpha` convention flipped (0=P, 90=S).**
+  The project owner is validating this solver's thin-film output against a
+  commercial RCWA tool (Lumerical FDTD) and supplied its actual
+  polarization-mixing script: `R_linear = sin(alpha)^2 * Rs_power +
+  cos(alpha)^2 * Rp_power` (`0=P, 90=S`), the opposite reference axis from
+  this project's pre-existing `s=cos(alpha), p=sin(alpha)*exp(i*delta)`
+  convention. Comparing the solver's `linear_15deg`/`linear_30deg` (45 deg
+  incidence, `sio2_sio_ni_sio2_on_semi_infinite_si` stack) against that
+  tool's exported curves showed a large apparent magnitude gap and a
+  reversed 15-vs-30 ordering; back-solving the tool's raw `Rss`/`Rpp` and
+  comparing to the solver's own pure-TE/pure-TM `R` matched to ~0.1%
+  absolute, proving the discrepancy was this labeling mismatch, not a
+  solver or oracle physics error. Flipped the formula to `s=sin(alpha),
+  p=cos(alpha)*exp(i*delta)` in `CONVENTIONS.md`'s worked-examples table,
+  `structures/thin_film/custom_multistack.py::_jones_state` (with its
+  `POLARIZATION_STATES_DEG` TE/TM `alpha_deg` entries swapped to keep
+  producing the same physical states), and
+  `structures/thin_film/sio2_on_si_thin_film.py::_polarization_amplitudes`.
+  RCP/LCP entries needed no numeric change (`alpha=45` makes `sin`/`cos`
+  equal). No `src/sougata_solver/` change, no test assertions changed
+  (`tests/test_polarization_states.py` hardcodes numeric `(s,p)` pairs
+  directly, not via this formula). Full investigation and scope-check in
+  `decisions.md` ADR-033.
 - **Phase 10 (Structure Visualization / 3D Preview) is complete.**
   Requested directly by the project owner ("a GUI like Lumerical where I
   can see what I build"), scoped via `AskUserQuestion` to a static 3D

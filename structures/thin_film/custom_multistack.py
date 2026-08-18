@@ -67,19 +67,25 @@ layers = [
 #
 # Every polarization state -- TE/TM, any linear angle, RCP/LCP, any ellipse
 # -- is one formula, per CONVENTIONS.md's "Worked polarization examples"
-# table (Category 6 target 6.1): s=cos(alpha), p=sin(alpha)*exp(i*delta).
+# table (Category 6 target 6.1): s=sin(alpha), p=cos(alpha)*exp(i*delta).
+# alpha=0 -> pure p (TM), alpha=90 -> pure s (TE) -- matched to the commercial
+# RCWA tool's own polarization-angle convention (0=P, 90=S; confirmed against
+# a Lumerical FDTD "grating_power" Rs_power/Rp_power export,
+# `R_linear = sin^2(alpha)*Rs_power + cos^2(alpha)*Rp_power`) so a solver
+# `linear_Xdeg` state means the same physical input as the commercial tool's
+# "Linear X deg" with no angle conversion needed (see decisions.md ADR-033).
 # Linear/circular are just special-case (alpha, delta) values of that same
 # formula, not separate physics -- so POLARIZATION_STATES_DEG below is a
 # single flat list of (name, alpha_deg, delta_deg) triples, all run through
 # the one `_jones_state` function. Add/remove/edit rows freely -- as many
 # linear angles (delta=0) or general ellipses as you want, in one place.
 # ============================================================================
-INCIDENT_ANGLE_DEG = 45.0
+INCIDENT_ANGLE_DEG = 0.0
 AZIMUTHAL_ANGLE_DEG = 0.0
 
 POLARIZATION_STATES_DEG = [
-    ("TE", 0.0, 0.0),              # alpha=0 -> pure s; delta irrelevant (sin(0)=0 kills p)
-    ("TM", 90.0, 0.0),             # alpha=90 -> pure p; delta irrelevant (cos(90)=0 kills s)
+    ("TE", 90.0, 0.0),             # alpha=90 -> pure s; delta irrelevant (cos(90)=0 kills p)
+    ("TM", 0.0, 0.0),              # alpha=0 -> pure p; delta irrelevant (sin(0)=0 kills s)
     ("RCP", 45.0, 90.0),           # equal split, +90 deg phase -> right-hand circular
     ("LCP", 45.0, -90.0),          # equal split, -90 deg phase -> left-hand circular
     ("linear_15deg", 15.0, 0.0),   # delta=0 -> linear, at whatever angle alpha is
@@ -92,16 +98,18 @@ POLARIZATION_STATES_DEG = [
 
 def _jones_state(alpha_deg: float, delta_deg: float) -> tuple[complex, complex]:
     """The one formula behind every polarization state in this file --
-    s=cos(alpha), p=sin(alpha)*exp(i*delta) -- per CONVENTIONS.md's table."""
+    s=sin(alpha), p=cos(alpha)*exp(i*delta) -- per CONVENTIONS.md's table
+    (ADR-033: alpha=0=P/alpha=90=S, matched to the commercial RCWA tool's
+    convention)."""
     alpha, delta = math.radians(alpha_deg), math.radians(delta_deg)
-    return math.cos(alpha), math.sin(alpha) * cmath.exp(1j * delta)
+    return math.sin(alpha), math.cos(alpha) * cmath.exp(1j * delta)
 
 
 POLARIZATION_STATES = {name: _jones_state(a, d) for name, a, d in POLARIZATION_STATES_DEG}
 
 # Pick exactly one state (a POLARIZATION_STATES key, printed by main() if
 # unsure of the exact generated name) for the main R/T-vs-wavelength run.
-POLARIZATION_STATE = "linear_30deg"
+POLARIZATION_STATE = "RCP"
 S_AMPLITUDE, P_AMPLITUDE = POLARIZATION_STATES[POLARIZATION_STATE]
 
 # Optionally compare EVERY generated state side-by-side at one wavelength

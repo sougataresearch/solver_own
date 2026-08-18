@@ -1138,3 +1138,50 @@ whether it was ever actually implemented.
   grid matching the solver's own sweep points, revisit
   `RCWA_plot_norm.py`'s "visual guide only" fallback to also print a
   per-point max-diff for that case.
+
+## 2026-08-18 (ADR-033: linear-polarization `alpha` convention flip)
+
+### Discussed
+- The project owner supplied the commercial RCWA tool's (Lumerical FDTD)
+  own polarization-mixing script for a "grating_power" export:
+  `R_linear = sin(alpha)^2 * Rs_power + cos(alpha)^2 * Rp_power`, with an
+  explicit in-script comment `(0=P, 90=S)` — the opposite reference axis
+  from this project's pre-existing `s=cos(alpha), p=sin(alpha)*exp(i*delta)`
+  convention (`0=S, 90=P`).
+- Comparing the solver's `linear_15deg`/`linear_30deg` states (45 deg
+  incidence, `sio2_sio_ni_sio2_on_semi_infinite_si` stack) against that
+  tool's `Linear15_Linear30.txt` export showed both a large apparent
+  magnitude gap (peak `R` 0.53 vs 0.35) and a reversed 15-vs-30 ordering.
+  Back-solved the tool's raw `Rss`/`Rpp` from its two exported curves (a
+  per-wavelength 2x2 linear solve against its own stated mixing formula)
+  and compared directly to the solver's own pure-TE/pure-TM `R` at the same
+  angle — matched to ~0.1% absolute (max diff 0.0013, RMS 0.0005,
+  noise-level from the tool's coarser wavelength grid), proving the entire
+  discrepancy was this labeling mismatch, not a solver or oracle physics
+  error.
+- Flipped the convention (`s=sin(alpha), p=cos(alpha)*exp(i*delta)`) in
+  `CONVENTIONS.md`'s worked-examples table,
+  `structures/thin_film/custom_multistack.py::_jones_state` (TE/TM
+  `alpha_deg` entries swapped to keep producing the same physical states),
+  and `structures/thin_film/sio2_on_si_thin_film.py::_polarization_amplitudes`.
+  Grepped every `structures/thin_film/*.py`, `structures/trench/*.py`,
+  `structures/via/*.py`, and `postprocessing/*.py` file for this
+  alpha-to-amplitude formula first — confirmed only these two files
+  implement it, so no other structure script needed the flip.
+- Confirmed `tests/test_polarization_states.py` needed no change: it
+  hardcodes numeric `(s,p)` pairs directly rather than deriving them from
+  this formula, so its `"linear_20deg"` label is cosmetic there.
+- Full reasoning, RCP/LCP unaffected-angle math, and the file-by-file scope
+  check are recorded in `decisions.md` ADR-033.
+
+### Action items
+- [x] Flip `alpha` convention to match the commercial tool (0=P, 90=S) in
+  `CONVENTIONS.md`, `custom_multistack.py`, `sio2_on_si_thin_film.py` —
+  done 2026-08-18, `decisions.md` ADR-033.
+- [x] Update `memory.md` with the ADR-033 summary — done 2026-08-18.
+- [ ] Re-run every `structures/thin_film/*_ellipsometry_run.py` /
+  `postprocessing/jones_mueller_ellipsometry.py` pair that consumes a
+  named linear/elliptical polarization state, to confirm downstream
+  Jones/Mueller/Psi-Delta outputs still make sense under the flipped
+  convention (not yet re-verified this session — only the two thin-film
+  R/T scripts above were touched).

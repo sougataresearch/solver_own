@@ -117,10 +117,19 @@ docstring):
 | TE (s-pol) | `1.0` | `0.0` |
 | TM (p-pol) | `0.0` | `1.0` |
 | Linear at 45 deg | `1/sqrt(2)` | `1/sqrt(2)` |
-| Linear at an arbitrary angle `alpha` | `cos(alpha)` | `sin(alpha)` |
+| Linear at an arbitrary angle `alpha` | `sin(alpha)` | `cos(alpha)` |
 | Right-hand circular (RCP) | `1/sqrt(2)` | `1j/sqrt(2)` |
 | Left-hand circular (LCP) | `1/sqrt(2)` | `-1j/sqrt(2)` |
-| Elliptical | `cos(alpha)` | `sin(alpha) * exp(1j*delta)`, `delta != 0, pi` |
+| Elliptical | `sin(alpha)` | `cos(alpha) * exp(1j*delta)`, `delta != 0, pi` |
+
+`alpha=0` is pure P (TM), `alpha=90` is pure S (TE) -- matched to a
+commercial RCWA tool's own polarization-angle convention (confirmed against
+a Lumerical FDTD "grating_power" `Rs_power`/`Rp_power` export computing
+`R_linear = sin(alpha)^2 * Rs_power + cos(alpha)^2 * Rp_power`), so a
+`linear_Xdeg` state here means the same physical input as that tool's
+"Linear X deg" with no angle conversion needed. See `decisions.md` ADR-033
+for the investigation that found the (pre-ADR-033) opposite convention and
+the reasoning for flipping it.
 
 These are the states `tests/test_polarization_states.py` (Category 6
 targets 6.2/6.3) exercises: normal-incidence regression checks that, for

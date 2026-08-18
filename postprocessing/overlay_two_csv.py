@@ -13,17 +13,17 @@ from pathlib import Path
 
 import numpy as np
 
-from sougata_solver.postprocessing.RCWA_plot_norm import _load_wavelength_r
+from RCWA_plot_norm import _load_wavelength_r
 
 # ============================================================================
 # EDIT: the two files to overlay. Set these to two DIFFERENT files --
 # pointing both at the same path just draws one curve twice.
 # ============================================================================
-PATH_1 = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\outputs\2026_08_12\15_27_13_sio2_sio_ni_sio2_on_semi_infinite_si\output_multistack_RT.csv"
+PATH_1 = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\outputs\2026_08_18\10_13_36_sio2_sio_ni_sio2_on_semi_infinite_si\output_multistack_RT.csv"
 LABEL_1 = "linear_15deg"
 
-PATH_2 = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\outputs\2026_08_12\15_29_00_sio2_sio_ni_sio2_on_semi_infinite_si\output_multistack_RT.csv"
-LABEL_2 = "linear_30deg"
+PATH_2 = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\outputs\2026_08_18\10_19_04_sio2_sio_ni_sio2_on_semi_infinite_si\output_multistack_RT.csv"
+LABEL_2 = "RCP"
 
 # Saved into the SAME folder PATH_2 came from -- this overlay is a derived
 # view of that run, not a new run of its own.

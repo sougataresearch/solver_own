@@ -49,9 +49,11 @@ AZIMUTHAL_ANGLE_DEG = 0.0
 # or "elliptical" (uses ELLIPTICAL_ALPHA_DEG/ELLIPTICAL_DELTA_DEG below).
 POLARIZATION = "elliptical"
 
-# Only used when POLARIZATION == "elliptical": s_amplitude = cos(alpha),
-# p_amplitude = sin(alpha) * exp(1j * delta), per CONVENTIONS.md's "Worked
+# Only used when POLARIZATION == "elliptical": s_amplitude = sin(alpha),
+# p_amplitude = cos(alpha) * exp(1j * delta), per CONVENTIONS.md's "Worked
 # polarization examples" table (delta != 0, pi, or it degenerates to linear).
+# alpha=0=P/alpha=90=S, matched to the commercial RCWA tool's own
+# polarization-angle convention (decisions.md ADR-033).
 ELLIPTICAL_ALPHA_DEG = 20.0
 ELLIPTICAL_DELTA_DEG = 50.0
 
@@ -83,7 +85,7 @@ def _polarization_amplitudes(polarization: str) -> tuple[complex, complex]:
     if polarization == "elliptical":
         alpha = math.radians(ELLIPTICAL_ALPHA_DEG)
         delta = math.radians(ELLIPTICAL_DELTA_DEG)
-        return math.cos(alpha), math.sin(alpha) * complex(np.exp(1j * delta))
+        return math.sin(alpha), math.cos(alpha) * complex(np.exp(1j * delta))
     raise ValueError("polarization must be 's', 'p', 'rcp', 'lcp', or 'elliptical'")
 
 

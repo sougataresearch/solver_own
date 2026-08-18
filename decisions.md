@@ -1622,3 +1622,64 @@
   `tests/test_1d_grating.py` (701 tests pass project-wide, up from 700),
   `references.md` updated with the new table row. No
   `src/sougata_solver/` change -- this is oracle infrastructure only.
+
+## ADR-033: Linear-polarization `alpha` convention flipped to match a commercial RCWA tool (0=P, 90=S)
+
+- **Decision**: `CONVENTIONS.md`'s "Worked polarization examples" table
+  (Category 6 target 6.1) and its two structure-script implementations
+  (`structures/thin_film/custom_multistack.py`'s `_jones_state`,
+  `structures/thin_film/sio2_on_si_thin_film.py`'s
+  `_polarization_amplitudes`) now use `s_amplitude=sin(alpha)`,
+  `p_amplitude=cos(alpha)*exp(1j*delta)` -- the opposite trig assignment
+  from before (`s=cos(alpha)`, `p=sin(alpha)*exp(1j*delta)`). Net effect:
+  `alpha=0` is now pure P (was pure S/TE); `alpha=90` is now pure S (was
+  pure P/TM). `custom_multistack.py`'s `POLARIZATION_STATES_DEG` entries for
+  `"TE"`/`"TM"` had their `alpha_deg` swapped (`90.0`/`0.0`) to keep
+  producing the correct physical amplitudes under the new formula --
+  `"linear_15deg"`/`"linear_30deg"`/`RCP`/`LCP`/`elliptical_*` entries keep
+  their existing `(alpha, delta)` values unchanged (verified below).
+- **Reason**: the project owner is validating this solver's thin-film
+  output against a commercial RCWA tool (Lumerical FDTD) and supplied its
+  actual polarization-mixing script:
+  `R_linear = sin(alpha)^2 * Rs_power + cos(alpha)^2 * Rp_power`, with an
+  explicit in-script comment `(0=P, 90=S)`. That is the opposite reference
+  axis from this project's pre-existing convention. Comparing the solver's
+  `linear_15deg`/`linear_30deg` (45 deg incidence, `sio2_sio_ni_sio2_on_
+  semi_infinite_si` stack) against that tool's `Linear15_Linear30.txt`
+  export directly showed both a large apparent magnitude gap (peak `R`
+  0.53 vs 0.35) and a reversed 15-vs-30 ordering. Back-solving the tool's
+  raw `Rss`/`Rpp` from its two exported curves (a per-wavelength 2x2 linear
+  solve against its own stated mixing formula) and comparing directly to
+  this solver's own pure-TE/pure-TM `R` at the same angle matched to
+  ~0.1% absolute (max diff 0.0013, RMS 0.0005 -- noise-level, from the
+  tool's coarser non-uniform wavelength grid) -- proving the entire
+  discrepancy was this labeling mismatch, not a solver or oracle physics
+  error. Flipping the convention makes a solver `linear_Xdeg` state equal
+  the commercial tool's `Linear X deg` state directly, with no `90-alpha`
+  conversion needed for future comparisons.
+- **Why RCP/LCP/elliptical entries needed no numeric change**: the phase
+  term stays attached to `p_amplitude` in both the old and new formula (only
+  which trig function multiplies `s`/`p` swapped) -- for the specific
+  `alpha=45` used by `RCP`/`LCP`, `sin(45)=cos(45)`, so `(s_amplitude,
+  p_amplitude)` is numerically identical under both formulas
+  (`RCP`: `(1/sqrt2, i/sqrt2)`; `LCP`: `(1/sqrt2, -i/sqrt2)`). General
+  elliptical/linear entries at other angles do change in physical meaning,
+  which is the intended effect of this ADR.
+- **Scope checked, not assumed**: grepped every `structures/thin_film/*.py`,
+  `structures/trench/*.py`, `structures/via/*.py`, and `postprocessing/*.py`
+  file for this alpha-to-amplitude formula -- only the two files above
+  implement it. `tests/test_polarization_states.py`'s `_UNIT_POWER_STATES`
+  hardcodes numeric `(s,p)` pairs directly (not via this formula) to test
+  an unrelated invariant (normal-incidence `R`/`T` independence of
+  polarization state for *any* `(s,p)` pair at fixed power) -- its
+  `"linear_20deg"` label is cosmetic there and needed no change.
+  `src/sougata_solver/excitation.py`, `polarimetry.py`, `sweep.py`, and
+  `plotting.py` all take already-resolved `s_amplitude`/`p_amplitude`
+  directly and contain no alpha-to-amplitude formula -- no core solver
+  change. No prior ADR existed for this convention; this is the first.
+- **Impact**: `CONVENTIONS.md`, `structures/thin_film/custom_multistack.py`,
+  `structures/thin_film/sio2_on_si_thin_film.py`. No
+  `src/sougata_solver/` change and no test assertions changed (the physical
+  S/P reflectance computation itself was already correct and already
+  matched the commercial tool to ~0.1%; only the linear/elliptical
+  angle-labeling convention changed).
