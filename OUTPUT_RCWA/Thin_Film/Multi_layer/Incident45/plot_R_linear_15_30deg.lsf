@@ -1,0 +1,44 @@
+########################################################################
+# Plots linear-polarization reflectance at 15 deg and 30 deg for the
+# sio2_sio_ni_sio2_on_semi_infinite_si stack at 45 deg incidence -- the
+# comparison that found and resolved the alpha-convention mismatch in
+# sougata_solver/decisions.md ADR-033 (project: sougata_solver).
+#
+# Corresponds to sougata_solver's structures/thin_film/custom_multistack.py
+# POLARIZATION_STATES_DEG entries "linear_15deg"/"linear_30deg".
+#
+# Formula: R_linear = sin(alpha)^2 * Rs + cos(alpha)^2 * Rp, alpha in the
+# (0=P, 90=S) convention -- matches sougata_solver's flipped convention
+# (ADR-033) exactly, no angle conversion needed.
+#
+# Array indexing note: Rs(:,1,1,6,6)/Rp(:,1,1,6,6) pick out the SPECULAR
+# (n=0, m=0) diffraction order from grating_power's per-order arrays (see
+# ADR-034 for why grating_power is order-resolved, not pre-summed).
+# Indices 6,6 are the middle element of the n/m harmonic axes here
+# (11-wide, spanning -5..5) -- valid *only* because this is a plain
+# uniform thin-film stack with no lateral pattern, so every non-specular
+# order is exactly zero and the specular order alone equals the total.
+# This indexing trick does NOT generalize to a genuinely patterned
+# structure (e.g. multistack_composite_grating.py) -- that case needs the
+# sum-over-all-orders approach in export_grating_power_composite_grating.lsf
+# instead.
+########################################################################
+
+gp = getresult("RCWA","grating_power");
+lambda = getparameter(gp,"lambda");
+Rs = getattribute(gp,"Rs_power");
+Rp = getattribute(gp,"Rp_power");
+
+Rss = pinch(Rs(:,1,1,6,6));
+Rpp = pinch(Rp(:,1,1,6,6));
+
+# --- Polarization angle 15 deg (0=P, 90=S) ---
+pol15 = 15*pi/180;
+R_linear_15 = (sin(pol15))^2 * Rss + (cos(pol15))^2 * Rpp;
+
+# --- Polarization angle 30 deg ---
+pol30 = 30*pi/180;
+R_linear_30 = (sin(pol30))^2 * Rss + (cos(pol30))^2 * Rpp;
+
+plot(lambda*1e9, R_linear_15, R_linear_30, "Wavelength (nm)","Reflectance");
+legend("Linear 15 deg","Linear 30 deg");

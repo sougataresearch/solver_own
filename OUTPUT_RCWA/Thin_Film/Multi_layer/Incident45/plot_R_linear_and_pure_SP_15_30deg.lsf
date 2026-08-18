@@ -1,0 +1,30 @@
+########################################################################
+# Same comparison as plot_R_linear_15_30deg.lsf (sio2_sio_ni_sio2_on_semi_
+# infinite_si stack at 45 deg incidence, ADR-033 investigation), but also
+# plots the pure-S and pure-P specular reflectance alongside the two mixed
+# linear states -- useful as a visual sanity check that R_linear_15/
+# R_linear_30 fall between the Rss/Rpp bounds as expected.
+#
+# See plot_R_linear_15_30deg.lsf's header for the full explanation of the
+# (0=P, 90=S) formula and the Rs(:,1,1,6,6)/Rp(:,1,1,6,6) specular-order
+# indexing (project: sougata_solver, sougata_solver/decisions.md ADR-033).
+########################################################################
+
+gp = getresult("RCWA","grating_power");
+lambda = getparameter(gp,"lambda");
+Rs = getattribute(gp,"Rs_power");
+Rp = getattribute(gp,"Rp_power");
+
+Rss = pinch(Rs(:,1,1,6,6));
+Rpp = pinch(Rp(:,1,1,6,6));
+
+# --- Polarization angle 15 deg (0=P, 90=S) ---
+pol15 = 15*pi/180;
+R_linear_15 = (sin(pol15))^2 * Rss + (cos(pol15))^2 * Rpp;
+
+# --- Polarization angle 30 deg ---
+pol30 = 30*pi/180;
+R_linear_30 = (sin(pol30))^2 * Rss + (cos(pol30))^2 * Rpp;
+
+plot(lambda*1e9, Rss, Rpp, R_linear_15, R_linear_30, "Wavelength (nm)","Reflectance");
+legend("Pure S","Pure P","Linear 15 deg","Linear 30 deg");

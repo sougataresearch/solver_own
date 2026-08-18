@@ -2,7 +2,13 @@
 # Export grating_power (total R/T vs wavelength, summed over all
 # diffraction orders) from the "RCWA" analysis group, for both
 # s- and p-polarization, to a comma-delimited text file that
-# sougata_solver's postprocessing/RCWA_plot_norm.py can read directly.
+# sougata_solver's postprocessing/overlay_composite_grating_vs_lumerical.py
+# can read directly.
+#
+# Corresponds to sougata_solver's
+# structures/thin_film/multistack_composite_grating.py, project: sougata_solver
+# (decisions.md ADR-034 -- the cross-validation this script's export was
+# used for, including the semi-infinite-vs-finite-substrate finding).
 #
 # IMPORTANT:
 #  1. Delete any existing composite_grating_lumerical_RCWA.txt at the
