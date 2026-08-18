@@ -96,7 +96,7 @@ P_AMPLITUDE = 0.0
 # this PERIOD/NUM_ORD/angle (troubleshooting.md's documented q==0 divide-by-
 # zero) is nudged automatically -- no manual per-range recomputation needed.
 WAVELENGTHS = avoid_rayleigh_wood_anomalies(
-    np.linspace(0.20e-6, 0.40e-6, 100), period=PERIOD, num_orders=NUM_ORD, theta=math.radians(INCIDENT_ANGLE_DEG)
+    np.linspace(0.40e-6, 0.80e-6, 400), period=PERIOD, num_orders=NUM_ORD, theta=math.radians(INCIDENT_ANGLE_DEG)
 )
 
 # ============================================================================
