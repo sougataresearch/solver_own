@@ -1185,3 +1185,62 @@ whether it was ever actually implemented.
   Jones/Mueller/Psi-Delta outputs still make sense under the flipped
   convention (not yet re-verified this session — only the two thin-film
   R/T scripts above were touched).
+
+## 2026-08-18 (composite-grating structure cross-validated against Lumerical RCWA)
+
+### Discussed
+- The project owner wanted `multistack_composite_grating.py`'s new
+  laterally-alternating composite structure (Si/SiO2 on one half of a 2 um
+  period, Ni/SiO on the other) cross-checked against the equivalent
+  structure they built in Lumerical's RCWA solver, and asked which
+  Lumerical result to export: settled on `grating_power`
+  (`Rs_power`/`Ts_power`/`Rp_power`/`Tp_power`), not `grating_order`
+  (per-order, too granular) or `grating_characterization` (setup/
+  convergence info, not a spectrum).
+- `grating_power`'s attributes turned out to be per-diffraction-order
+  (`size(Rs_power) = 401 x 17 x 9`, indexed by wavelength x n-order x
+  m-order), not already-summed totals like the earlier ADR-033 comparison
+  assumed (that case only had one order, a plain thin film, so summing was
+  never visibly necessary there). Fixed by summing over both order
+  dimensions in the exported Lumerical script (`pinch()` to strip
+  singleton `f`/`theta`/`phi` dims, then `sum(sum(Rs_p,3),2)`).
+- First overlay attempt (`postprocessing/overlay_composite_grating_vs_lumerical.py`,
+  new script) showed a large mismatch: `R` max\|diff\|=0.28, `T`
+  max\|diff\|=0.69. Ruled out materials data first (this solver's
+  `NK_FILE/*_KLA.txt` permittivity for Si/Ni/SiO2/SiO matched Lumerical's
+  Palik-fit plots closely at every sampled wavelength) before concluding
+  the real cause: Lumerical's `Si_substrate`/`Ni_substrate` objects were
+  drawn 5 um deep while the RCWA region's z-extent only reached -0.5 um,
+  so (per Lumerical's documented incidence/transmission-inference
+  behavior) it was resolving a genuinely semi-infinite, laterally-patterned
+  Si(left)/Ni(right) exit -- not "finite Si/Ni over air" like this
+  solver's model. Confirmed with a thickness sweep (0.5/2/5/10 um) on this
+  solver's side showing `R` still hadn't converged at 10 um for the
+  800nm/weakly-absorbing case (real Fabry-Perot fringing from the buried
+  interface), proving a thick-finite-layer workaround wouldn't have worked
+  either.
+- Project owner fixed the Lumerical model to match (`Si_substrate`/
+  `Ni_substrate` made genuinely finite, 0.5 um, real air below; RCWA
+  region `z min` nudged to -0.6 um). Re-running the overlay against the
+  corrected export gave `R` max\|diff\|=0.013 (RMS 0.0045), `T`
+  max\|diff\|=0.012 (RMS 0.0022) -- full reasoning in `decisions.md`
+  ADR-034.
+- Also fixed along the way: the Lumerical export script's `write()`
+  appends rather than overwrites (three concatenated header+data blocks
+  accumulated in one file across re-runs) -- the overlay script's loader
+  now always uses the last block; and an absolute-path `write()` call
+  failed on the machine actually running Lumerical (different computer,
+  different drive layout) -- resolved by writing next to the `.fsp` file
+  and copying the result over manually.
+
+### Action items
+- [x] Build `structures/thin_film/multistack_composite_grating.py` and
+  cross-validate against Lumerical RCWA — done 2026-08-18, `decisions.md`
+  ADR-034, ~1% R/T agreement.
+- [x] `postprocessing/overlay_composite_grating_vs_lumerical.py` — done
+  2026-08-18.
+- [ ] The *original* Lumerical structure (Si/Ni as a genuinely
+  semi-infinite, laterally-patterned substrate, no common material
+  beneath) is not representable by this solver today (`Simulation.
+  transmission` must be one uniform `Material`) — logged as a real
+  capability gap in `decisions.md` ADR-034, not implemented.

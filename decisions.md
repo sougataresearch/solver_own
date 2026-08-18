@@ -1683,3 +1683,71 @@
   S/P reflectance computation itself was already correct and already
   matched the commercial tool to ~0.1%; only the linear/elliptical
   angle-labeling convention changed).
+
+## ADR-034: `multistack_composite_grating.py` cross-validated against Lumerical RCWA — the mismatch was a semi-infinite-vs-finite substrate difference, not a materials or formula bug
+
+- **Decision**: `structures/thin_film/multistack_composite_grating.py` (a
+  laterally-alternating composite of two multilayer stacks -- Si/SiO2 on
+  one half of a 2 um period, Ni/SiO on the other, 1D-periodic via
+  `Lattice1D`/`Slab`, reproducing a structure the project owner built in
+  Lumerical's RCWA solver) is now cross-validated against that Lumerical
+  model to ~1% agreement: `R` max\|diff\|=0.013 (RMS 0.0045), `T`
+  max\|diff\|=0.012 (RMS 0.0022), via a new
+  `postprocessing/overlay_composite_grating_vs_lumerical.py` script that
+  overlays this solver's `output_*_RT.csv` against Lumerical's own
+  `grating_power` result (`Rs_power`/`Ts_power`, summed over all
+  diffraction orders -- see that result's `n`/`m` order-index dimensions,
+  confirmed via `size(Rs_power)` before trusting the sum).
+- **What the mismatch actually was**: the first comparison attempt showed a
+  large, structurally-shaped gap (`R` max\|diff\|=0.28, `T`
+  max\|diff\|=0.69 -- absolute units, not percent) that survived a direct
+  materials-data cross-check: this solver's `NK_FILE/*_KLA.txt`
+  permittivity for Si/Ni/SiO2/SiO matched Lumerical's Palik-database fit
+  closely at every sampled wavelength (e.g. Si `eps` 30.9/13.6 at
+  400/800nm here vs. Lumerical's plotted ~30/~14; Ni `eps` -3.0/-13.1 vs.
+  Lumerical's ~-2.5/~-12.5) -- ruling out materials as the cause. Root
+  cause: the original Lumerical geometry drew `Si_substrate`/`Ni_substrate`
+  as 5 um-deep rectangles while the RCWA computation region's own z-extent
+  only reached -0.5 um. Per Lumerical's documented behavior (incidence/
+  transmission media are inferred from whatever object the simulation
+  region's z-boundary extends into, not from the Interfaces tab list),
+  Lumerical was resolving a genuinely semi-infinite, laterally-patterned
+  Si(left)/Ni(right) exit medium -- not "finite Si/Ni over air" like this
+  solver's `TRANSMISSION_MATERIAL = air` model. This solver's `Simulation`
+  requires `transmission=` to be one uniform `Material`; it has no way to
+  represent "Si going down forever on the left, Ni going down forever on
+  the right" simultaneously.
+- **Confirmed, not just inferred**: a controlled thickness sweep on this
+  solver's side (Si/Ni at 0.5/2/5/10 um over semi-infinite air) showed `R`
+  had not converged even at 10 um for the weakly-absorbing 800nm case
+  (0.405 -> 0.345 -> 0.215 -> 0.243, non-monotonic) -- genuine Fabry-Perot
+  interference from the buried Si/Ni-to-air interface, matching
+  `structures/README.md`'s already-documented thick-Si fringing note. This
+  proves a "thick finite layer" cannot stand in for a true semi-infinite
+  half-space either (at wavelengths where the material isn't strongly
+  absorbing), so the fix had to be structural, not a thickness tweak.
+- **Resolution**: the project owner changed the Lumerical model's
+  `Si_substrate`/`Ni_substrate` objects to genuinely finite 0.5 um slabs
+  (`z: -0.5` to `0`, matching what `multistack_composite_grating.py`
+  already built) with real air below (RCWA region `z min` nudged to -0.6
+  um so the computation actually samples that air rather than sitting
+  exactly on the object boundary), then re-ran the RCWA solve. That
+  produced the ~1%-agreement result above; the residual gap is consistent
+  with RCWA harmonic-order truncation and Lumerical's multi-coefficient
+  dispersion-fit vs. this solver's tabulated-`n,k` interpolation, not a
+  remaining structural error.
+- **Scope note, not a bug**: a genuinely semi-infinite, laterally-patterned
+  substrate (the *original* Lumerical model) is a real capability gap in
+  this solver today -- flagged here rather than worked around, per
+  `rules.md` AI Coding Rule 2. Representing that exact structure would
+  need new solver work (a patterned semi-infinite half-space eigenbasis as
+  the exit boundary condition), not a scripting change.
+- **Impact**: new `postprocessing/overlay_composite_grating_vs_lumerical.py`
+  (R/T overlay against a Lumerical `grating_power` export, linear-
+  interpolated onto this solver's wavelength grid for a max/RMS diff,
+  robust to Lumerical's `write()` append-not-overwrite behavior via
+  last-header-block detection -- see that script's
+  `_load_lumerical_grating_power`). No `src/sougata_solver/` change.
+  `structures/thin_film/multistack_composite_grating.py` itself needed no
+  change -- it was correct from the start; the mismatch was entirely in
+  the Lumerical reference model.

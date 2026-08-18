@@ -19,7 +19,7 @@ import numpy as np
 # run_metadata.txt, if you need to find it again later). Copy the whole
 # path, including the .csv extension.
 # ============================================================================
-INPUT_CSV_PATH = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\outputs\2026_08_07\10_12_14_sio2_on_semi_infinite_si\output_R.csv"
+INPUT_CSV_PATH = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\outputs\2026_08_18\13_53_18_multistack_composite_grating\output_multistack_composite_grating_RT.csv"
 
 # ============================================================================
 # EDIT (2): plot display/output filename (saved into the SAME folder the

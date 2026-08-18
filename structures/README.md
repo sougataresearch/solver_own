@@ -28,6 +28,7 @@ comment in each script).
 | [`custom_multistack.py`](thin_film/custom_multistack.py) | Reusable N-layer stack template |
 | [`anti_reflection_coating.py`](thin_film/anti_reflection_coating.py) | Single- or multi-layer AR coating example |
 | [`sio2_on_si_ellipsometry_run.py`](thin_film/sio2_on_si_ellipsometry_run.py) | Saves raw field data (not just R/T) for `postprocessing/jones_mueller_ellipsometry.py` to consume |
+| [`multistack_composite_grating.py`](thin_film/multistack_composite_grating.py) | **Exception to this folder's "no in-plane pattern" rule** (project owner's explicit placement choice) -- a laterally-alternating composite of two multilayer stacks (Si/SiO2 vs Ni/SiO, 1D-periodic in x via real `Lattice1D`/`Slab` patterning, reproducing a structure built in a commercial RCWA tool). Mechanically this is `trench/`-family (1D-periodic patterned layers), just with two full materials per layer instead of material-vs-air |
 
 ### Editing a script for your own structure
 

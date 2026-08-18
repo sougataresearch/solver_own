@@ -23,7 +23,7 @@ import numpy as np
 KLA_TXT_FILE = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\OUTPUT_RCWA\Thin_Film\17_08_26\Multi\0_degree.txt"
 LABEL_1 = "RCWA"
 
-OUTPUT_R_CSV = r"sougata_solver/outputs/2026_08_06/12_50_00_sio2_sio_ni_sio2_on_semi_infinite_si/output_multistack_RT.csv"
+OUTPUT_R_CSV = r"C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\outputs\2026_08_18\13_53_18_multistack_composite_grating\output_multistack_composite_grating_RT.csv"
 LABEL_2 = "solver"
 
 # Saved into the SAME folder OUTPUT_R_CSV came from -- this overlay is a

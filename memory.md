@@ -5,9 +5,13 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-18 (ADR-033, linear-polarization `alpha` convention flipped
-to match a commercial RCWA tool), 2026-08-12 (Phase 10, Structure
-Visualization / 3D Preview, shipped),
+As of 2026-08-18 (ADR-034, `multistack_composite_grating.py` cross-validated
+against Lumerical RCWA to ~1% agreement after finding the mismatch was a
+semi-infinite-vs-finite substrate difference, not materials/physics --
+a genuinely semi-infinite laterally-patterned substrate is a real,
+flagged-not-implemented capability gap), 2026-08-18 (ADR-033,
+linear-polarization `alpha` convention flipped to match a commercial RCWA
+tool), 2026-08-12 (Phase 10, Structure Visualization / 3D Preview, shipped),
 2026-08-07 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 17, targets
 17.1-17.6 all resolved), 2026-08-07 (Category 16, targets 16.1-16.7 all
 resolved), 2026-08-07 (Category 15, targets
