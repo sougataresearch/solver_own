@@ -1,0 +1,19 @@
+script: C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\trench\tapered_trench.py
+run_at: 2026-08-19T10:26:00
+
+period_m: 2.028e-06
+tcd_m: 4.6018e-07
+bcd_m: 4.86352e-07
+depth_m: 4.5113591e-06
+spacing_m: 1.56782e-06
+residual_thickness_m: 1.0606409e-06
+slab_material: Si
+etch_material: air
+transmission_material: air
+incident_angle_deg: 0.0
+azimuthal_angle_deg: 0.0
+num_orders: 31
+s_amplitude: 1.0
+p_amplitude: 0.0
+wavelength_range_m: (np.float64(4e-07), np.float64(8e-07), 400)
+finest_num_slices: 64

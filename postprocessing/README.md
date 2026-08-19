@@ -14,7 +14,7 @@ input file, then the `postprocessing/` script to visualize or compare it.
 | [`overlay_two_csv.py`](overlay_two_csv.py) | two of this solver's own `output_R.csv` runs | Generic sibling of `RCWA_plot_norm.py` for comparing two solver runs directly (e.g. two polarization states), reusing the same auto-detected-format loader so the two scripts never diverge on parsing. |
 | [`plot_rcwa_reflectance.py`](plot_rcwa_reflectance.py) | a single `RCWA_module` export (`lambda(m)`/`Y` columns) | Plots that export alone vs. wavelength, y-axis fixed 0–1 — no solver data, no overlay. |
 | [`overlay_composite_grating_vs_lumerical.py`](overlay_composite_grating_vs_lumerical.py) | `structures/thin_film/multistack_composite_grating.py`'s CSV + a Lumerical RCWA `grating_power` export (`export_grating_power.lsf`) | Overlays solver vs. Lumerical R/T on two panels, prints max/RMS difference (interpolated onto the solver's wavelength grid). The comparison behind `decisions.md` ADR-034. |
-| [`overlay_tapered_trench_vs_lumerical.py`](overlay_tapered_trench_vs_lumerical.py) | `structures/trench/tapered_trench.py`'s CSV + a Lumerical RCWA `grating_power` export (`export_trench_grating_power.lsf`, project root) | Same overlay/max-RMS-diff approach as above, for the depth-tapered trench structure. The comparison behind `decisions.md` ADR-036 (~0.5% R RMS, ~0.15% T RMS agreement once materials and harmonic-order truncation were matched between the two tools). |
+| [`overlay_tapered_trench_vs_lumerical.py`](overlay_tapered_trench_vs_lumerical.py) | `structures/trench/tapered_trench.py`'s CSV + a Lumerical RCWA `grating_power` export (`../OUTPUT_RCWA/Trench/export_trench_grating_power.lsf`) | Same overlay/max-RMS-diff approach as above, for the depth-tapered trench structure. The comparison behind `decisions.md` ADR-036 (~0.5% R RMS, ~0.15% T RMS agreement once materials and harmonic-order truncation were matched between the two tools). |
 | [`plot_field_cross_section.py`](plot_field_cross_section.py) | a `.npz` field grid from `structures/trench/trench_field_cross_section.py` or `structures/via/pillar_field_cross_section.py` | Plots `\|E\|^2` over the reconstructed cross-section/map, handling both the trench (x,z) and pillar/via (x,y) `.npz` layouts. |
 | [`jones_mueller_ellipsometry.py`](jones_mueller_ellipsometry.py) | raw reflected-field CSV from `structures/thin_film/sio2_on_si_ellipsometry_run.py` | Assembles the Jones reflection matrix, Mueller matrix, and ellipsometric angles (Psi, Delta) — zeroth-order/uniform-stack case. |
 | [`jones_mueller_per_order.py`](jones_mueller_per_order.py) | raw per-order reflected-field CSV from `structures/trench/trench_grating_ellipsometry_run.py` | Same Jones/Mueller/Psi/Delta derivation as above, but per diffraction order (patterned-layer case) — reuses the same `sougata_solver.polarimetry` functions so the two scripts can't silently drift apart on convention. |
@@ -27,9 +27,9 @@ input file, then the `postprocessing/` script to visualize or compare it.
 script (Lumerical Script Language) inside Lumerical itself against a solved
 RCWA simulation:
 
-- `export_grating_power.lsf` (referenced in `overlay_composite_grating_vs_lumerical.py`'s
-  docstring) — for the composite-grating structure.
-- [`export_trench_grating_power.lsf`](../export_trench_grating_power.lsf) (project root) —
+- [`export_grating_power.lsf`](../OUTPUT_RCWA/Thin_Film/Complex_Multi/multistack_composite_grating.lsf) —
+  for the composite-grating structure.
+- [`export_trench_grating_power.lsf`](../OUTPUT_RCWA/Trench/export_trench_grating_power.lsf) —
   for the tapered-trench structure.
 
 Both extract Lumerical's `grating_power` result (`Rs_power`/`Ts_power`/

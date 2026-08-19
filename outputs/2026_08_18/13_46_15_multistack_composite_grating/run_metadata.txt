@@ -1,0 +1,13 @@
+script: C:\Users\sougata.bhunia\Desktop\Solver_own\sougata_solver\structures\thin_film\multistack_composite_grating.py
+run_at: 2026-08-18T13:46:15
+
+period_m: 2e-06
+left_width_m: 1e-06
+layers: [('oxide_step', 1e-07), ('oxide_lower', 2e-07), ('substrate', 5e-07)]
+incidence_material: air
+transmission_material: air
+incident_angle_deg: 0.0
+num_orders: 31
+s_amplitude: 1.0
+p_amplitude: 0.0
+wavelength_range_m: (np.float64(4.0049999999999997e-07), np.float64(8e-07), 401)
