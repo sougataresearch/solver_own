@@ -505,6 +505,18 @@ class Pattern:
 
     background: Material
     shapes: list[Shape] = field(default_factory=list)
+    skip_bounds_check: bool = False
+    """`decisions.md` ADR-035: `validate_pattern_fits_lattice`'s
+    `2*bounding_radius >= min_period` test is a conservative, cheap
+    *sufficient* condition (see that function's own docstring), not an
+    exact overlap test -- for an elongated, non-circular shape whose
+    footprint touches (but never crosses) the cell edge along one axis, the
+    circular bounding-radius bound can flag a false positive even though no
+    true self-overlap occurs. Set this only after independently confirming
+    (e.g. a direct real-space containment check against the shape's
+    periodic images) that the shape genuinely does not overlap itself --
+    this is a narrow, per-pattern escape hatch, not a general relaxation of
+    the check, which stays on by default for every other pattern."""
 
     def add(self, shape: Shape) -> None:
         self.shapes.append(shape)

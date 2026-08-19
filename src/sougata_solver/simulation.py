@@ -355,7 +355,7 @@ class Simulation:
         # images at construction time, not deep inside solve() -- see
         # geometry.validate_pattern_fits_lattice's docstring for the policy.
         for layer in self.layer_stack:
-            if layer.pattern is not None:
+            if layer.pattern is not None and not layer.pattern.skip_bounds_check:
                 validate_pattern_fits_lattice(layer.pattern, lattice)
 
     def _cached_toeplitz(self, pattern, g: np.ndarray, wavelength: float, inverse: bool) -> np.ndarray:

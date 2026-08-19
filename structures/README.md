@@ -46,7 +46,7 @@ and output path. No other part of the script should normally need touching.
 |---|---|
 | [`trench_grating.py`](trench/trench_grating.py) | Uniform (untapered) lamellar grating, wavelength sweep |
 | [`trench_grating_ellipsometry_run.py`](trench/trench_grating_ellipsometry_run.py) | Saves raw field data for ellipsometry postprocessing |
-| [`tapered_trench.py`](trench/tapered_trench.py) | Linearly-tapered ridge (staircase-discretized), `num_slices` convergence sweep; FDTD-style `TCD`/`BCD`/`SPACING`/`PERIOD` naming for the ridge geometry |
+| [`tapered_trench.py`](trench/tapered_trench.py) | Depth-tapered air-filled trench etched into a Si slab (staircase-discretized), plus a uniform residual-slab layer beneath the taper, `num_slices` convergence sweep. Geometry rebuilt from a project owner's senior's Lumerical FDTD reference file (`decisions.md` ADR-036) -- FDTD-style `TCD`/`BCD`/`PERIOD` naming, `SLAB_MATERIAL`/`ETCH_MATERIAL`/`TRANSMISSION_MATERIAL` constants. Cross-validated against real Lumerical RCWA output once materials and harmonic-order truncation were matched between the two tools (~0.5% R RMS, ~0.15% T RMS agreement, `postprocessing/overlay_tapered_trench_vs_lumerical.py`) |
 | [`trench_field_cross_section.py`](trench/trench_field_cross_section.py) | Reconstructs `(Ex,Ey,Ez,Hx,Hy,Hz)` over an (x,z) cross-section grid through the grating (Category 9 targets 9.1-9.8) — saves raw field data for `postprocessing/plot_field_cross_section.py` |
 | [`trench_ocd_sweep.py`](trench/trench_ocd_sweep.py) | Category 11 target 11.6: wavelength sweep at several `ocd.OCDTrapezoidParams` sidewall angles, `run_metadata.txt` recording every swept parameter |
 

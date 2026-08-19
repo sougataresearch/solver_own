@@ -12,4 +12,4 @@ venv/
 htmlcov/
 outputs/
 OUTPUT_RCWA/
-demo.fsp
+*.fsp

@@ -1751,3 +1751,203 @@
   `structures/thin_film/multistack_composite_grating.py` itself needed no
   change -- it was correct from the start; the mismatch was entirely in
   the Lumerical reference model.
+
+## ADR-035: `Pattern.skip_bounds_check` — a narrow, explicit escape hatch for `validate_pattern_fits_lattice`'s conservative bounding-radius false positives
+
+- **Decision**: added `Pattern.skip_bounds_check: bool = False` (default
+  unchanged for every existing caller) and gated `Simulation.__init__`'s
+  call to `validate_pattern_fits_lattice` (Category 4 target 4.2) on it.
+  When `True`, the caller has independently verified (not merely assumed)
+  that the specific shape does not truly overlap its own periodic images,
+  despite tripping the conservative `2*bounding_radius >= min_period` test.
+- **Why this was needed**: building
+  `structures/trench/offset_tapered_trench_2d.py` (a structure matching a
+  Lumerical RCWA file the project owner shared, see that script's own
+  docstring for the full axis-mapping account) produces `Rectangle`
+  patches whose y-halfwidth (2.286 um, fixed across the depth taper) is
+  larger than the lattice's x-period (2.028 um) — the check's circular
+  bounding-radius bound (based on corner-to-center distance, compared
+  against the *shorter* of the two lattice periods) flags this as a
+  potential overlap, even though the shape is comfortably clear of
+  self-overlap on **both** axes independently: `2*0.2625um < 2.028um` (x)
+  and `2*2.286um < 6.572um` (y). Confirmed directly via
+  `tests/test_unit_cell_bounds.py::test_elongated_rectangle_on_narrow_axis_flags_false_positive_then_verified_safe`,
+  not assumed. The same false-positive class first appeared, and was
+  resolved the same way, for an elongated `Polygon` case earlier in this
+  session (now a synthetic regression test only,
+  `test_y_tapered_trapezoid_bounding_radius_flags_false_positive`/
+  `test_skip_bounds_check_lets_verified_safe_pattern_construct_and_solve`
+  — that specific shape doesn't correspond to a real structure anymore,
+  see below).
+- **What was explicitly rejected**: (1) altering the real device dimensions
+  to fit inside the check's threshold — would misrepresent the actual
+  structure being compared against Lumerical; (2) loosening or removing
+  `validate_pattern_fits_lattice` globally — it remains the default,
+  active protection for every pattern that doesn't opt out.
+- **Known, honestly-documented limitation, not fixed here**: this is now
+  the *second* time the same conservative-bound false-positive class has
+  appeared (an elongated/axis-aligned shape on a non-square lattice, or a
+  boundary-touching shape on any lattice). `validate_pattern_fits_lattice`'s
+  own docstring already flags its bounding-radius test as conservative,
+  not exact; a tighter, per-axis-aware check (exact for `Rectangle`, still
+  conservative but less so for arbitrary `Polygon`) would remove the need
+  for this escape hatch in these recurring cases, but is a larger design
+  change not undertaken in this session — flagged as a candidate future
+  improvement, not implemented speculatively.
+- **Correction, same session**: the first attempt at building this
+  structure (`structures/trench/y_tapered_polygon_trench.py`, a `Polygon`
+  with an in-plane, non-depth taper) was built on a wrong axis reading —
+  the project owner corrected this mid-session: the source Lumerical file
+  uses `propagation axis = y` (confirmed directly by the project owner,
+  not independently verifiable from the `.fsp` binary itself — see below),
+  the opposite of `sougata_solver`'s own fixed z-is-depth convention. Under
+  the corrected mapping this is a standard depth-tapered rectangular
+  trench (Phase 5's `staircase_rectangle_layers`, no new physics), offset
+  within a genuinely 2D lattice — the wrong-axis script was deleted and
+  replaced by `structures/trench/offset_tapered_trench_2d.py`.
+- **`.fsp` binary spot-check**: `my trench.fsp` (the project owner's actual
+  Lumerical save file) was inspected directly — it is a proprietary
+  Lumerical binary format (not HDF5; no Lumerical install available in
+  this environment for `lumapi` access), but every key dimension
+  (2.028e-6, 1.014e-6, ±4.572e-6, -2.286e-6 m, and a solver-region object
+  with z-span 6.972e-6 m) was located as an exact IEEE754 float64 at a
+  byte offset consistent with the `Si_slab`/`etch`/solver-region object
+  cluster — independent confirmation the numbers transcribed from the
+  dialog screenshots are correct. `propagation axis` itself is stored as
+  an unlabeled integer code (no adjacent string), so it could not be
+  independently confirmed this way — that fact rests on the project
+  owner's direct statement, not on file inspection.
+- **Impact**: `src/sougata_solver/geometry.py` (`Pattern.skip_bounds_check`
+  field), `src/sougata_solver/simulation.py` (one-line gate on the existing
+  validation call), `tests/test_unit_cell_bounds.py` (6 new tests: 2
+  Polygon-case, 2 Rectangle-case, matching the pattern already established
+  for the check itself), `structures/trench/offset_tapered_trench_2d.py`
+  (new). No existing test weakened; default behavior unchanged for every
+  pattern that doesn't set the new field.
+
+**Second correction, same session, resolved by a direct GUI check rather
+than another verbal claim**: the project owner then shared the actual
+Lumerical "Interfaces" tab (the RCWA region's own solver-computed layer-
+slicing list: `Si_slab`/max/1, `etch`/min/10, `Si_slab`/min/1, "calculated
+position" -6.572/-4.572/-6.572 um) and asked to check the source `.fsp`
+file directly. A raw-binary spot-check of `my trench.fsp` located the
+actual `reference_name`/`reference_position`/`reference_interfaces`
+property triples and confirmed the interface *counts* (1, 10, 1) match
+exactly -- but the "calculated position" values only make sense as z-axis
+extents (matching `Si_slab`/`etch`'s own z min from the geometry dialogs),
+which is the *opposite* of the y-is-depth reading the previous correction
+had just adopted, creating a genuine, unresolved tension (the etch's "10
+interfaces" count, on the other hand, only makes sense for a depth-*varying*
+shape, arguing the other way). Rather than keep resolving this by further
+binary archaeology or another verbal claim, asked the project owner to
+check the RCWA region's **General** tab directly -- the one field
+(`propagation axis`) no amount of indirect evidence could substitute for.
+Confirmed: **`propagation axis = z`, `propagation direction = backward`**
+-- exactly `sougata_solver`'s own fixed convention, no translation needed
+at all. This reverts to the *original* (first) reading: the etch is
+z-uniform, taper genuinely in-plane along y.
+`structures/trench/offset_tapered_trench_2d.py` (the y-is-depth build) was
+deleted; `structures/trench/y_tapered_polygon_trench.py` (the Polygon/
+z-uniform build) was recreated. The synthetic Rectangle-case tests from
+the first correction (`test_elongated_rectangle_on_narrow_axis_flags_false_positive_then_verified_safe`/
+`test_skip_bounds_check_lets_offset_tapered_trench_construct_and_solve`)
+were kept as a distinct, no-longer-structure-tied `skip_bounds_check`
+regression case rather than deleted, since they exercise a genuinely
+different shape (axis-aligned `Rectangle` vs. `Polygon`) tripping the same
+false-positive class. The etch's "10 interfaces" count remains an open,
+honestly-unrecorded question -- not resolvable without a Lumerical
+install, and not load-bearing for the z-uniform structure actually built
+(a z-uniform shape needs no staircase in `sougata_solver` regardless of
+why Lumerical's own count is 10).
+
+## ADR-036: `tapered_trench.py` rebuilt from a real Lumerical FDTD reference file, cross-validated against real Lumerical RCWA output (~0.5% R RMS, ~0.15% T RMS)
+
+- **Decision**: `structures/trench/tapered_trench.py`'s geometry constants
+  (`TCD`/`BCD`/`DEPTH`/`PERIOD`) and material roles (`SLAB_MATERIAL`/
+  `ETCH_MATERIAL`/`TRANSMISSION_MATERIAL`, replacing the prior `RIDGE_`/
+  `GROOVE_`/`SUBSTRATE_MATERIAL` naming) were rebuilt from the project
+  owner's senior's actual Lumerical FDTD file (`Trench_Result_0.3.fsp`),
+  after that file's own dialogs (confirmed directly, not assumed) showed
+  `dimension: 2D`, boundary conditions `x=Periodic, y=PML`, source
+  `injection axis = y-axis`, monitor `type = 2D Y-normal` -- a standard
+  1D-periodic lamellar trench (period 2.028 um along x, depth/propagation
+  along y *in that file's own convention*, uniform along the axis a 2D
+  simulation doesn't include). `Etch_0`'s vertices, read with y=depth, give
+  TCD=0.46018 um (narrower, at the surface) and BCD=0.486352 um (wider, at
+  depth) -- an inverse taper vs. the usual outward-flaring kind, built
+  exactly as measured rather than "corrected" toward a more common
+  convention. A 1.0606409 um uniform residual layer sits beneath the taper
+  (the background rectangle's own extent goes deeper than the etch).
+- **Why this superseded a same-session, in-plane-taper reading**: this
+  session's first attempt at the *related* `my trench.fsp` RCWA file (a
+  different, separate file the project owner was independently building)
+  read its `etch` polygon as a z-uniform shape with an in-plane (y-direction)
+  taper -- see `decisions.md` ADR-035 for that structure and its own
+  `Pattern.skip_bounds_check` finding. That reading turned out to rest on a
+  wrong assumption about which axis `my trench.fsp`'s RCWA region uses as
+  `propagation axis` (a verbal claim, later found incorrect); the project
+  owner then directly confirmed via that file's own General tab:
+  `propagation axis = z, direction = backward` -- exactly `sougata_solver`'s
+  own fixed z-is-depth convention, no translation needed. This ADR's
+  structure (`tapered_trench.py`) is built from the *separate* FDTD
+  reference file instead, which needed no such correction -- its
+  boundary-condition/source/monitor settings unambiguously identify the
+  depth axis without relying on a verbal claim.
+- **Real, honestly-recorded troubleshooting sequence during Lumerical-side
+  cross-validation** (each caught by direct evidence, not assumed away):
+  1. First Lumerical export used the built-in `"Si (Silicon) - Palik"`
+     material while `sougata_solver` used the project's own
+     `NK_FILE/si_KLA.txt` -- R RMS diff 0.056, max 0.13. The overlaid plot
+     showed the *fringe pattern* (Fabry-Perot-like oscillation position)
+     matching almost exactly between the two curves, strong evidence the
+     geometry/period/taper direction were already correct -- only a
+     systematic amplitude offset remained, consistent with a dispersion-
+     model mismatch, not a structural error.
+  2. Re-exporting after assigning a custom `Si_KLA` material (imported from
+     the same `si_KLA.txt` file) gave *identical* R/T to the Palik run --
+     traced to the RCWA solver not having been re-run after the material
+     swap, so `getresult(...,"grating_power")` returned a stale cached
+     result. General lesson recorded here since it recurred: **any change
+     to an RCWA object's settings requires re-running the solve before
+     `getresult()` reflects it** -- changing a field alone does nothing to
+     already-computed results.
+  3. The export script's own sanity print (`size(Rs_p)`) showed Lumerical
+     using 11 total harmonic orders per lattice direction vs.
+     `sougata_solver`'s 31 -- a second, independent source of disagreement,
+     fixed by setting the RCWA Solver tab's "max number ku" = 15 (giving
+     `2*15+1=31`, matching exactly).
+  4. After both fixes (matched material, matched order count) and
+     confirming the solve was actually re-run: R RMS dropped to **0.0049**
+     (max 0.0395), T RMS to **0.0015** (max 0.0132) --
+     `postprocessing/overlay_tapered_trench_vs_lumerical.py`, on par with
+     (slightly better than) `decisions.md` ADR-034's earlier successful
+     Lumerical cross-validation (~1%).
+- **What this confirms and what it doesn't**: this is strong evidence the
+  structure (period, depth-taper direction, residual-layer thickness,
+  materials, and `sougata_solver`'s fixed z-is-depth axis convention) is
+  correctly matched to a real Lumerical RCWA run of the same device. It
+  does **not** claim the two solvers are now numerically identical --
+  Lumerical's manually-built staircase used a different number of z-slices
+  than `sougata_solver`'s internal discretization, and Lumerical's mesh
+  accuracy was left at "2 (low, fastest)"; the ~0.5%/~0.15% residual RMS is
+  consistent with those known, still-present differences, not chased to
+  zero.
+- **Impact**: `structures/trench/tapered_trench.py` (constants and
+  material-role rewrite, matching the FDTD reference's confirmed geometry;
+  `RESIDUAL_THICKNESS`/`Layer("residual_slab", ...)` added --
+  `staircase_slab_layers`'s own return value never included a residual
+  layer, so this is appended in `build_geometry` after calling it, not a
+  change to the shared staircase generator), `postprocessing/overlay_tapered_trench_vs_lumerical.py`
+  (new, mirrors `overlay_composite_grating_vs_lumerical.py`'s established
+  pattern), `export_trench_grating_power.lsf` (new, project root -- the
+  Lumerical-side script that produces the comparison input, mirroring the
+  existing but undocumented-in-repo `export_grating_power.lsf` this
+  project already used for ADR-034), `postprocessing/README.md` (new,
+  documents every script in that folder). No `src/sougata_solver/` change
+  beyond ADR-035's already-recorded `Pattern.skip_bounds_check`. 706 tests
+  pass project-wide (unchanged by this ADR -- no new automated test, since
+  this is a real-world cross-validation against an external tool's live
+  output, not a repeatable oracle fixture; the comparison numbers above are
+  this ADR's own record of that one-time result, per `rules.md`'s
+  discipline of citing what was actually measured, not asserting it as a
+  frozen regression).

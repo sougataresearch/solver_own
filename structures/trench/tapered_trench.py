@@ -1,36 +1,52 @@
-"""Single-taper ridge grating, staircase-discretized.
+"""Depth-tapered trench, staircase-discretized -- built from the project
+owner's senior's FDTD reference file (`Trench_Result_0.3.fsp`), confirmed
+directly (not assumed) via that file's own Lumerical dialogs:
 
-Matches the structure built by the Lumerical script actually in active use
-(the "Edit structure group" script tab, keyed to the `tcd/bcd/depth/spacing/
-grating_number/zSpan/yCompensation/zCompensation` user properties shown in
-that dialog) -- a single trapezoid per period, NOT the two-segment
-`ttcd`/`DoT` "5CD" version from `Code2_grating generate_5CD_hui.py` (that
-script's own embedded structure-group script has an extra "upper" polygon;
-this one doesn't, confirmed directly against the property panel, which
-lists no `ttcd`/`DoT` property at all).
+    - `dimension: 2D` and boundary conditions `x=Periodic, y=PML` mean the
+      structure is periodic along x (period 2.028 um) and uniform/invariant
+      along whatever axis a 2D simulation doesn't include -- a standard 1D
+      lamellar trench, matching `sougata_solver`'s `Lattice1D` +
+      `staircase_slab_layers` exactly.
+    - Source `injection axis = y-axis`, monitor `type = 2D Y-normal` confirm
+      y is depth/propagation *in that FDTD file's own convention* (not
+      `sougata_solver`'s, which is always z -- see `CONVENTIONS.md`).
+    - `Etch_0`'s vertices (object center y=0.0303209, relative vertices at
+      y=+-2.25568), read as y=depth: top edge (y=2.286, exactly flush with
+      the `Trench` background rectangle's own y max) has half-width
+      0.23009 um (TCD=0.46018 um); bottom edge (y=-2.2253591) has
+      half-width 0.243176 um (BCD=0.486352 um) -- narrower at the surface,
+      wider at depth (an inverse taper vs. the usual outward-flaring kind;
+      built exactly as measured, not "corrected" toward a more common
+      convention). Depth = 4.5113591 um.
+    - `Trench` (the background rectangle)'s own y min (-3.286) is below the
+      etch's bottom edge (-2.2253591) by 1.0606409 um -- a uniform,
+      un-etched residual layer left beneath the taper before the
+      semi-infinite half-space.
 
-Stack (top to bottom, i.e. incidence-side to substrate-side):
-    air                                (incidence, semi-infinite)
-    ridge: tapers tcd (top) -> bcd     (single staircase-discretized
-      (bottom), over thickness depth    segment, 1D-periodic along x)
-    substrate                          (transmission, semi-infinite)
+**Found and flagged, not silently reconciled**: a separate, related
+Lumerical RCWA attempt at this same structure (`my trench.fsp`) was
+confirmed (via its own General tab) to use `propagation axis = z`, and its
+own `etch` object was found to be a single z-uniform polygon varying only
+*in-plane* along y -- a genuinely different shape from this FDTD
+reference's *depth* taper. This script builds the FDTD reference's
+structure (the authoritative source, being the senior's file), not that
+RCWA attempt's geometry.
 
-RIDGE_MATERIAL / SUBSTRATE_MATERIAL / GROOVE_MATERIAL are each independently
-selectable below (not hardcoded) -- per the property panel, the ridge here
-is SiO2 (Glass), but substrate and groove-fill aren't shown in that dialog
-and must be set to whatever your actual Lumerical simulation actually uses.
-Use whichever KLA n,k file matches the *same* database entry Lumerical's
-material picker resolved to (e.g. Palik vs. KLA vs. Lumerical's own SiO2
-model are different datasets) -- confirm this mapping manually; nothing in
-this script can infer it for you.
+RIDGE_MATERIAL / TRANSMISSION_MATERIAL are each independently selectable
+below -- confirm these match your actual Lumerical material picks before
+comparing results; nothing in this script can infer that mapping. The
+residual layer and etch fill are assumed Si / air respectively (matching
+the project owner's earlier confirmation for the related structure); the
+half-space below the residual layer is assumed air (free-standing) --
+neither assumption is visible in the FDTD screenshots shown so far.
 
 `grating_number` (finite repeat count in the Lumerical FDTD-style geometry
 view) has no equivalent parameter here: this solver's RCWA formalism is
 already exactly, infinitely periodic via `Lattice1D`, so there's nothing to
 truncate -- it's not silently dropped, it simply doesn't apply.
 
-NOT modeled here (same caveats as the single-segment predecessor of this
-script): no corner rounding (R_top/R_bot), no bowed (non-linear) sidewall.
+NOT modeled here: no corner rounding (R_top/R_bot), no bowed (non-linear)
+sidewall.
 
 Sweeps `num_slices` at a fixed wavelength/angle and prints R/T/A.
 
@@ -46,6 +62,7 @@ import numpy as np
 
 from sougata_solver.excitation import PlaneWaveExcitation
 from sougata_solver.geometry import Lattice1D
+from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
 from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
@@ -63,24 +80,27 @@ MATERIAL_NK_PATHS = {
 NK_WAVELENGTH_UNIT = "nm"
 
 # ============================================================================
-# EDIT: select ridge / substrate / groove-fill materials independently.  Use
-# one of MATERIAL_NK_PATHS' keys, or "air" for vacuum/air (constant n=1).
-# Confirm each against your actual Lumerical simulation before comparing --
-# none of this can be inferred from the structure-group script alone.
+# EDIT: select the surrounding-slab / transmission-side materials
+# independently. Use one of MATERIAL_NK_PATHS' keys, or "air" for
+# vacuum/air (constant n=1). Confirm each against your actual Lumerical
+# simulation before comparing -- none of this can be inferred from the
+# FDTD dialogs alone.
 # ============================================================================
-RIDGE_MATERIAL = "Si"        # matches the property panel's "material" = SiO2 (Glass)
-SUBSTRATE_MATERIAL = "Si"     # NOT shown in the property panel -- set to match your actual Lumerical substrate
-GROOVE_MATERIAL = "air"       # gap fill between ridges -- NOT shown in the property panel either
+SLAB_MATERIAL = "Si"           # the surrounding solid material (matches "Trench"/"Si_slab")
+ETCH_MATERIAL = "air"          # the etched, tapered groove's fill
+TRANSMISSION_MATERIAL = "air"  # semi-infinite half-space below the residual layer
 
 
 # ============================================================================
-# EDIT: the four CDs, matching the property panel's values exactly.
+# EDIT: the four CDs plus the residual layer, matching Trench_Result_0.3.fsp's
+# `Etch_0`/`Trench` dialogs exactly (see module docstring for the derivation).
 # ============================================================================
-TCD = 1.383e-6      # critical dimension at the ridge top (incidence side), meters
-BCD = 1.322e-6      # critical dimension at the ridge base (substrate side), meters
-DEPTH = 4.981e-6          # ridge height (meters)
-SPACING = 0.649e-6  # gap between adjacent ridges (meters)
-PERIOD = TCD + SPACING     # = 3.0 um for the panel's values -- sanity-check this against your own numbers
+TCD = 0.46018e-6           # critical dimension at the surface (top), meters -- narrower
+BCD = 0.486352e-6          # critical dimension at depth (bottom), meters -- wider
+DEPTH = 4.5113591e-6       # etch depth (meters)
+PERIOD = 2.028e-6          # lattice period (meters)
+SPACING = PERIOD - TCD     # derived, for reference/sanity-check only
+RESIDUAL_THICKNESS = 1.0606409e-6  # uniform, un-etched layer beneath the taper (meters)
 
 
 # ============================================================================
@@ -115,7 +135,7 @@ def _material(name: str) -> Material:
     return Material.from_nk_file(name, str(MATERIAL_NK_PATHS[name]), NK_WAVELENGTH_UNIT)
 
 
-def build_geometry(num_slices=None, period=None, tcd=None, bcd=None, depth=None):
+def build_geometry(num_slices=None, period=None, tcd=None, bcd=None, depth=None, residual_thickness=None):
     """Returns (layers, lattice, incidence, transmission).
 
     `num_slices` defaults to `SLICE_COUNTS[-1]` (the finest/most
@@ -127,10 +147,11 @@ def build_geometry(num_slices=None, period=None, tcd=None, bcd=None, depth=None)
     tcd = tcd if tcd is not None else TCD
     bcd = bcd if bcd is not None else BCD
     depth = depth if depth is not None else DEPTH
+    residual_thickness = residual_thickness if residual_thickness is not None else RESIDUAL_THICKNESS
 
-    ridge = _material(RIDGE_MATERIAL)
-    groove = _material(GROOVE_MATERIAL)
-    substrate = _material(SUBSTRATE_MATERIAL)
+    slab = _material(SLAB_MATERIAL)
+    etch = _material(ETCH_MATERIAL)
+    transmission = _material(TRANSMISSION_MATERIAL)
     air = Material("air", 1.0)
     lattice = Lattice1D(period)
     layers = staircase_slab_layers(
@@ -139,17 +160,19 @@ def build_geometry(num_slices=None, period=None, tcd=None, bcd=None, depth=None)
         bottom_halfwidth=0.5 * bcd,
         thickness=depth,
         num_slices=num_slices,
-        shape_material=ridge,
-        background_material=groove,
+        shape_material=etch,
+        background_material=slab,
     )
-    return layers, lattice, air, substrate
+    if residual_thickness > 0:
+        layers.append(Layer("residual_slab", residual_thickness, material=slab))
+    return layers, lattice, air, transmission
 
 
 def main() -> None:
-    print(f"Period (pitch)     = {PERIOD * 1e6:.4f} um  (= TCD + SPACING)")
-    print(f"TCD / BCD          = {TCD * 1e6:.4f} / {BCD * 1e6:.4f} um")
-    print(f"Depth              = {DEPTH * 1e6:.4f} um")
-    print(f"Ridge / Substrate / Groove = {RIDGE_MATERIAL} / {SUBSTRATE_MATERIAL} / {GROOVE_MATERIAL}")
+    print(f"Period (pitch)     = {PERIOD * 1e6:.4f} um")
+    print(f"TCD / BCD          = {TCD * 1e6:.4f} / {BCD * 1e6:.4f} um  (narrower at top, wider at depth)")
+    print(f"Depth              = {DEPTH * 1e6:.4f} um  (+ {RESIDUAL_THICKNESS * 1e6:.4f} um residual slab)")
+    print(f"Slab / Etch / Transmission = {SLAB_MATERIAL} / {ETCH_MATERIAL} / {TRANSMISSION_MATERIAL}")
     print()
 
     num_orders = 2 * NUM_ORD + 1
@@ -159,8 +182,8 @@ def main() -> None:
     absorptance = np.zeros((len(SLICE_COUNTS), len(WAVELENGTHS)))
 
     for si_idx, num_slices in enumerate(SLICE_COUNTS):
-        layers, lattice, air, substrate = build_geometry(num_slices=num_slices)
-        sim = Simulation(lattice, layers, num_orders=num_orders, incidence=air, transmission=substrate)
+        layers, lattice, air, transmission = build_geometry(num_slices=num_slices)
+        sim = Simulation(lattice, layers, num_orders=num_orders, incidence=air, transmission=transmission)
 
         for wl_idx, wavelength in enumerate(WAVELENGTHS):
             excitation = PlaneWaveExcitation(
@@ -196,9 +219,10 @@ def main() -> None:
         bcd_m=BCD,
         depth_m=DEPTH,
         spacing_m=SPACING,
-        ridge_material=RIDGE_MATERIAL,
-        substrate_material=SUBSTRATE_MATERIAL,
-        groove_material=GROOVE_MATERIAL,
+        residual_thickness_m=RESIDUAL_THICKNESS,
+        slab_material=SLAB_MATERIAL,
+        etch_material=ETCH_MATERIAL,
+        transmission_material=TRANSMISSION_MATERIAL,
         incident_angle_deg=INCIDENT_ANGLE_DEG,
         azimuthal_angle_deg=AZIMUTHAL_ANGLE_DEG,
         num_orders=num_orders,
