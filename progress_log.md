@@ -1425,3 +1425,209 @@ whether it was ever actually implemented.
   (new ADR-036), `memory.md`, `structures/README.md`, `.gitignore`, and
   this file. New files: `postprocessing/overlay_tapered_trench_vs_lumerical.py`,
   `postprocessing/README.md`, `export_trench_grating_power.lsf`.
+
+## 2026-08-19 (continued again)
+
+### Discussed
+- Project owner asked why `structures/trench/trench_ocd_sweep.py` exists
+  given `tapered_trench.py` already simulates their real device -- clarified
+  the two serve different purposes: `tapered_trench.py` simulates one
+  specific, known, cross-validated device; `trench_ocd_sweep.py`
+  demonstrates the OCD scatterometry library-generation workflow (many
+  candidate geometries, for later inverse CD extraction against an unknown
+  measured spectrum), currently only sweeping one parameter (`BOTTOM_CDS`)
+  with a single value in it.
+- Project owner confirmed the intended future scope: a genuine multi-
+  dimensional library varying TCD, BCD, height, sidewall angle (geometric)
+  plus wavelength, polarization, incidence angle, and azimuth angle
+  (measurement-configuration), reusing the already-converged
+  `SLICE_COUNTS`/`num_slices=32` finding from `tapered_trench.py`'s
+  convergence study as a fixed setting (not re-swept per candidate) --
+  and confirmed this belongs in a separate folder from `structures/trench/`
+  given its scale, with a GPU backend preferred given how combinatorially
+  expensive it would be.
+
+### Action items
+- [ ] **Phase 11 (OCD spectral library generation & inverse dimension
+  extraction)** — recorded as future work, not started. See `phases.md`
+  Phase 11 for the full scope, and `decisions.md` ADR-024's GPU-not-
+  approved decision, which should be revisited against this concrete
+  workload (not assumed to still apply unchanged) once this phase is
+  actually started.
+- **Session summary**: no code changed this sub-session -- `phases.md`
+  (new Phase 11 entry) and this file updated to record the discussion and
+  future-work scope per the project owner's explicit request.
+
+## 2026-08-19 (continued yet again)
+
+### Discussed
+- Project owner asked for the actual workflow to be enforced in code: run
+  `tapered_trench.py` first to confirm the real device and its converged
+  slice count, then use `trench_ocd_sweep.py`, with the code itself
+  reminding of/enforcing consistency rather than relying on the user to
+  remember to keep two independently-typed geometries in sync.
+
+### Action items
+- [x] Fixed structurally, not by adding a reminder comment --
+  `trench_ocd_sweep.py` now dynamically loads `tapered_trench.py` and
+  reuses its `build_geometry()`/constants directly (including a new
+  `tapered_trench.RECOMMENDED_NUM_SLICES = 32`), so the two files cannot
+  silently drift apart. `decisions.md` ADR-036 addendum has the full
+  account. `structures/trench/README.md` updated to match.
+- **Session summary**: 706 tests pass project-wide (unchanged). Verified
+  the rewritten `trench_ocd_sweep.py` with a reduced-scope sanity run
+  before trusting it.
+
+## 2026-08-19 (final continuation)
+
+### Discussed
+- Project owner asked for the OCD library/inverse-modeling work to live in
+  a genuinely separate sibling project, not nested inside `sougata_solver`,
+  since it's conceptually inverse modeling and combinatorial batch
+  simulation (GPU-preferred), not RCWA solving. Used `EnterPlanMode` given
+  this involves cross-repo structural decisions (folder name, own git repo
+  or not, dependency wiring, initial scope) worth aligning on before
+  creating files/repos, especially given how much rework other parts of
+  this session already needed.
+- Confirmed via `AskUserQuestion`: folder name `ocd_library`, own git repo,
+  `pip install -e ../sougata_solver` dependency wiring, and scope = move
+  the existing single-parameter sweep now plus scaffold (stubs only, no
+  logic) for the future multi-parameter sweep/library/matching work.
+
+### Action items
+- [x] Create `ocd_library` sibling project, move
+  `trench_ocd_sweep.py` there, scaffold `geometry_sweep.py`/
+  `measurement_sweep.py`/`library_builder.py`/`spectrum_matcher.py` as
+  `NotImplementedError` stubs -- done 2026-08-19. `decisions.md` ADR-037.
+- [x] Found and fixed a real cross-repo output-path bug before trusting
+  the move (`sougata_solver.output_paths` writes into that repo's own
+  `outputs/` regardless of caller) -- done, new local
+  `ocd_library/src/ocd_library/output_paths.py`.
+- [x] Update `sougata_solver`'s own docs (`structures/trench/README.md`,
+  `structures/README.md`, `phases.md` Phase 11) to point to the new
+  location -- done.
+- **Session summary**: 706 tests pass project-wide in `sougata_solver`
+  (unchanged). `ocd_library` verified end to end with a reduced-scope
+  sanity run (matches the pre-move numbers exactly) before trusting the
+  move. `sougata_solver`'s own changes (deletion + doc updates) not yet
+  committed/pushed -- confirming with the project owner first.
+
+## 2026-08-19 (second-user onboarding)
+
+### Discussed
+- Project owner asked to make `sougata_solver` installable by other users
+  ("like pip install type"), without hardcoding the project owner's own
+  machine path. This is exactly ADR-007's own stated revisit trigger
+  ("used by a second person"), so treated as a legitimate scope revisit,
+  not scope creep -- but confirmed the actual shape via `AskUserQuestion`
+  rather than assuming "installable for others" meant public PyPI
+  publishing.
+- Walked through PyPI's real requirements (package name availability,
+  `LICENSE` choice, version-pinning policy, `CHANGELOG.md`, release
+  tagging, public/world-readable listing, and that actual upload is a
+  publishing action requiring the project owner's own explicit go-ahead
+  and PyPI token) before the project owner chose a path.
+- Confirmed via `AskUserQuestion`: **git clone from the existing public
+  GitHub repo** (verified reachable/public via the GitHub API), plus a
+  one-command `setup.ps1` + `GETTING_STARTED.md` recipe -- not PyPI, not
+  a zipped-folder handoff.
+- Verified before writing anything: no hardcoded personal paths inside
+  `src/sougata_solver/` (the installable package) or `structures/`; a
+  handful of `postprocessing/*.py` scripts have an editable default input
+  path, but those are user-edited scratch scripts outside the package,
+  not a portability blocker. Also verified `REFERENCE/` (~1GB, one level
+  above `sougata_solver/`) is never imported at runtime/in tests --
+  docstring citations only -- so a new user doesn't need it.
+
+### Action items
+- [x] `GETTING_STARTED.md` (new) -- path-independent step-by-step recipe:
+  install Python 3.10+, `git clone`, run `setup.ps1`, activate the venv,
+  run an example, troubleshooting notes.
+- [x] `setup.ps1` (new, repo root) -- creates `.venv`, runs
+  `pip install -e ".[dev]"`, verifies with the same
+  `pytest -m "not slow"` command `.github/workflows/ci.yml` already runs.
+- [x] `README.md` Installation section now points to `GETTING_STARTED.md`
+  first, manual commands kept below for existing users.
+- [x] `deployment.md` given a dated addendum recording this without
+  rewriting its existing "no PyPI/Docker" scope note.
+- [x] `decisions.md` ADR-038 records the decision and why PyPI/Docker were
+  not chosen.
+- **Session summary**: no `src/sougata_solver/` change, no dependency
+  added, no existing test behavior changed -- purely onboarding docs/
+  script. Not yet run end-to-end on a genuinely clean machine (no existing
+  `.venv`/Python config); recommend the project owner (or the actual new
+  user) do one real dry run of `GETTING_STARTED.md` before relying on it.
+
+## 2026-08-20 (Category 18 documentation)
+
+### Discussed
+- Project owner asked to complete `COMMERCIAL_RCWA_ATOMIC_TARGETS.md`
+  Category 18's remaining targets "one by one," after a review of
+  `phases.md`/`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` found Category 18
+  (Documentation) was the one category with genuinely open, non-deferred
+  work -- every other unchecked box elsewhere in the register turned out
+  to already be evaluated-and-deferred, not pending.
+- Used `EnterPlanMode` given the scope (8 targets, 4 new files, no
+  existing file-structure convention to follow). An Explore pass surfaced
+  the key finding before any writing started: every equation/example/
+  oracle this would document already exists, cited, and validated
+  elsewhere (`design.md`, `s_matrix_method.md`, `CONVENTIONS.md`,
+  `src/sougata_solver/README.md`'s module map, `structures/`/
+  `tests/oracles/` docstrings, `testing.md`'s Validation Inventory) -- so
+  this was scoped as consolidation, not new derivation, matching
+  `rules.md` AI Coding Rule 1.
+
+### Action items
+- [x] `theory.md` (new) -- targets 18.1-18.3. A ToC/front-door over
+  `design.md`/`CONVENTIONS.md`/`s_matrix_method.md`, plus an end-to-end
+  pipeline narration (Fourier factorization -> eigenmode solve -> S-matrix
+  cascade -> field/power extraction) none of those gave individually, and
+  an anisotropy section explicitly stating target 1.5 (longitudinal
+  coupling) remains deferred.
+- [x] `api_reference.md` (new) -- target 18.4. Expands
+  `src/sougata_solver/README.md`'s Module Map (verified still accurate)
+  into a full per-symbol reference across all 20 `src/sougata_solver/`
+  modules; exceptions documented by citing `design.md`'s Failure Contract
+  once rather than duplicating it per function.
+- [x] `tutorials.md` (new) -- targets 18.5-18.7. Walks through
+  `structures/thin_film/sio2_on_si_thin_film.py`,
+  `structures/trench/trench_grating.py`, and
+  `structures/via/tapered_pillar.py` -- no new example code. All three
+  actually re-run this session (not remembered output) to capture real
+  sample numbers, including the tapered-pillar convergence trend
+  (R: 0.263 at num_slices=1 -> converged ~0.701 by num_slices=8).
+- [x] `validation_guide.md` (new) -- target 18.8. Deliberately organized
+  *by oracle* (6 files under `tests/oracles/`) rather than duplicating
+  `testing.md`'s existing *by-category* Validation Inventory -- profiles
+  each oracle's actual proof scope, most notably that
+  `rcwa_2djl_eigenvalues.py`/`rcwa_anisotropic_inplane_jl.py` check
+  eigenvalues only, never a full R/T pipeline, which is easy to
+  misread as equivalent to the 1D case's two independent full-R/T oracles
+  if not spelled out explicitly.
+- [x] `phases.md` Phase 8 given an explicit `**DONE**` status (previously
+  had none, unlike every other phase) -- its "example gallery" deliverable
+  is exactly what 18.5-18.7 completed; its convergence-study deliverable
+  was already satisfied by Category 14 target 14.7. A documentation/status
+  gap, not an implementation gap.
+- [x] `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 18 checkboxes 18.1-18.8
+  checked with "Done 2026-08-20" notes; category header changed
+  PARTIAL -> DONE; exit-criteria status line added.
+- [x] `tasks.md`/`memory.md` updated to match.
+- **Session summary**: 706 tests pass project-wide, unchanged -- confirmed
+  by actually running `pytest -m "not slow" -q` after all four docs
+  landed, not assumed from "docs-only, so it must be fine." No
+  `src/sougata_solver/` change, no new test, no new example script. Three
+  guessed Markdown anchor links (`api_reference.md#...`,
+  `tutorials.md#...`) were caught during self-review and replaced with
+  plain file links rather than trusting an unverified GitHub heading-slug
+  guess.
+- **Follow-up same day**: project owner asked for a "formula sources"
+  section in `GETTING_STARTED.md` so a new user can verify a cited formula
+  without needing the ~1GB `REFERENCE/` folder. Added a repo-name -> public
+  GitHub URL table (S4, EMpy, RigorousCoupledWaveAnalysis.jl,
+  Rigorous-Coupled-Wave-Analysis, PyRCWA) -- URLs read directly from each
+  vendored repo's own `.git/config` (not typed from memory) and all five
+  confirmed live via a direct GitHub API reachability check before adding.
+  `EMTutorial` explicitly excluded with a stated reason (vendored JCMsuite
+  project files, not an independent public code repo) rather than silently
+  omitted.

@@ -1697,37 +1697,78 @@ Categories 16-17 combined (683 before + 19 new in
 `tests/test_plotting.py` + 4 new here), full fast+slow suite re-run and
 confirmed green.
 
-## 18. Documentation — PARTIAL
+## 18. Documentation — DONE
 
 ### Already present
 
 - README, PRD, architecture, design, decisions, testing, references, and
   troubleshooting documents.
+- `theory.md`, `api_reference.md`, `tutorials.md`, `validation_guide.md`
+  (added 2026-08-20, targets 18.1-18.8).
 
 **Current scope**
 
-Internal documentation is strong; a cohesive mathematical theory guide and
-user tutorial/API reference remain incomplete.
+Done 2026-08-20: a cohesive mathematical theory guide
+(`theory.md`), full API reference (`api_reference.md`), tutorials for all
+three structure families (`tutorials.md`), and an oracle-by-oracle
+validation guide (`validation_guide.md`) close out this category. All four
+are consolidations of already-implemented, already-cited, already-tested
+material (per `rules.md` AI Coding Rule 1) -- no new formula, no new
+example code, no new test. Fast suite re-confirmed unchanged (706 passed)
+after this category's docs-only changes.
 
 ### Small targets
 
-- [ ] **18.1 Theory outline:** create a table of contents for the mathematical
+- [x] **18.1 Theory outline:** create a table of contents for the mathematical
   derivation, conventions, and validation notes.
-- [ ] **18.2 Core derivation:** document the isotropic uniform/1D/2D equations
+  Done 2026-08-20: `theory.md` -- a ToC/front-door consolidating (not
+  re-deriving) `design.md`'s Algorithms section, `CONVENTIONS.md`, and
+  `s_matrix_method.md`, plus a pipeline diagram narrating Fourier
+  factorization -> eigenmode solve -> S-matrix cascade -> field/power
+  extraction as one sequence, which no single existing doc did.
+- [x] **18.2 Core derivation:** document the isotropic uniform/1D/2D equations
   already implemented, citing code and sources.
-- [ ] **18.3 Anisotropy derivation:** add only after the corresponding Category-1
+  Done 2026-08-20: `theory.md`'s per-stage sections, each citing the exact
+  `design.md` Algorithm/`CONVENTIONS.md` section rather than restating
+  equations already documented elsewhere.
+- [x] **18.3 Anisotropy derivation:** add only after the corresponding Category-1
   milestones are validated.
-- [ ] **18.4 API reference:** generate or maintain a reference for public API
+  Done 2026-08-20: `theory.md`'s Anisotropic materials section -- a table
+  mapping targets 1.3/1.4/1.6/1.7/1.8 to solver entry points and their
+  validating tests, plus an explicit statement that target 1.5
+  (longitudinal coupling) remains deferred (not implemented) so the doc
+  cannot be read as claiming full-tensor support.
+- [x] **18.4 API reference:** generate or maintain a reference for public API
   signatures, units, and exceptions.
-- [ ] **18.5 Tutorial: thin film:** reproduce a validated Fresnel/TMM example.
-- [ ] **18.6 Tutorial: grating:** reproduce a validated 1D diffraction example.
-- [ ] **18.7 Tutorial: via/taper:** reproduce validated 2D and staircase examples.
-- [ ] **18.8 Validation guide:** explain what each benchmark proves and does not prove.
+  Done 2026-08-20: `api_reference.md` -- expands
+  `src/sougata_solver/README.md`'s Module Map table into a full per-symbol
+  reference (all 20 `src/sougata_solver/` modules), citing `design.md`'s
+  Failure Contract for exceptions rather than duplicating it per-function.
+- [x] **18.5 Tutorial: thin film:** reproduce a validated Fresnel/TMM example.
+- [x] **18.6 Tutorial: grating:** reproduce a validated 1D diffraction example.
+- [x] **18.7 Tutorial: via/taper:** reproduce validated 2D and staircase examples.
+  Done 2026-08-20 (18.5-18.7 together): `tutorials.md` -- walks through
+  `structures/thin_film/sio2_on_si_thin_film.py`,
+  `structures/trench/trench_grating.py`, and `structures/via/tapered_pillar.py`
+  respectively; no new example code written, all three scripts re-run this
+  session to capture real (not remembered) sample output.
+- [x] **18.8 Validation guide:** explain what each benchmark proves and does not prove.
+  Done 2026-08-20: `validation_guide.md` -- an oracle-centric companion to
+  `testing.md`'s existing category-centric Validation Inventory, profiling
+  each of the 6 `tests/oracles/*.py` files individually (what it proves,
+  what it explicitly does not), plus the standing 2D full-R/T oracle gap.
 
 ### Exit criteria
 
 **Category gate:** a new user can reproduce a validated example without
 reading implementation source.
+
+**Status as of 2026-08-20**: all 8 targets done. The category gate is met
+directly: `tutorials.md`'s three walkthroughs are runnable end to end from
+`GETTING_STARTED.md`'s setup alone, with real captured output, and never
+require reading `src/sougata_solver/` source to reproduce. 706 tests pass
+project-wide (unchanged -- this category made no `src/sougata_solver/`
+change).
 
 ## 19. Future extensions — DEFERRED
 

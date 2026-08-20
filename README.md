@@ -471,10 +471,20 @@ sougata_solver/
 Folder-level READMEs with more detail:
 [`src/sougata_solver/README.md`](src/sougata_solver/README.md) ·
 [`structures/README.md`](structures/README.md) ·
+[`structures/trench/README.md`](structures/trench/README.md) ·
 [`tests/README.md`](tests/README.md) ·
-[`profiling/README.md`](profiling/README.md)
+[`profiling/README.md`](profiling/README.md) ·
+[`postprocessing/README.md`](postprocessing/README.md)
 
 ## Installation
+
+**New to this project?** See [`GETTING_STARTED.md`](GETTING_STARTED.md) for
+a full step-by-step recipe (installing Python, cloning the repo, and a
+one-command `setup.ps1` that creates the environment, installs
+dependencies, and verifies the install by running the test suite).
+
+The manual equivalent, for anyone who already has the repo and just wants
+the raw commands:
 
 ```bash
 cd sougata_solver

@@ -435,7 +435,7 @@ plan-mode scratch file) as phases complete.
   tests. `fields.save_field_grid_npz` covers this phase's field-export
   need (NumPy `.npz`; CSV/HDF5 deliberately deferred, no schema designed).
 
-## Phase 8 — Expanded Validation Suite & Example Gallery
+## Phase 8 — Expanded Validation Suite & Example Gallery — **DONE**
 
 - **Objectives**: systematic convergence-vs-`num_orders` studies for every
   geometry type; a complete example gallery mirroring the vendored
@@ -451,6 +451,19 @@ plan-mode scratch file) as phases complete.
   convergence-rate-vs-theory checks (`testing.md`'s Physical-Invariant
   Testing, first required starting Phase 3) get collected into one
   systematic sweep rather than living only in each phase's own test file.
+- **Status**: this phase never got an explicit status line even after its
+  deliverables landed piecemeal elsewhere — closed out explicitly
+  2026-08-20 rather than left ambiguous. Both original deliverables are
+  satisfied: the systematic convergence-vs-`num_orders` studies are
+  `COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 14 target 14.7
+  (`tests/test_harmonic_convergence_matrix.py`, all 7 supported geometry
+  families, `slow`-marked); the example gallery already existed as
+  `structures/`'s per-geometry scripts (thin film, DBR, trench, via,
+  pillar, tapered variants) and now has a user-facing narrated tour in
+  Category 18's `tutorials.md` (targets 18.5-18.7), which is the piece
+  that was still genuinely missing (a reader-facing walkthrough, not just
+  runnable scripts). No new code or tests were needed to close this phase
+  out — it was a documentation/status gap, not an implementation gap.
 
 ## Phase 9 — Performance & Optional GPU/Autodiff Backend (later, optional)
 
@@ -536,6 +549,69 @@ plan-mode scratch file) as phases complete.
   (no display available) — only its data-prep/rebuild pipeline was
   verified programmatically in PyVista's offscreen mode; the project
   owner needs to run it themselves to confirm the live experience.
+
+## Phase 11 — OCD Spectral Library Generation & Inverse Dimension Extraction (future, not started; tracked in a separate sibling project)
+
+**Update, same day**: this phase's actual implementation now lives in a new
+sibling project, `../ocd_library` (own git repo, `pip install -e ../sougata_solver`
+dependency) — not inside `sougata_solver` itself. The project owner asked
+for this directly: OCD library generation/inverse modeling is a
+conceptually different workload (combinatorial batch simulation for
+inverse-fitting, not RCWA solving) from everything else in this repo, with
+different scaling needs (GPU-preferred). `structures/trench/trench_ocd_sweep.py`
+moved to `ocd_library/sweeps/trench_ocd_sweep.py` unchanged in behavior
+(still delegates to this repo's `tapered_trench.build_geometry()`, loaded
+dynamically across the two repos so it can't silently drift). See
+`decisions.md`'s ADR recording the move and `ocd_library/README.md`'s own
+Roadmap for the current status of the objectives below — this entry stays
+here only as the original scope record, not as an actively-tracked
+sougata_solver deliverable.
+
+- **Objectives**: build a multi-dimensional library of simulated spectra
+  (R/T, and potentially per-order diffraction efficiencies) across both
+  geometric parameters (top CD, bottom CD, height — sidewall angle is
+  already a derived property of these three via `ocd.OCDTrapezoidParams`,
+  not an independent sweep axis) and measurement-configuration parameters
+  (polarization state, incidence angle theta, azimuth angle phi; wavelength
+  is already the per-point axis within each individual spectrum) — to
+  support **inverse CD extraction**: given an unknown/measured spectrum
+  from a real device, search the library for the best-matching entry and
+  read off its geometric parameters as the extracted dimensions. Requested
+  directly by the project owner (2026-08-19), building on
+  `ocd_library/sweeps/trench_ocd_sweep.py`'s existing single-parameter
+  (bottom-CD-only) sweep and `tapered_trench.py`'s real-device cross-
+  validation (`decisions.md` ADR-036).
+- **Deliverables**: a **new, separate top-level folder** (not nested inside
+  `structures/trench/` — this is a fundamentally different kind of
+  workload: large combinatorial batch generation, not a single illustrative
+  example script) housing the library-generation driver; a storage format
+  for the resulting multi-dimensional array of spectra (revisit Category 15
+  target 15.8's HDF5-deferral decision, `decisions.md` ADR-026, now that a
+  genuine large-multi-dimensional-array use case exists — a plain `.npz`
+  per combination is unlikely to scale). The actual spectrum-matching/
+  search routine (given an unknown spectrum, find the best library entry)
+  is explicitly a **separate, later** deliverable from library generation
+  itself — not scoped here.
+- **Estimated complexity**: High — this is the concrete, combinatorially-
+  expensive workload Category 13 target 13.6's GPU/autodiff-backend
+  decision point anticipated but had no driver to justify at the time
+  (`decisions.md` ADR-024, GPU explicitly not approved for general
+  performance work when last asked). The project owner has directly
+  indicated a GPU backend is preferred for *this* specific workload given
+  its scale — revisit ADR-024's "not approved" status against this
+  concrete use case when this phase is actually started, rather than
+  assuming the earlier general-purpose "not approved" answer still applies
+  unchanged to a workload that didn't exist yet when that decision was made.
+- **Dependencies**: Phase 5 (tapered-trench staircase machinery), Category
+  8 (sweep infrastructure), Category 11 (OCD parameter object,
+  `ocd.OCDTrapezoidParams`/`trapezoid_trench_layers`). The already-measured
+  `num_slices=32` convergence finding (`tapered_trench.py`, `decisions.md`
+  ADR-036) should be reused directly as a **fixed** discretization setting
+  for every library entry — re-running a slice-count convergence study for
+  each of potentially thousands of parameter combinations would be wasted
+  work the existing convergence study already did once, generally.
+- **Status**: not started — explicitly deferred, recorded here per the
+  project owner's direct request to track this as planned future work.
 
 ## Phase Sequencing Summary
 

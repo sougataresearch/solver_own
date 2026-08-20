@@ -5,7 +5,22 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-19 (ADR-036, `tapered_trench.py` rebuilt from a real
+As of 2026-08-20 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 18,
+targets 18.1-18.8 all done -- four new root-level docs, `theory.md`
+(18.1-18.3), `api_reference.md` (18.4), `tutorials.md` (18.5-18.7),
+`validation_guide.md` (18.8), all consolidations of already-implemented/
+cited/tested material, no new formula or example code; also closed out
+Phase 8's previously-ambiguous status in `phases.md` as a side effect,
+since 18.5-18.7's tutorials are what its "example gallery" deliverable was
+still missing; 706 tests pass, unchanged; same session also produced
+`GETTING_STARTED.md`/`setup.ps1` for second-user onboarding via git clone,
+per ADR-038 -- see `progress_log.md`'s two 2026-08-19/2026-08-20 entries
+for the full account of both), 2026-08-19 (ADR-036 addendum, `trench_ocd_sweep.py` rebuilt to
+dynamically load `tapered_trench.py`'s geometry/materials/converged
+`num_slices` instead of hand-copying them, eliminating a drift risk the
+project owner flagged directly -- new `structures/trench/README.md`,
+`phases.md` Phase 11 recorded as planned future work for a full
+multi-parameter OCD library), 2026-08-19 (ADR-036, `tapered_trench.py` rebuilt from a real
 Lumerical FDTD reference file and cross-validated against real Lumerical
 RCWA output to ~0.5% R RMS / ~0.15% T RMS agreement -- see below), 2026-08-19
 (ADR-035, `Pattern.skip_bounds_check` added -- a narrow,

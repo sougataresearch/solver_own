@@ -1951,3 +1951,142 @@ why Lumerical's own count is 10).
   this ADR's own record of that one-time result, per `rules.md`'s
   discipline of citing what was actually measured, not asserting it as a
   frozen regression).
+
+**Addendum (same day): `trench_ocd_sweep.py` rebuilt to structurally reuse `tapered_trench.py`'s geometry, not hand-copy it.**
+The project owner pointed out that `trench_ocd_sweep.py` (a pre-existing
+Category 11 example) still used an independent, hand-typed copy of trench
+geometry constants (`PERIOD`/`TOP_CD`/`HEIGHT` matching the *original*,
+pre-ADR-036 `tapered_trench.py` numbers) and asked for a workflow where
+running `tapered_trench.py` first (to confirm the real device and its
+converged slice count) and then using `trench_ocd_sweep.py` couldn't
+silently drift apart -- explicitly requesting the code itself remind of
+this, not just a comment. Fixed structurally rather than by adding a
+reminder: `trench_ocd_sweep.py` now dynamically loads `tapered_trench.py`
+(`importlib.util.spec_from_file_location`, the same technique this
+project used once before for `plot_structure_3d_preview.py`'s hand-copied-
+constant bug) and reads `PERIOD`/`TCD`/`DEPTH`/`RESIDUAL_THICKNESS`/
+materials/`NUM_ORD` directly from it, calling `tapered_trench.build_geometry()`
+itself for every sweep point rather than reconstructing the stack via a
+separate `OCDTrapezoidParams`/`trapezoid_trench_layers` path. `OCDTrapezoidParams`
+is still used, but now only to compute `sidewall_angle_deg` for metadata --
+a pure, already-validated derived-property calculation, not the layer
+construction itself. Also added `tapered_trench.RECOMMENDED_NUM_SLICES = 32`
+(the convergence-check finding from ADR-036's own account), a new, named,
+importable constant -- previously that number only existed in this ADR's
+prose and the conversation history, not as a value another script could
+actually read. `BOTTOM_CDS` also changed from an arbitrary unrelated value
+to a small offset range around the real device's own BCD
+(`tapered_trench.BCD`), since sweeping CD only makes sense as "what if the
+real device's BCD were slightly different," not an unrelated example
+value. Verified with a reduced-scope sanity run (2 CD values x 3
+wavelengths) before trusting the full rewrite; 706 tests pass project-wide
+(unchanged -- no test imports `trench_ocd_sweep.py`).
+
+## ADR-037: `trench_ocd_sweep.py` moved to a new sibling project (`ocd_library`), out of `sougata_solver` entirely
+
+- **Decision**: `structures/trench/trench_ocd_sweep.py` moved to a new,
+  separate sibling repository, `C:\Users\sougata.bhunia\Desktop\Solver_own\ocd_library`
+  (its own git repo, `pip install -e ../sougata_solver` dependency), as
+  `ocd_library/sweeps/trench_ocd_sweep.py`. Requested directly by the
+  project owner: OCD spectral library generation and inverse dimension
+  extraction (`phases.md` Phase 11, recorded earlier the same day) is
+  conceptually inverse modeling / combinatorial batch simulation, not RCWA
+  solving, and doesn't belong nested inside `structures/trench/` alongside
+  plain forward-solve example scripts -- a different kind of workload
+  (GPU-preferred, per the project owner) with different scaling needs than
+  this repo's own test/example suite.
+- **Why a separate repo, not just a separate top-level folder inside
+  `sougata_solver`** (e.g. alongside `profiling/`/`postprocessing/`):
+  confirmed directly via `AskUserQuestion` -- the project owner wants
+  independent version history from `sougata_solver` for this work, matching
+  the existing sibling-project convention (`sougata_solver`/`REFERENCE/`
+  are already each their own repo under `Solver_own/`).
+- **Dependency wiring, confirmed via `AskUserQuestion`**: `pip install -e ../sougata_solver`
+  (standard editable install into `ocd_library`'s own venv) rather than
+  `sys.path` manipulation -- `sougata_solver` is already a proper
+  pip-installable package (`src/` layout, `pyproject.toml`), so this is the
+  standard approach, not a new pattern invented for this move.
+- **What moved unchanged vs. what had to change**: `trench_ocd_sweep.py`'s
+  actual sweep logic (delegating to `tapered_trench.build_geometry()`,
+  `BOTTOM_CD_OFFSETS` around the real device's BCD) is unchanged. Two
+  things had to change for the cross-repo move: (1) the dynamic-load path
+  to `tapered_trench.py` (previously same-directory, now
+  `parents[2] / "sougata_solver" / "structures" / "trench" / "tapered_trench.py"`,
+  assuming the default sibling-checkout layout, documented as overridable);
+  (2) output-path handling -- **found and fixed before trusting the move**:
+  a first verification run showed the CSV/metadata landing in
+  `sougata_solver/outputs/`, not `ocd_library/outputs/`, traced to
+  `sougata_solver.output_paths.OUTPUTS_ROOT` being anchored to *that
+  package's own* file location
+  (`Path(__file__).resolve().parents[2] / "outputs"`), not the calling
+  script's project -- any script importing that module writes into the
+  solver's own `outputs/` regardless of which project actually runs it.
+  Fixed by adding a local `ocd_library/src/ocd_library/output_paths.py`
+  (a copy of the same three functions, anchored to `ocd_library`'s own
+  root instead), confirmed by re-running the verification and checking the
+  output landed inside `ocd_library/outputs/` this time.
+- **Scaffolding added, structure only, no logic**: per the project owner's
+  explicit scoping ("no coding now, only structure the project"),
+  `ocd_library/sweeps/geometry_sweep.py`, `measurement_sweep.py`,
+  `library_builder.py`, and `ocd_library/inverse/spectrum_matcher.py` are
+  all stubs -- a docstring describing future scope (citing this repo's
+  `phases.md` Phase 11) and one function raising `NotImplementedError`,
+  matching this project's own convention for marking unimplemented
+  capability loudly (`rules.md` AI Coding Rule 2) rather than an empty
+  file or silent `pass`. Verified each one runs and raises the expected
+  error, not a crash from a missing import or typo.
+- **Impact**: `structures/trench/trench_ocd_sweep.py` deleted from
+  `sougata_solver` (moved, not duplicated). `structures/trench/README.md`,
+  `structures/README.md`, and `phases.md` Phase 11 updated to point to the
+  new location. New `ocd_library` repo: `.gitignore`, `pyproject.toml`,
+  `README.md`, `src/ocd_library/{__init__.py,output_paths.py}`,
+  `sweeps/{trench_ocd_sweep.py,geometry_sweep.py,measurement_sweep.py,library_builder.py}`,
+  `inverse/spectrum_matcher.py`. No `src/sougata_solver/` change. 706 tests
+  pass project-wide in `sougata_solver` (unchanged -- no test imported the
+  removed file, confirmed both before and after deletion).
+
+## ADR-038: Second-user onboarding via `git clone` + `setup.ps1`, not PyPI/Docker
+
+- **Decision**: ADR-007's own revisit condition ("used by a second person")
+  was triggered by the project owner asking to make `sougata_solver`
+  installable for other users. Resolved by staying inside ADR-007's
+  existing scope rather than expanding it: distribution is `git clone`
+  from the already-public `github.com/sougataresearch/solver_own` repo
+  (confirmed public via the GitHub API, `"private": false`), plus two new
+  files -- `GETTING_STARTED.md` (step-by-step recipe, path-independent) and
+  `setup.ps1` (repo root; creates `.venv`, runs `pip install -e ".[dev]"`,
+  then verifies with the exact same `pytest -m "not slow"` command
+  `.github/workflows/ci.yml` already runs, so a green local setup means the
+  same thing as a green CI run).
+- **Why not PyPI**: confirmed via `AskUserQuestion` -- the project owner
+  chose git-clone distribution specifically after being shown PyPI's actual
+  requirements (a free package name, a `LICENSE` file, a version-pinning
+  policy, `CHANGELOG.md`, release tagging, and a public/world-readable
+  listing -- none of which exist or were wanted today). `pip install -e .`
+  already gives the "downloads everything it needs" experience for
+  `sougata_solver`'s own dependencies regardless of where the source came
+  from, so PyPI publishing would add process without changing what the new
+  user actually experiences.
+- **Why not Docker**: not evaluated as an option -- out of scope per
+  `deployment.md`'s existing stance (no service component, a venv is
+  sufficient), and the project owner's request was answered by the
+  git-clone + script path without needing it.
+- **`REFERENCE/` is not part of what's shared**: confirmed by grep across
+  `src/` and `tests/` that nothing imports from `REFERENCE/` at runtime --
+  every reference is a docstring citation (formula provenance, per
+  `rules.md`'s Documentation Standards). The ~1GB `REFERENCE/` folder lives
+  one level up from `sougata_solver/` (outside its own git repo per
+  ADR-008) and is correctly absent from a fresh `git clone` of
+  `sougata_solver` alone; `GETTING_STARTED.md` says so explicitly so a new
+  user doesn't go looking for it.
+- **Alternatives considered**: zipped-folder/network-share distribution --
+  offered alongside git-clone via `AskUserQuestion`; not chosen once the
+  GitHub repo was confirmed publicly reachable, since it would mean
+  maintaining two distribution paths for no added benefit over `git clone`.
+- **Impact**: new `sougata_solver/GETTING_STARTED.md`, new
+  `sougata_solver/setup.ps1`. `README.md`'s Installation section now points
+  new users to `GETTING_STARTED.md` first, manual venv/pip commands kept
+  below it for anyone who already has the repo. `deployment.md` has a dated
+  addendum recording this ADR without rewriting its existing "no PyPI/
+  Docker" scope note. No `src/sougata_solver/` change; no dependency added;
+  no test behavior change.

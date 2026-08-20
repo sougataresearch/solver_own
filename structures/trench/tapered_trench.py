@@ -116,13 +116,22 @@ P_AMPLITUDE = 0.0
 # this PERIOD/NUM_ORD/angle (troubleshooting.md's documented q==0 divide-by-
 # zero) is nudged automatically -- no manual per-range recomputation needed.
 WAVELENGTHS = avoid_rayleigh_wood_anomalies(
-    np.linspace(0.40e-6, 0.80e-6, 400), period=PERIOD, num_orders=NUM_ORD, theta=math.radians(INCIDENT_ANGLE_DEG)
+    np.linspace(0.40e-6, 0.80e-6, 401), period=PERIOD, num_orders=NUM_ORD, theta=math.radians(INCIDENT_ANGLE_DEG)
 )
 
 # ============================================================================
 # EDIT: slice-count sweep
 # ============================================================================
 SLICE_COUNTS = [1, 2, 4, 8, 16, 32, 64]
+
+# Found via a targeted convergence check (4 sample wavelengths across
+# SLICE_COUNTS): R stabilizes to ~1e-4 vs. the finest (64-slice) reference
+# by 32 slices -- see `decisions.md` ADR-036. Any other script building on
+# this same real-device geometry (e.g. `trench_ocd_sweep.py`) should import
+# this constant directly rather than hand-copying a slice count, so a future
+# re-run of the convergence check here can't silently leave that script
+# using a stale value.
+RECOMMENDED_NUM_SLICES = 32
 
 OUTPUT_CSV = "output_trench_RT.csv"
 

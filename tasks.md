@@ -322,5 +322,22 @@ Status snapshot (update the source-of-truth file first, then this line):
   regression guard using a same-run relative-scaling ratio rather than
   an absolute wall-clock threshold, per `rules.md`'s Performance
   Requirements, `decisions.md` ADR-028).
-□ Categories 18-19 — not yet started at atomic-target grain (see that
-  file for each category's own small-target checklist).
+☑ Category 18 (Documentation) — targets 18.1-18.8 all done, 2026-08-20
+  (four new root-level docs, each a consolidation of already-implemented/
+  cited/tested material, not new derivation or example code: `theory.md`
+  (18.1-18.3, a ToC over `design.md`/`CONVENTIONS.md`/`s_matrix_method.md`
+  plus an end-to-end pipeline narration none of those individually gave);
+  `api_reference.md` (18.4, expands `src/sougata_solver/README.md`'s
+  Module Map into a full per-symbol reference); `tutorials.md` (18.5-18.7,
+  walks through one already-oracle-validated example script per structure
+  family, all three re-run this session for real captured output);
+  `validation_guide.md` (18.8, an oracle-centric companion to `testing.md`'s
+  category-centric Validation Inventory, profiling each of the 6
+  `tests/oracles/*.py` files' actual proof scope). Also closed out
+  Phase 8's previously-ambiguous status (`phases.md`) as a side effect,
+  since its "example gallery" deliverable is what 18.5-18.7 completed.
+  706 tests pass project-wide, unchanged (no `src/sougata_solver/`
+  change).
+□ Category 19 — not yet started at atomic-target grain, explicitly
+  deferred pending the project owner's own use-case decision (see that
+  file for each small target's own checklist).

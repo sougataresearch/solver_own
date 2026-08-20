@@ -40,7 +40,10 @@ and output path. No other part of the script should normally need touching.
 
 ## `trench/` (Phase 3 lamellar grating, Phase 5 tapered sidewall, Phase 7 field cross-section — done)
 
-1D-periodic patterned layers (`Lattice1D`/`Slab`).
+1D-periodic patterned layers (`Lattice1D`/`Slab`). See
+[`trench/README.md`](trench/README.md) for a suggested run order and more
+detail on each script, including `tapered_trench.py`'s real-Lumerical-derived
+geometry and cross-validation.
 
 | Script | Purpose |
 |---|---|
@@ -48,7 +51,7 @@ and output path. No other part of the script should normally need touching.
 | [`trench_grating_ellipsometry_run.py`](trench/trench_grating_ellipsometry_run.py) | Saves raw field data for ellipsometry postprocessing |
 | [`tapered_trench.py`](trench/tapered_trench.py) | Depth-tapered air-filled trench etched into a Si slab (staircase-discretized), plus a uniform residual-slab layer beneath the taper, `num_slices` convergence sweep. Geometry rebuilt from a project owner's senior's Lumerical FDTD reference file (`decisions.md` ADR-036) -- FDTD-style `TCD`/`BCD`/`PERIOD` naming, `SLAB_MATERIAL`/`ETCH_MATERIAL`/`TRANSMISSION_MATERIAL` constants. Cross-validated against real Lumerical RCWA output once materials and harmonic-order truncation were matched between the two tools (~0.5% R RMS, ~0.15% T RMS agreement, `postprocessing/overlay_tapered_trench_vs_lumerical.py`) |
 | [`trench_field_cross_section.py`](trench/trench_field_cross_section.py) | Reconstructs `(Ex,Ey,Ez,Hx,Hy,Hz)` over an (x,z) cross-section grid through the grating (Category 9 targets 9.1-9.8) — saves raw field data for `postprocessing/plot_field_cross_section.py` |
-| [`trench_ocd_sweep.py`](trench/trench_ocd_sweep.py) | Category 11 target 11.6: wavelength sweep at several `ocd.OCDTrapezoidParams` sidewall angles, `run_metadata.txt` recording every swept parameter |
+| ~~`trench_ocd_sweep.py`~~ | **Moved** to the sibling `ocd_library` project (`../../ocd_library/sweeps/trench_ocd_sweep.py`) — inverse-modeling/library-generation work, not RCWA solving; see `phases.md` Phase 11 and `decisions.md`. |
 
 ## `via/` (Phase 4a/4b 2D patterned layers, Phase 5 tapered sidewall, Phase 7 field cross-section — done)
 

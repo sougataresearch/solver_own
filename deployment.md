@@ -6,6 +6,15 @@ no PyPI publishing, no Docker, no production servers — and says so
 explicitly rather than padding with unneeded process. Revisit if this ever
 becomes a shared/public project.
 
+**Update (2026-08-19, ADR-038)**: ADR-007's own revisit condition — "used
+by a second person" — was triggered. The resolution stays inside this
+document's existing scope: distribution is by `git clone` from the
+already-public `github.com/sougataresearch/solver_own` repo, not PyPI or
+Docker. `GETTING_STARTED.md` (new) and `setup.ps1` (new, repo root) give a
+new user a one-command path to a working, test-verified install. Full
+PyPI publishing (version-pinning policy, `CHANGELOG.md`, release tagging)
+remains a separate, not-yet-made decision — see ADR-038.
+
 ## Environment Setup
 
 ```powershell
