@@ -47,7 +47,7 @@ Tp_total = sum(sum(Tp_p,3),2);
 # Write out -- forward slashes, to avoid backslash-escape issues in
 # string literals. EDIT this path to wherever you want the file saved.
 ########################################################################
-fname = "D:/Sougata/Via/pillar_lumerical_RCWA.txt";
+fname = "D:\Solver_own\sougata_solver\OUTPUT_RCWA\Via\pillar_lumerical_RCWA.txt";
 
 write(fname, "lambda_nm,Rs,Ts,Rp,Tp");
 for(i=1:length(lambda)){
