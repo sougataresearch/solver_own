@@ -1,0 +1,24 @@
+# Mirrors pyproject.toml's [project.dependencies] / [project.optional-dependencies]
+# exactly -- pyproject.toml is the authoritative source (this project's
+# established install path is `pip install -e ".[dev]"`, per decisions.md
+# ADR-038/GETTING_STARTED.md); this file exists as a plain-pip-compatible
+# alternative for tools/environments that expect a requirements.txt
+# specifically. If pyproject.toml's dependency lists ever change, update
+# this file to match -- do not let the two drift apart.
+#
+# Install everything needed to run the solver, examples, and test suite:
+#   pip install -r requirements.txt
+#
+# ---- Core (always required) ----
+numpy>=1.24
+scipy>=1.10
+
+# ---- dev extra: examples, plotting, tests, linting ----
+pytest>=7.0
+matplotlib>=3.7
+ruff>=0.16
+
+# ---- gui extra: only needed for postprocessing/live_structure_viewer.py ----
+# Heavy binary dependency (~85MB) -- commented out by default, same
+# opt-in treatment pyproject.toml's own `gui` extra gives it.
+# pyvista>=0.44

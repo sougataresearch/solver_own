@@ -1631,3 +1631,115 @@ whether it was ever actually implemented.
   `EMTutorial` explicitly excluded with a stated reason (vendored JCMsuite
   project files, not an independent public code repo) rather than silently
   omitted.
+
+## 2026-08-20 — 2D pillar/via prepared for Lumerical RCWA cross-validation (ADR-039)
+
+- **Discussion**: project owner asked to build 2D pillar and via structures
+  "similar like 1d trench structure" in both `sougata_solver` and commercial
+  RCWA (Ansys/Lumerical), and overlay outputs. Read `phases.md` first: Phase
+  4a/4b (2D pillar/via eigensolver, well-conditioned + stress-tested) and
+  Phase 5 (tapered via/pillar) are already **DONE** — `pillar_array.py`/
+  `via_array.py`/`tapered_pillar.py`/`tapered_via.py` already exist. What
+  Phase 4a's own status note flags as still open is a full external R/T
+  oracle (only eigenvalues were cross-checked, against
+  `RigorousCoupledWaveAnalysis.jl`) — so this request is exactly the
+  workflow that closes that gap, not new solver-phase work.
+- Confirmed via `AskUserQuestion`: both pillar and via in scope; no real
+  Lumerical `.fsp` file to transcribe this time — build a from-scratch
+  Lumerical geometry matching `sougata_solver`'s own current constants
+  (ADR-034's approach), not ADR-035/036's real-device-transcription
+  approach.
+- [x] Measured (not assumed) that the shipped `NUM_ORDERS=7` was far
+  under-converged for both structures. Found and documented a genuine
+  physical finding along the way: the freestanding pillar shows sharp
+  guided-mode/Fano resonances, making a single-wavelength convergence probe
+  misleading (see `decisions.md` ADR-039 for the full account). Both
+  scripts bumped to `NUM_ORDERS=81`, wavelength grid widened to 101 points
+  and guarded with `avoid_rayleigh_wood_anomalies` (matching
+  `tapered_trench.py`'s convention). Re-run end to end: R+T=1.0000 (~1e-13)
+  at every point, no NaN, 706 tests pass, `ruff check` clean.
+- [x] `OUTPUT_RCWA/Via/export_pillar_grating_power.lsf`/
+  `export_via_grating_power.lsf` (new) and
+  `postprocessing/overlay_pillar_vs_lumerical.py`/`overlay_via_vs_lumerical.py`
+  (new) — mirror the already-working ADR-034/036 export/overlay pattern.
+  `OUTPUT_RCWA/Via/README.md` (new) gives the project owner the exact
+  Lumerical build spec, including two findings carried forward explicitly
+  so they aren't repeated: use a constant index (not the dispersive Si
+  database, ADR-036's own materials-mismatch lesson), and build the via's
+  substrate as genuinely semi-infinite (ADR-034's lesson) — plus an honest,
+  unresolved note that `sougata_solver`'s circular 2D order truncation and
+  Lumerical's per-axis "max number ku/kv" aren't the same scheme and have no
+  confirmed exact correspondence.
+- [ ] **Open**: actual Lumerical cross-validation run and R/T agreement
+  numbers — needs the project owner to build the Lumerical structure per
+  `OUTPUT_RCWA/Via/README.md` and share the exported `.txt` files (no
+  Lumerical/lumapi access in this environment, same constraint as every
+  prior cross-validation in this project). Follow up with a `decisions.md`
+  ADR-039 addendum once real numbers exist — do not fabricate a comparison
+  result in the meantime, per `rules.md` AI Coding Rule 5.
+- **Follow-up, same day**: project owner clarified their standard
+  Lumerical build convention is "one rectangle structure and one group of
+  structure," pointing at `my_trench_0.3.fsp` as the reference. Extracted
+  the real embedded construction script directly from that file's binary
+  (no Lumerical needed) instead of guessing — confirmed the object tree is
+  `Si_slab` (plain Rectangle) + `Etch` (Structure Group, `setupscript`
+  running the 32-slice `addrect` staircase loop). `build_and_export_pillar.lsf`
+  rewritten to mirror this exactly (`Air_bg` Rectangle + `Pillar` Structure
+  Group with a one-child construction script), using property names
+  (`"x span"`, `"material"`, etc.) copied verbatim from the real file
+  rather than reconstructed from memory. See `decisions.md` ADR-039's
+  addendum for the full account, including which two properties are still
+  a best-effort guess (the group's own script-enabling property names).
+- **Follow-up, same day**: project owner reviewed the actual Lumerical
+  render of the free-standing pillar and pointed out a real pillar device
+  is essentially never fully free-standing. Confirmed via
+  `AskUserQuestion`: grow it on a Si substrate (reusing the pillar's own
+  index). `pillar_array.py`'s `transmission` changed from air to a
+  substrate `Material`; re-measured convergence (not reused from the
+  free-standing case) found `NUM_ORDERS=121` needed, not 81 -- and a nice
+  physical side-effect: the substrate damps the free-standing case's
+  pathological sharp resonances (new sweep: R ranges a well-behaved
+  0.0004-0.286, vs. resonances reaching >0.99 before). Re-verified:
+  R+T=1.0000 (~5e-13), no NaN, 706 tests pass, `ruff check` clean.
+  `build_and_export_pillar.lsf` updated to match (added a `Si_substrate`
+  Rectangle, nudged RCWA `z min`, raised `ku`/`kv` to 17). Iterated live
+  with the project owner through three real Lumerical script errors
+  (`setglobalsource` frequency-points property, polarization property,
+  and -- per direct correction -- materials must be referenced by name
+  from the database, not defined inline via `addmaterial`/`setmaterial`,
+  matching how `my_trench_0.3.fsp`'s own script references `"etch"`). See
+  `decisions.md` ADR-039's second addendum for the full account.
+
+## 2026-08-21 — Real dispersive Si + 0.4-0.8um range; GPU backend approved (not yet started); requirements.txt added
+
+- Project owner requested `pillar_array.py`/`via_array.py` switch from a
+  flat `n=3.48` constant to real dispersive Si (`Material.from_nk_file`,
+  `NK_FILE/si_KLA.txt` -- same loader `tapered_trench.py` already uses)
+  and the 0.4-0.8um/401-point range, matching `tapered_trench.py`'s own
+  convention. Both files updated; `build_and_export_pillar.lsf` updated
+  to match (wavelength range, Si references switched to the project
+  owner's imported `si_KLA.txt` custom material).
+- [x] `build_and_export_via.lsf` (new) -- via hadn't gotten a full build
+  script yet (only the export-only `export_via_grating_power.lsf`
+  existed). Mirrors `build_and_export_pillar.lsf`'s now-confirmed-working
+  object convention exactly.
+- **Real, still-open finding**: re-measuring `NUM_ORDERS` convergence for
+  the new dispersive/short-wavelength regime found a genuine hard case --
+  at 420nm (where Si absorption is strong), R has not settled even at
+  `num_orders=289` (candidates 121/169/225/289 give 0.2415/0.2026/0.2750/0.2344,
+  no stable plateau). 550nm converges by 225. This is not yet resolved --
+  `NUM_ORDERS` for the final comparison is still open, to be revisited
+  before trusting any short-wavelength overlay numbers.
+- [x] `requirements.txt` (new) -- mirrors `pyproject.toml`'s dependency
+  lists as a plain-pip-compatible alternative; `pyproject.toml` stays
+  authoritative (ADR-038's own install-path decision unchanged).
+- [x] GPU/autodiff backend work **approved** by the project owner after
+  observing the above solve's real CPU runtime -- reopens Category 13
+  target 13.6's earlier "not granted" finding. PyTorch selected (this
+  session's recommendation, project owner deferred to "the best library").
+  **Not started** -- project owner confirmed letting the current CPU run
+  finish and continuing the pillar/via cross-validation takes priority.
+  `decisions.md` ADR-040, `phases.md` Phase 9 status line added.
+- [ ] **Open**: pillar/via Lumerical overlay comparison itself, and the
+  `NUM_ORDERS` short-wavelength convergence question above -- both still
+  pending as this entry is written.

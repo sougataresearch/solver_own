@@ -11,6 +11,10 @@ the comparison is recorded in -- this file is just the index.
 | `Thin_Film/Complex_Multi/` | `multistack_composite_grating.lsf` | Exports `grating_power` (`Rs_power`/`Ts_power`/`Rp_power`/`Tp_power`), summed over all diffraction orders, to `composite_grating_lumerical_RCWA.txt` | `structures/thin_film/multistack_composite_grating.py` — `decisions.md` ADR-034 |
 | `Thin_Film/Multi_layer/Incident45/` | `plot_R_linear_15_30deg.lsf` | Linear-polarization reflectance at 15/30 deg from the specular (n=0,m=0) order only | `structures/thin_film/custom_multistack.py` (`linear_15deg`/`linear_30deg` states) — `decisions.md` ADR-033 |
 | `Thin_Film/Multi_layer/Incident45/` | `plot_R_linear_and_pure_SP_15_30deg.lsf` | Same, plus the pure-S/pure-P curves for a visual sanity check | `structures/thin_film/custom_multistack.py` — `decisions.md` ADR-033 |
+| `Via/` | `build_pillar_structure.lsf` | Builds the pillar geometry + RCWA solver region only (no `run;`, no export) — project owner runs the solve themselves | `structures/via/pillar_array.py` — `decisions.md` ADR-039/ADR-040 |
+| `Via/` | `export_pillar_grating_power.lsf` | Exports `grating_power` (`Rs_power`/`Ts_power`/`Rp_power`/`Tp_power`), summed over all diffraction orders, to `pillar_lumerical_RCWA.txt` | `structures/via/pillar_array.py` — `decisions.md`'s Phase 4a Lumerical cross-validation ADR |
+| `Via/` | `build_via_structure.lsf` | Same build-only pattern, for the via structure | `structures/via/via_array.py` — `decisions.md` ADR-039/ADR-040 |
+| `Via/` | `export_via_grating_power.lsf` | Same export, for the via structure, to `via_lumerical_RCWA.txt` | `structures/via/via_array.py` — `decisions.md`'s Phase 4a Lumerical cross-validation ADR |
 
 **Two conventions worth knowing before writing a new one here:**
 - `grating_power`'s `Rs_power`/`Rp_power`/etc. attributes are

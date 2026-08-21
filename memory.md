@@ -5,7 +5,50 @@ of every substantive session — see `rules.md`'s AI Coding Rules, item 6.
 
 ## Current Project Status
 
-As of 2026-08-20 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 18,
+As of 2026-08-21 (ADR-040, GPU/autodiff backend work approved -- reopening
+Category 13 target 13.6's earlier "not granted" finding -- PyTorch
+selected as the library, but **not yet implemented**; project owner
+confirmed the pillar/via Lumerical cross-validation takes priority for
+now. Same session: `pillar_array.py`/`via_array.py` switched from a flat
+`n=3.48` constant to real dispersive Si (`NK_FILE/si_KLA.txt`) and the
+0.4-0.8um/401-point range, matching `tapered_trench.py`'s convention;
+`build_and_export_via.lsf` added (via previously had no full build
+script); `requirements.txt` added (mirrors `pyproject.toml`, which stays
+authoritative). **Real open finding, not yet resolved**: `NUM_ORDERS`
+convergence at the short-wavelength (~420nm), strongly-absorbing end of
+the new range has not settled even at 289 orders -- the pillar/via
+overlay comparison against the project owner's real Lumerical export
+(`OUTPUT_RCWA/Via/pillar_lumerical_RCWA.txt`, already received) is still
+pending this. See `decisions.md` ADR-040 and `progress_log.md`'s
+2026-08-21 entry), 2026-08-20 (ADR-039, `pillar_array.py`/`via_array.py` prepared for a
+Lumerical RCWA cross-validation -- the project owner asked to build 2D
+pillar/via structures and cross-validate against commercial RCWA, mirroring
+the trench/composite-grating precedent. Found and fixed a real convergence
+gap (`NUM_ORDERS` 7 -> 81 initially, then re-measured to 121 after
+`pillar_array.py`'s model changed -- see below), and a genuine physical
+finding along the way: a free-standing pillar (air both sides) shows sharp
+guided-mode/Fano resonances that make a single-wavelength convergence probe
+misleading; a Si growth substrate underneath measurably damps this. The
+project owner reviewed an actual Lumerical render of the free-standing
+version and pointed out a real pillar is essentially never fully
+free-standing -- `pillar_array.py` changed to grow the pillar on a Si
+substrate (reusing the pillar's own index, not an independent choice),
+re-measured convergence (121, not 81) and re-verified end to end
+(R+T=1.0000 to ~5e-13, R ranging a well-behaved 0.0004-0.286, 706 tests
+pass). The Lumerical-side build script was built from real evidence, not
+guessed: extracted the actual embedded construction script directly from
+`OUTPUT_RCWA/Trench/my_trench_0.3.fsp`'s binary (no Lumerical install
+needed) to confirm the project owner's own object convention -- a plain
+Rectangle (background) plus a Structure Group (patterned feature via a
+construction script) -- and iterated through several real Lumerical script
+errors live with the project owner (wrong `setglobalsource` property, wrong
+polarization property, materials referenced from the database by name
+rather than defined inline via script) until it builds cleanly. The actual
+cross-validation numbers are **still not yet available** -- pending the
+project owner running the finished script in Lumerical and sharing the
+exported `.txt`; see `decisions.md` ADR-039 and its two addenda for the
+full account, to be followed by a further addendum once real Lumerical
+output exists), 2026-08-20 (`COMMERCIAL_RCWA_ATOMIC_TARGETS.md` Category 18,
 targets 18.1-18.8 all done -- four new root-level docs, `theory.md`
 (18.1-18.3), `api_reference.md` (18.4), `tutorials.md` (18.5-18.7),
 `validation_guide.md` (18.8), all consolidations of already-implemented/

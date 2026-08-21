@@ -218,6 +218,13 @@ plan-mode scratch file) as phases complete.
   stress cases. 107 tests pass project-wide (101 prior + 6 new
   parametrized eigenoperator-oracle cases).
 
+  **Follow-up, 2026-08-20**: work toward closing the full-R/T-oracle gap
+  above started — `structures/via/pillar_array.py`/`via_array.py` prepared
+  for a Lumerical RCWA cross-validation (convergence fixed, `NUM_ORDERS`
+  7 -> 81; export/overlay scripts and a build-spec README ready). The
+  actual Lumerical run and agreement numbers are not yet available — see
+  `decisions.md` ADR-039, `progress_log.md`'s 2026-08-20 entry.
+
 ## Phase 4b — 2D-Periodic Patterned Layers, Near-Degenerate / Ill-Conditioned Cases — **DONE**
 
 - **Objectives**: stress-test Phase 4a's general eigensolver on the cases
@@ -481,6 +488,12 @@ plan-mode scratch file) as phases complete.
   alone.
 - **Dependencies**: Phases 2-8 (explicitly deferred until correctness is
   solid — see `decisions.md`).
+- **Status**: not started. Phase 8 (this phase's own gating dependency) is
+  now done, and the GPU-backend approval Category 13 target 13.6 sought
+  and didn't get has since been explicitly granted (`decisions.md` ADR-040,
+  2026-08-21, PyTorch selected) — but implementation itself has not begun;
+  the project owner confirmed continuing the pillar/via Lumerical
+  cross-validation work takes priority for now.
 
 ## Phase 10 — Structure Visualization (3D Preview) — **DONE**
 

@@ -9,12 +9,23 @@ The geometry mirrors a through-silicon-via (TSV) scatterometry target:
 Si bulk with air holes etched through it, as in the vendored
 `EMTutorial/Scatterometry/ThroughSiliconVia` JCMsuite reference case.
 
+Si is real dispersive `n,k` data (`NK_FILE/si_KLA.txt`, via
+`Material.from_nk_file`) rather than a flat constant, and the wavelength
+range is 0.4-0.8um/401 points -- matching `pillar_array.py`'s own updated
+convention (decisions.md ADR-039) and `structures/trench/tapered_trench.py`'s
+range, per the project owner's direct request to stop using a simplified
+constant index. The corresponding Lumerical build needs the *same*
+imported `si_KLA.txt` data as a custom material (not the built-in
+"Si (Silicon) - Palik" dataset, a materials-model mismatch already found
+and fixed once, ADR-036).
+
 Run with:  python structures/via/via_array.py
 """
 
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -24,6 +35,12 @@ from sougata_solver.layer import Layer
 from sougata_solver.materials import Material
 from sougata_solver.output_paths import run_output_dir, write_run_metadata
 from sougata_solver.simulation import Simulation
+from sougata_solver.sweep import avoid_rayleigh_wood_anomalies
+
+# Si_KLA.txt has columns: wavelength [nm], n, k -- same file/loader
+# structures/trench/tapered_trench.py and pillar_array.py already use.
+NK_DIR = Path(__file__).resolve().parents[3] / "NK_FILE"
+SI_NK_PATH = NK_DIR / "si_KLA.txt"
 
 # ============================================================================
 # EDIT: via geometry and materials
@@ -31,21 +48,30 @@ from sougata_solver.simulation import Simulation
 PERIOD = 0.7e-6          # lattice period (meters)
 VIA_RADIUS = 0.18e-6     # via (hole) radius (meters)
 THICKNESS = 0.46e-6      # via depth (meters)
-N_SUBSTRATE = 3.48       # substrate index (e.g. Si)
 N_VIA = 1.0              # via fill index (air)
 
 # ============================================================================
 # EDIT: incident light -- angle, polarization, order truncation
 # ============================================================================
 INCIDENT_ANGLE_DEG = 0.0
-NUM_ORDERS = 7            # 2D Fourier order truncation parameter
+# Re-measured after switching to real dispersive Si and the new 0.4-0.8um
+# range (see decisions.md ADR-039's addendum for the exact convergence scan
+# -- do not assume the old constant-index/0.5-1.5um value still applies).
+NUM_ORDERS = 81            # 2D Fourier order truncation parameter -- PLACEHOLDER, being re-measured
 S_AMPLITUDE = 1.0         # 1.0/0.0 = s-pol; 0.0/1.0 = p-pol
 P_AMPLITUDE = 0.0
 
 # ============================================================================
 # EDIT: wavelength sweep (meters)
 # ============================================================================
-WAVELENGTHS = np.linspace(0.5e-6, 1.5e-6, 21)
+# 0.4-0.8um/401 points -- matches pillar_array.py's updated range and
+# structures/trench/tapered_trench.py's own convention. Any grid point
+# landing exactly on a Rayleigh/Wood's-anomaly wavelength for this
+# PERIOD/NUM_ORDERS/angle (troubleshooting.md's documented q==0 divide-by-
+# zero) is nudged automatically -- no manual per-range recomputation needed.
+WAVELENGTHS = avoid_rayleigh_wood_anomalies(
+    np.linspace(0.40e-6, 0.80e-6, 401), period=PERIOD, num_orders=NUM_ORDERS, theta=math.radians(INCIDENT_ANGLE_DEG)
+)
 
 OUTPUT_CSV = "output_via_RT.csv"
 
@@ -57,7 +83,9 @@ def build_geometry(period=None, via_radius=None, thickness=None):
     thickness = thickness if thickness is not None else THICKNESS
 
     air = Material("air", N_VIA**2)
-    substrate = Material("substrate", N_SUBSTRATE**2)
+    # Real dispersive Si, not a flat n=3.48 constant -- same NK_FILE/loader
+    # tapered_trench.py and pillar_array.py already use.
+    substrate = Material.from_nk_file("Si", str(SI_NK_PATH), "nm")
 
     # Via (air hole) centered in the unit cell at (period/2, period/2)
     pattern = Pattern(
@@ -101,7 +129,7 @@ def main() -> None:
         period_m=PERIOD,
         via_radius_m=VIA_RADIUS,
         thickness_m=THICKNESS,
-        n_substrate=N_SUBSTRATE,
+        substrate_material="Si (dispersive, NK_FILE/si_KLA.txt)",
         n_via=N_VIA,
         incident_angle_deg=INCIDENT_ANGLE_DEG,
         num_orders=NUM_ORDERS,

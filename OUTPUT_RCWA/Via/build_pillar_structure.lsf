@@ -1,0 +1,115 @@
+########################################################################
+# Builds a circular Si pillar GROWN ON A Si SUBSTRATE (air above, Si
+# substrate below), matching sougata_solver's
+# structures/via/pillar_array.py's transmission=substrate model
+# (decisions.md ADR-039). Substrate reuses the same Si material as the
+# pillar -- not a new arbitrary material.
+#
+# BUILD ONLY -- no run;, no grating_power export. Pair this with the
+# existing export_pillar_grating_power.lsf (run this first, click Run in
+# Lumerical yourself, then run that export script).
+#
+# Si is real dispersive n,k data (NK_FILE/si_KLA.txt on the sougata_solver
+# side; your own imported "Si_KLA" custom material here), not a flat
+# n=3.48 constant. Wavelength range 0.40-0.80um/401 points, matching
+# pillar_array.py's own WAVELENGTHS = linspace(0.40e-6, 0.80e-6, 401).
+#
+# Uses the SAME object convention as the real trench build
+# (my_trench_0.3.fsp): one plain Rectangle for the background material,
+# plus one Structure Group holding the patterned feature via a
+# construction script -- confirmed working (object tree built exactly
+# as expected: Air_bg, Si_substrate, Pillar > pillar_0, RCWA).
+#
+# Corresponds to sougata_solver's structures/via/pillar_array.py
+# (project: sougata_solver, decisions.md ADR-039).
+########################################################################
+
+newproject;
+
+# ------------------------------------------------------------------
+# RCWA solver region == the 2D unit cell. Square lattice, period 0.7um.
+# z max=0.46e-6 bounds the top of the patterned layer -- air above is
+# inferred since nothing is drawn past it. z min is nudged to -0.05e-6
+# (slightly below the patterned layer's z=0 bottom face, into the Si
+# substrate below) rather than sitting exactly at 0 -- per
+# decisions.md ADR-034's confirmed finding that Lumerical needs the
+# region boundary to actually sample the medium to correctly infer a
+# semi-infinite half-space.
+# ------------------------------------------------------------------
+addrcwa;
+set("name","RCWA");
+set("x",0);
+set("x span",0.7e-6);
+set("y",0);
+set("y span",0.7e-6);
+set("z min",-0.05e-6);
+set("z max",0.46e-6);
+
+setglobalsource("wavelength start",0.40e-6);
+setglobalsource("wavelength stop",0.80e-6);
+select("RCWA");
+set("frequency points",401);   # matches pillar_array.py's WAVELENGTHS = linspace(0.40e-6, 0.80e-6, 401)
+set("angle theta",0);
+set("angle phi",0);
+
+set("max number ku",17);
+set("max number kv",17);       # (2*17+1)^2 = 1225 total -- over-provisioned; see OUTPUT_RCWA/Via/README.md for why this doesn't map 1:1 to sougata_solver's circular NUM_ORDERS
+
+# ------------------------------------------------------------------
+# Air background rectangle -- fills the whole unit cell footprint at the
+# pillar layer's z-range, same role Si_slab plays in the trench file
+# (a plain, ungrouped Rectangle).
+# ------------------------------------------------------------------
+addrect;
+set("name","Air_bg");
+set("x",0);
+set("x span",0.7e-6);
+set("y",0);
+set("y span",0.7e-6);
+set("z",0);
+set("z span",0.46e-6);
+set("material","etch");   # confirmed constant, index=1 (air)
+
+# ------------------------------------------------------------------
+# Si substrate rectangle -- the pillar's growth substrate. Extends from
+# z=0 (the patterned layer's bottom face) down to well past the RCWA
+# region's z min (-1e-6, comfortably beyond -0.05e-6), so Lumerical reads
+# it as a genuine semi-infinite half-space, not a finite block (same
+# mechanism ADR-034 confirmed).
+# ------------------------------------------------------------------
+addrect;
+set("name","Si_substrate");
+set("x",0);
+set("x span",0.7e-6);
+set("y",0);
+set("y span",0.7e-6);
+set("z min",-1e-6);
+set("z max",0);
+set("material","Si_KLA");   # your imported real dispersive Si -- MUST NOT be "Si (Silicon) - Palik", a different dataset that reproduces ADR-036's already-found-and-fixed mismatch
+
+# ------------------------------------------------------------------
+# Pillar structure group -- mirrors Etch's role, one child instead of a
+# 32-slice loop since this structure has no taper. deleteall; at the top
+# is the same idempotent-rerun pattern the trench group uses.
+# ------------------------------------------------------------------
+addstructuregroup;
+set("name","Pillar");
+set("x",0);
+set("y",0);
+set("z",0);
+set("construction group",1);
+set("script",
+    "deleteall;" + endl +
+    "radius = 0.18e-6;" + endl +
+    "thickness = 0.46e-6;" + endl +
+    "addcircle;" + endl +
+    "set('name','pillar_0');" + endl +
+    "set('x',0);" + endl +
+    "set('y',0);" + endl +
+    "set('z',thickness/2);" + endl +
+    "set('z span',thickness);" + endl +
+    "set('radius',radius);" + endl +
+    "set('material','Si_KLA');"
+);
+
+save("pillar_array_lumerical.fsp");

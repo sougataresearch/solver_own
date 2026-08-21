@@ -2090,3 +2090,282 @@ wavelengths) before trusting the full rewrite; 706 tests pass project-wide
   addendum recording this ADR without rewriting its existing "no PyPI/
   Docker" scope note. No `src/sougata_solver/` change; no dependency added;
   no test behavior change.
+
+## ADR-039: `pillar_array.py`/`via_array.py` prepared for a Lumerical RCWA cross-validation (Phase 4a's own flagged R/T-oracle gap) — sougata_solver side ready, Lumerical run still pending
+
+- **Decision**: requested directly by the project owner ("make 2D structure
+  like pillar and via similar like 1d trench structure ... and match and
+  overlap their outputs" against "commercial RCWA ansys solver"). Confirmed
+  via `AskUserQuestion` that both `pillar_array.py` (solid pillar) and
+  `via_array.py` (etched via) should be covered, and that — unlike
+  `tapered_trench.py` (ADR-035/036) — no real Lumerical `.fsp` file exists
+  for this structure to transcribe; instead, a Lumerical geometry should be
+  built from scratch to match `sougata_solver`'s own already-shipped
+  constants, the same approach ADR-034 used for
+  `multistack_composite_grating.py`. This closes exactly the gap Phase 4a's
+  own status note in `phases.md` flagged as open: an eigenoperator oracle
+  (`RigorousCoupledWaveAnalysis.jl`) already validates the 2D solver's
+  eigenvalues, but "a full external R/T oracle... is still an open gap."
+- **Convergence finding, measured directly before picking `NUM_ORDERS`, not
+  assumed**: the shipped `NUM_ORDERS=7` in both scripts was never validated
+  for convergence. A harmonic-order sweep (`num_orders=9/25/49/81/121/169/225`)
+  at the scripts' actual geometry (period=0.7um, radius=0.18um,
+  thickness=0.46um, n=3.48) showed `via_array.py` converges cleanly by
+  `num_orders=49` (`sweep.find_convergence_index`, tolerance=1e-2), but a
+  single-wavelength probe on `pillar_array.py` gave wildly non-monotonic R
+  values (0.198 -> 0.089 -> 0.942 -> 0.80 -> ... up to `num_orders=225`) that
+  looked like outright non-convergence. Investigated rather than
+  worked around: a full R(lambda) spectral scan at `num_orders=25/49/81`
+  showed the freestanding pillar (a high-index dielectric slab suspended in
+  air on both sides) supports genuine sharp, narrow guided-mode/Fano-type
+  resonances across the swept range — the single-wavelength probe had
+  landed on a steep resonance slope, where the resonance's exact spectral
+  position (not the overall physics) is sensitive to order count. The
+  overall R(lambda) envelope shape stabilizes by `num_orders=81`, matching
+  `tests/test_harmonic_convergence_matrix.py`'s own "true plateau only from
+  81" finding for its structurally similar 2D-pillar moderate-contrast
+  fixture. Both scripts now use `NUM_ORDERS=81`, documented in-file with
+  this finding rather than left as an unexplained magic number.
+- **Also fixed**: neither script previously guarded its wavelength grid
+  against exact Rayleigh/Wood's-anomaly points (`troubleshooting.md`'s
+  documented `q==0` divide-by-zero) the way `tapered_trench.py` already
+  does — both now wrap `WAVELENGTHS` in `sweep.avoid_rayleigh_wood_anomalies`,
+  same convention. Wavelength resolution raised from 21 to 101 points over
+  the same 0.5-1.5um range, since the resonance finding above means a coarse
+  grid could miss real spectral features entirely. Re-run end to end after
+  both changes: R+T=1.0000 (to ~1e-13) at every one of 101 points for both
+  structures, no NaN, all 706 project-wide tests still pass, `ruff check`
+  clean.
+- **Lumerical side — prepared, not yet run (nothing fabricated per
+  `rules.md` AI Coding Rule 5)**: `OUTPUT_RCWA/Via/export_pillar_grating_power.lsf`/
+  `export_via_grating_power.lsf` (new, mirror the already-working
+  `grating_power`-export pattern from ADR-034/036 exactly) and
+  `postprocessing/overlay_pillar_vs_lumerical.py`/`overlay_via_vs_lumerical.py`
+  (new, mirror `overlay_tapered_trench_vs_lumerical.py`'s structure) are
+  ready to run once a matching Lumerical structure exists.
+  `OUTPUT_RCWA/Via/README.md` (new) gives the project owner the exact build
+  spec (geometry, constant-index materials rather than the dispersive Si
+  database — flagged specifically to avoid reproducing ADR-036's own
+  materials-mismatch finding — and the semi-infinite-substrate handling
+  ADR-034 required for the via case), plus an honest, unresolved scope
+  note: `sougata_solver`'s circular (`|k|`-magnitude) 2D order truncation
+  and Lumerical's per-axis "max number ku/kv" truncation are not the same
+  scheme, and no exact numeric correspondence between them was confirmed
+  (they coincided exactly for the 1D trench case in ADR-036, but that does
+  not generalize to 2D) — the README recommends over-provisioning
+  Lumerical's order count and confirming convergence independently, rather
+  than asserting an unverified "equivalent" number.
+- **Impact**: `structures/via/pillar_array.py`/`via_array.py` (NUM_ORDERS,
+  wavelength grid, docstring findings), two new `.lsf` export scripts, two
+  new overlay scripts, `OUTPUT_RCWA/Via/README.md`, `OUTPUT_RCWA/README.md`
+  index updated. No `src/sougata_solver/` change. Actual cross-validation
+  numbers (R/T max/RMS agreement) are **not yet available** and will need a
+  follow-up ADR addendum once the project owner builds the Lumerical
+  structure and shares the exported `.txt` files — this ADR records
+  preparation, not a completed comparison.
+
+**Addendum (same day): pillar build script rewritten to match the project
+owner's actual Lumerical object convention, confirmed by inspecting the
+real trench `.fsp` binary, not guessed a second time.** The project owner
+pointed out their standard RCWA-build pattern is "one rectangle structure
+and one group of structure," citing `OUTPUT_RCWA/Trench/my_trench_0.3.fsp`
+as the reference. Rather than guess what that meant, extracted printable
+strings directly from that file's binary (no Lumerical/lumapi install
+needed — same technique as ADR-035's `.fsp` spot-check) and found the
+actual embedded construction script: the object tree is
+`::model::Si_slab` (a plain Rectangle) + `::model::Etch` (a Structure
+Group whose `setupscript` property runs `deleteall; for(i=0;i<32;i=i+1){
+addrect; set("name","etch_"+num2str(i)); ...}` — the literal staircase-slice
+loop, confirming this is genuinely the same file ADR-036's cross-validation
+used). `build_and_export_pillar.lsf` rewritten to mirror this exactly: a
+plain `Air_bg` Rectangle plus a `Pillar` Structure Group whose construction
+script draws one `addcircle` child (no loop needed, since the pillar isn't
+tapered). Every geometry `set(...)` property name in the new script
+(`"x span"`/`"z span"` with a space, `"material"`) is copied verbatim from
+the real file's own script text, not reconstructed from memory — a
+strictly higher-confidence source than the first draft's general
+Lumerical-scripting-convention guesses. The two remaining unconfirmed
+pieces (the Structure Group's own script-*enabling* property
+names — `"construction group"`/`"script"`, reconstructed from the internal
+storage keys `constructionflag`/`setupscript` found in the same file, not
+independently verified) are flagged explicitly in both the script's
+comments and `OUTPUT_RCWA/Via/README.md`, per `rules.md` AI Coding Rule 1's
+spirit extended to this non-Python domain: distinguish what was directly
+confirmed from what is still a best-effort reconstruction.
+
+**Addendum (same day): `pillar_array.py` changed from free-standing to
+grown-on-substrate after the project owner reviewed an actual render, not
+a test failure.** Reviewing the built Lumerical structure's 3D view, the
+project owner pointed out that a real pillar device is essentially never
+fully free-standing (air both above and below) — it's normally grown on,
+or etched from, a substrate. Confirmed via `AskUserQuestion`: grown on a
+substrate, reusing the pillar's own index (`N_SUBSTRATE = N_PILLAR = 3.48`,
+not an independently chosen value — a pillar grown from/etched into the
+same wafer material it stands on, absent a stated reason to pick a
+different one). `build_geometry` now returns a `substrate` `Material` as
+`transmission` instead of `air`; module docstring and stack diagram
+updated.
+- **Re-measured convergence, not reused from the free-standing case**:
+  the free-standing case's `NUM_ORDERS=81` doesn't automatically transfer
+  to this different transmission boundary condition. A direct re-check
+  (`sweep.find_convergence_index`, tolerance=1e-2) at 600/1000/1400nm
+  needed `num_orders=121/121/49` respectively — `NUM_ORDERS=121` covers
+  all three. **A genuine physical finding worth recording**: the
+  substrate measurably damps the free-standing case's pathological sharp
+  Fano/guided-mode resonances — the new full 101-point sweep at
+  `num_orders=121` shows `R` ranging a well-behaved 0.0004-0.286
+  throughout (no near-unity spikes), versus the free-standing case's
+  resonances reaching >0.99 with wild single-wavelength sensitivity.
+  Re-verified end to end: R+T=1.0000 (~5e-13) at every point, no NaN, all
+  706 project-wide tests still pass, `ruff check` clean.
+- **Lumerical side updated to match**: `build_and_export_pillar.lsf` gains
+  a `Si_substrate` Rectangle (same index as the pillar) extending well
+  past the RCWA region's `z min`, with `z min` itself nudged slightly
+  below the patterned layer's bottom face rather than sitting exactly on
+  it — the same semi-infinite-inference mechanism ADR-034 already
+  confirmed, applied here for the first time to a *transmission-side*
+  substrate rather than composite-grating's original context. `ku`/`kv`
+  raised from 15 to 17 (1225 total) to keep headroom over the new
+  `NUM_ORDERS=121`.
+- **Materials changed from a per-object index override to named database
+  materials, per direct project-owner request, twice-corrected**: the
+  first attempt used `addmaterial("Dielectric")`/`setmaterial(...)` to
+  script constant-index materials into existence — the project owner
+  pointed out their actual convention (visible in `my_trench_0.3.fsp`'s
+  own construction script, `set("material","etch")`) is to *reference* an
+  already-existing named database material, never define one inline via
+  script. Removed the `addmaterial`/`setmaterial` calls entirely; the
+  script now assumes `Air_n1` (constant index 1.0) and `Si_n3p48`
+  (constant index 3.48) already exist in the Material Database, created
+  once via the GUI the same way `"etch"` already exists for the trench —
+  documented as a precondition, not a script step, in both the `.lsf`
+  file's comments and `OUTPUT_RCWA/Via/README.md`.
+- **Still open, unchanged from the base ADR**: the actual Lumerical run
+  and R/T agreement numbers.
+
+**Addendum (same day): structure builds cleanly; `"construction group"`/
+`"script"` reconstruction confirmed correct; two remaining material
+mistakes caught from a screenshot of the built object tree and render,
+not from a script error.** The project owner ran the (by-then-corrected)
+script and shared a screenshot: the object tree built exactly as
+predicted (`Air_bg`, `Si_substrate`, `Pillar` > `pillar_0`, `RCWA`), no
+error on either `set("construction group",1)` or `set("script",...)` --
+confirming those two previously-unverified property names were actually
+right. Two real problems remained, visible in the project owner's own
+edited copy of the script: (1) `Si_substrate` was set to
+`"Si (Silicon) - Palik"` (the dispersive database material) rather than
+the constant `Si_n3p48` -- exactly reproducing ADR-036's already-found-
+and-fixed materials mismatch had it gone uncaught; (2) the render showed
+one dominant solid block rather than a recognizable pillar-on-substrate
+shape, traced to `Si_substrate`'s depth (5um) being drawn at true scale
+against the pillar's 0.46um layer -- shrunk to 1um (still comfortably
+clearing the RCWA region's `z min=-0.05um`, so the solve is unaffected)
+purely so the render reads correctly. `Air_bg`'s material
+(`set("material","etch")` in the project owner's edit) was flagged as
+needing confirmation rather than corrected outright -- `"etch"` may
+already mean air/index=1 in their database (plausible, since it filled
+the trench's etched-away regions), not necessarily wrong. **Confirmed by
+the project owner**: `"etch"` is indeed constant, index=1 -- kept as-is
+(reused directly, no separate `"Air_n1"` material needed), and the
+project owner confirmed the resulting built structure (object tree +
+render) is the correct pillar-on-substrate structure. Geometry side is
+now considered settled; only the Lumerical solve + export + overlay
+comparison remains open.
+
+## ADR-040: GPU/autodiff backend work approved (reopens the Category 13 target 13.6 "not granted" decision), PyTorch selected as the library, implementation deferred
+
+- **Decision**: the project owner directly requested GPU support after
+  observing `pillar_array.py`'s dispersive-Si, high-order (`NUM_ORDERS=121`,
+  401 wavelength points) solve take a long time on CPU. This explicitly
+  reopens Category 13 target 13.6's earlier finding (see `memory.md`'s
+  Category 13 summary): "explicit approval for GPU/autodiff backend work
+  was sought from the project owner... and **not granted**." Per `rules.md`
+  AI Coding Rule 4 ("never add a... GPU/backend requirement... without it
+  being explicitly requested and recorded in `decisions.md`"), that
+  approval now exists and is recorded here.
+- **Library choice**: PyTorch, per this session's own recommendation
+  (confirmed via `AskUserQuestion` -- the project owner deferred to "the
+  best library"). Reasoning offered and not contested: PyTorch has the
+  widest install/GPU-driver compatibility on Windows specifically (the
+  project's actual dev environment) and a mature CPU fallback, versus
+  JAX's comparatively less-common Windows install experience -- both were
+  already named as Phase 9 candidates in `phases.md`/`references.md`
+  ("Meent"/"TORCWA" precedent) before this session.
+- **Scope note, explicitly NOT started this session**: the project owner
+  separately confirmed (same `AskUserQuestion`) that the *immediate*
+  priority is letting the already-running CPU solve finish and continuing
+  the pillar/via Lumerical cross-validation, not pausing to begin the GPU
+  rewrite now. **This ADR records the approval and library decision only**
+  -- no `src/sougata_solver/` code has been written toward it. A real
+  speedup requires batching many wavelength points into one vectorized
+  eigendecomposition call (GPUs gain little from replacing a single
+  per-wavelength dense eigensolve with an equivalent GPU call one at a
+  time) -- genuinely new numerical work for the general 2D patterned case,
+  distinct from and larger than Category 13 target 13.4's existing
+  `vectorized.py` (which is narrowly scoped to uniform-isotropic/thin-film
+  stacks only, `num_orders=1`, and explicitly raises on any patterned
+  layer). Per `rules.md`'s Performance Requirements, any such vectorized/
+  GPU path must be validated against the existing CPU path for numerical
+  equivalence before being trusted, the same discipline ADR-023 already
+  applied to the thin-film vectorized path.
+- **Impact**: `requirements.txt` (new, mirrors `pyproject.toml`'s
+  dependency lists as a plain-pip-compatible alternative -- `pyproject.toml`
+  remains authoritative per ADR-038's own install-path decision) does
+  **not** yet list `torch` -- adding it is deferred to when the actual
+  implementation work starts, not speculatively pre-added for a backend
+  that doesn't exist yet.
+
+**Addendum (same day): materials-mismatch root cause found (objects still
+referenced the old constant `Si_n3p48`, not the newly-imported dispersive
+material), and workflow split into build-only + export-only per the
+project owner's preference.** The first overlay comparison against real
+Lumerical output showed enormous disagreement (R max|diff|=0.85, RMS=0.20).
+Diagnosed by comparing energy conservation on both sides: `sougata_solver`'s
+R+T ranged 0.46-0.96 (expected -- real Si absorbs strongly at short
+wavelengths, confirmed directly against `si_KLA.txt`'s own `k` column,
+e.g. `k=0.387` at 400nm), while Lumerical's `Rs+Ts=1.000000` at every
+single wavelength -- the signature of a lossless material. The project
+owner shared a screenshot of the imported dispersive material's own
+`Re(eps)`/`Im(eps)` fit plot, which showed `Im(eps)` correctly rising to
+~4.2 near 400nm (converting to `k~0.38`, matching the file almost
+exactly) -- ruling out a bad import. Root cause found by re-reading the
+project owner's own live script: the `Si_substrate`/`pillar_0` objects'
+`material` property still referenced the old constant `"Si_n3p48"`, never
+updated to the newly-imported dispersive material -- the solve never
+touched real absorption data at all, consistent with both symptoms
+(lossless R+T=1, and R magnitudes matching a flat-index model rather than
+real Si's much higher/more dispersive index). Fix: reassign
+`Si_substrate`/`pillar_0`'s material to the actual imported material.
+**Naming correction**: this project's own material-database screenshot
+showed the material as `si_KLA` (lowercase s); the project owner's
+following message stated it as `Si_KLA` (capital S) -- deferred to the
+project owner's own most recent, explicit statement (`Si_KLA`) as the
+name actually used in the delivered script, since only they can see the
+literal dropdown text with certainty.
+- **Workflow split, per direct request**: the project owner runs Lumerical
+  themselves and doesn't want a combined build+run+export script --
+  `OUTPUT_RCWA/Via/build_pillar_structure.lsf` (new) is build-only (no
+  `run;`, no `grating_power` export), paired with the already-existing
+  `export_pillar_grating_power.lsf`.
+
+**Addendum (same day): the two-script drift this was warning about
+actually happened -- combined scripts deleted, `build_via_structure.lsf`
+added.** The project owner ran the older `build_and_export_pillar.lsf`
+(still referencing the stale lowercase `si_KLA` name and confirmed by
+direct inspection to have drifted out of sync with `build_pillar_structure.lsf`,
+which correctly used the project owner's actual `Si_KLA` naming) and
+reported the object tree looked wrong. Rather than patch the combined
+script's material name a second time and risk a third drift cycle,
+`build_and_export_pillar.lsf` and `build_and_export_via.lsf` were deleted
+outright (confirmed via `git log`/`git status` first -- neither was ever
+committed, `OUTPUT_RCWA/` is gitignored by default and these were never
+force-added, so deletion was not a recoverability risk). `build_via_structure.lsf`
+(new) completes the build-only pair for via, mirroring `build_pillar_structure.lsf`
+exactly. `OUTPUT_RCWA/Via/README.md` rewritten (it had also drifted --
+still described the old constant-n=3.48/0.5-1.5um model, the old
+`Si_n3p48` material, and the deleted combined-script filenames) to match
+current reality: build-only + export-only workflow, real dispersive
+`Si_KLA` material, 0.40-0.80um/401-point range, and an explicit note that
+`NUM_ORDERS` is still an open question pending the short-wavelength
+convergence investigation. `OUTPUT_RCWA/README.md`'s index table updated
+to list the two new build-only scripts.

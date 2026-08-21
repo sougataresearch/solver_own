@@ -1,0 +1,57 @@
+########################################################################
+# Export grating_power (total R/T vs wavelength, summed over all
+# diffraction orders) from the "RCWA" analysis group, for both
+# s- and p-polarization, to a comma-delimited text file that
+# sougata_solver's postprocessing/overlay_pillar_vs_lumerical.py
+# can read directly.
+#
+# Corresponds to sougata_solver's structures/via/pillar_array.py
+# (project: sougata_solver, decisions.md's Phase 4a Lumerical
+# cross-validation ADR).
+#
+# IMPORTANT:
+#  1. Delete any existing pillar_lumerical_RCWA.txt at the path below
+#     BEFORE running this (write() appends, not overwrites).
+#  2. Click "Run" on the RCWA simulation first (after any geometry edit)
+#     so getresult() reflects the current structure, not a stale run.
+#  3. If your RCWA analysis group isn't literally named "RCWA", change
+#     the string in the getresult() call below to match.
+########################################################################
+
+gp = getresult("RCWA","grating_power");
+lambda = getparameter(gp,"lambda");   # meters
+
+Rs = getattribute(gp,"Rs_power");
+Ts = getattribute(gp,"Ts_power");
+Rp = getattribute(gp,"Rp_power");
+Tp = getattribute(gp,"Tp_power");
+
+# Strip singleton dimensions (f, theta, phi) -- should leave
+# (num_wavelengths, num_n_orders, num_m_orders).
+Rs_p = pinch(Rs);
+Ts_p = pinch(Ts);
+Rp_p = pinch(Rp);
+Tp_p = pinch(Tp);
+
+? "size(Rs_p) = " + num2str(size(Rs_p));   # sanity check before trusting the sum below
+
+# Sum over m (dim 3) then n (dim 2) diffraction orders -> total R/T per wavelength.
+Rs_total = sum(sum(Rs_p,3),2);
+Ts_total = sum(sum(Ts_p,3),2);
+Rp_total = sum(sum(Rp_p,3),2);
+Tp_total = sum(sum(Tp_p,3),2);
+
+? "size(Rs_total) = " + num2str(size(Rs_total));   # expect (num_wavelengths, 1)
+
+########################################################################
+# Write out -- forward slashes, to avoid backslash-escape issues in
+# string literals. EDIT this path to wherever you want the file saved.
+########################################################################
+fname = "D:/Sougata/Via/pillar_lumerical_RCWA.txt";
+
+write(fname, "lambda_nm,Rs,Ts,Rp,Tp");
+for(i=1:length(lambda)){
+    write(fname, num2str(lambda(i)*1e9) + "," + num2str(Rs_total(i)) + "," + num2str(Ts_total(i))
+                 + "," + num2str(Rp_total(i)) + "," + num2str(Tp_total(i)));
+}
+? "Wrote " + num2str(length(lambda)) + " rows to " + fname;

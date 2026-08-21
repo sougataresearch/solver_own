@@ -1,0 +1,115 @@
+########################################################################
+# Builds a circular AIR via etched into a Si substrate (TSV-style),
+# matching sougata_solver's structures/via/via_array.py. Mirrors
+# build_pillar_structure.lsf's confirmed-working object convention
+# exactly (one plain Rectangle for the background material, plus one
+# Structure Group holding the patterned feature via a construction
+# script) -- same convention my_trench_0.3.fsp itself uses
+# (::model::Si_slab Rectangle + ::model::Etch Structure Group).
+#
+# BUILD ONLY -- no run;, no grating_power export. Pair this with the
+# existing export_via_grating_power.lsf (run this first, click Run in
+# Lumerical yourself, then run that export script).
+#
+# Si is real dispersive n,k data (NK_FILE/si_KLA.txt on the sougata_solver
+# side; your own imported "Si_KLA" custom material here, same one used
+# for the pillar build), not a flat constant. Wavelength range
+# 0.40-0.80um/401 points, matching via_array.py's own
+# WAVELENGTHS = linspace(0.40e-6, 0.80e-6, 401).
+#
+# Corresponds to sougata_solver's structures/via/via_array.py
+# (project: sougata_solver, decisions.md ADR-039).
+########################################################################
+
+newproject;
+
+# ------------------------------------------------------------------
+# RCWA solver region == the 2D unit cell. Square lattice, period 0.7um.
+# z max=0.46e-6 bounds the top of the patterned (via) layer -- air above
+# is inferred since nothing is drawn past it. z min is nudged to
+# -0.05e-6 (slightly below the patterned layer's z=0 bottom face, into
+# the Si substrate below) rather than sitting exactly at 0 -- per
+# decisions.md ADR-034's confirmed finding that Lumerical needs the
+# region boundary to actually sample the medium to correctly infer a
+# semi-infinite half-space.
+# ------------------------------------------------------------------
+addrcwa;
+set("name","RCWA");
+set("x",0);
+set("x span",0.7e-6);
+set("y",0);
+set("y span",0.7e-6);
+set("z min",-0.05e-6);
+set("z max",0.46e-6);
+
+setglobalsource("wavelength start",0.40e-6);
+setglobalsource("wavelength stop",0.80e-6);
+select("RCWA");
+set("frequency points",401);   # matches via_array.py's WAVELENGTHS = linspace(0.40e-6, 0.80e-6, 401)
+set("angle theta",0);
+set("angle phi",0);
+
+set("max number ku",17);
+set("max number kv",17);       # (2*17+1)^2 = 1225 total -- over-provisioned; see OUTPUT_RCWA/Via/README.md for why this doesn't map 1:1 to sougata_solver's circular NUM_ORDERS
+
+# ------------------------------------------------------------------
+# Si substrate rectangle -- the bulk material the via is etched into.
+# Fills the whole unit cell footprint at the patterned layer's z-range,
+# same role Si_slab plays in the trench file (a plain, ungrouped
+# Rectangle) -- NOT the same role as build_pillar_structure.lsf's
+# Air_bg, since here Si is the *background* (the via is what's carved
+# out of it), not the feature.
+# ------------------------------------------------------------------
+addrect;
+set("name","Si_bg");
+set("x",0);
+set("x span",0.7e-6);
+set("y",0);
+set("y span",0.7e-6);
+set("z",0);
+set("z span",0.46e-6);
+set("material","Si_KLA");   # your imported real dispersive Si -- MUST NOT be "Si (Silicon) - Palik", a different dataset that reproduces ADR-036's already-found-and-fixed mismatch
+
+# ------------------------------------------------------------------
+# Si substrate below the patterned layer -- semi-infinite, same
+# mechanism ADR-034 confirmed (extends well past the RCWA region's z
+# min so Lumerical reads it as a genuine half-space, not a finite
+# block). Same material as Si_bg above -- the via is etched into one
+# continuous piece of Si, not grown on a different one.
+# ------------------------------------------------------------------
+addrect;
+set("name","Si_substrate");
+set("x",0);
+set("x span",0.7e-6);
+set("y",0);
+set("y span",0.7e-6);
+set("z min",-1e-6);
+set("z max",0);
+set("material","Si_KLA");
+
+# ------------------------------------------------------------------
+# Via structure group -- the air hole etched into Si_bg, one child (no
+# taper, so no slice loop needed), same construction-group pattern
+# confirmed working for the pillar build.
+# ------------------------------------------------------------------
+addstructuregroup;
+set("name","Via");
+set("x",0);
+set("y",0);
+set("z",0);
+set("construction group",1);
+set("script",
+    "deleteall;" + endl +
+    "radius = 0.18e-6;" + endl +
+    "thickness = 0.46e-6;" + endl +
+    "addcircle;" + endl +
+    "set('name','via_0');" + endl +
+    "set('x',0);" + endl +
+    "set('y',0);" + endl +
+    "set('z',thickness/2);" + endl +
+    "set('z span',thickness);" + endl +
+    "set('radius',radius);" + endl +
+    "set('material','etch');"
+);
+
+save("via_array_lumerical.fsp");
