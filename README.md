@@ -462,10 +462,12 @@ sougata_solver/
 │   └── via/                        2D via/pillar arrays, tapered/elliptical/polygon
 │                                    pillars, field cross-sections, TSV/OCD sweeps
 │                                    (Phase 4/5/7, Category 4/11, done)
-└── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
-                                  output and derive Jones/Mueller matrices, ellipsometric
-                                  angles, field-intensity plots, and (planned) RI/thickness
-                                  extraction
+├── postprocessing/             YOU RUN THESE SECOND: take a structures/ script's raw
+│                                 output and derive Jones/Mueller matrices, ellipsometric
+│                                 angles, field-intensity plots, and (planned) RI/thickness
+│                                 extraction
+└── CHROMA_SHARING/            internal progress-meeting decks -- see
+                                  CHROMA_SHARING/README.md
 ```
 
 Folder-level READMEs with more detail:
@@ -474,7 +476,8 @@ Folder-level READMEs with more detail:
 [`structures/trench/README.md`](structures/trench/README.md) ·
 [`tests/README.md`](tests/README.md) ·
 [`profiling/README.md`](profiling/README.md) ·
-[`postprocessing/README.md`](postprocessing/README.md)
+[`postprocessing/README.md`](postprocessing/README.md) ·
+[`CHROMA_SHARING/README.md`](CHROMA_SHARING/README.md)
 
 ## Installation
 
